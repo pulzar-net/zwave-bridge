@@ -52,6 +52,7 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends qemu-user mosquitto file
       - name: Test and build
         env:
+          RUSTUP_TOOLCHAIN: ${{ env.NIGHTLY }}
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUNNER: qemu-aarch64
           CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUNNER: qemu-mipsel
           CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static -C link-self-contained=no
@@ -62,9 +63,9 @@ jobs:
           for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl mipsel-unknown-linux-musl; do
             std=()
             case "${target}" in mips*) std=(-Zbuild-std) ;; esac
-            cargo +${NIGHTLY} zigbuild test --workspace --target "${target}" "${std[@]}"
+            cargo-zigbuild test --workspace --target "${target}" "${std[@]}"
             case "${target}" in mips*) std=(-Zbuild-std=std,panic_abort) ;; esac
-            cargo +${NIGHTLY} zigbuild --release -p zwave-bridge -p zwave-sim --target "${target}" "${std[@]}"
+            cargo zigbuild --release -p zwave-bridge -p zwave-sim --target "${target}" "${std[@]}"
             for bin in zwave-bridge zwave-sim; do
               f="target/${target}/release/${bin}"
               file "${f}" | grep -q 'statically linked' || { file "${f}"; echo "${target}: ${bin} not static" >&2; exit 1; }

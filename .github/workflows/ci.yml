@@ -98,6 +98,7 @@ jobs:
       - name: Test under qemu, build, check static and size
         env:
           TARGET: ${{ matrix.target }}
+          RUSTUP_TOOLCHAIN: ${{ env.NIGHTLY }}
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUNNER: qemu-aarch64
           CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUNNER: qemu-mipsel
           CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static -C link-self-contained=no
@@ -106,9 +107,9 @@ jobs:
           set -euo pipefail
           std=()
           case "${TARGET}" in mips*) std=(-Zbuild-std) ;; esac
-          cargo +${NIGHTLY} zigbuild test --workspace --target "${TARGET}" "${std[@]}"
+          cargo-zigbuild test --workspace --target "${TARGET}" "${std[@]}"
           case "${TARGET}" in mips*) std=(-Zbuild-std=std,panic_abort) ;; esac
-          cargo +${NIGHTLY} zigbuild --release -p zwave-bridge -p zwave-sim --target "${TARGET}" "${std[@]}"
+          cargo zigbuild --release -p zwave-bridge -p zwave-sim --target "${TARGET}" "${std[@]}"
           runner="CARGO_TARGET_$(echo "${TARGET}" | tr 'a-z-' 'A-Z_')_RUNNER"
           for bin in zwave-bridge zwave-sim; do
             f="target/${TARGET}/release/${bin}"
