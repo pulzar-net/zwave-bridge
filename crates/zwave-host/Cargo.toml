@@ -1,6 +1,30 @@
 [package]
 name = "zwave-host"
+description = "Z-Wave controller host stack: inclusion with S2 and SmartStart, interview, node store, wake-up queues, routing and NVM backup"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-publish = false
+repository.workspace = true
+authors.workspace = true
+keywords = ["zwave", "z-wave", "controller", "iot", "home-automation"]
+categories = ["embedded", "hardware-support", "network-programming"]
+
+[dependencies]
+zwave-serial.workspace = true
+zwave-security = { workspace = true, features = ["serde"] }
+zwave-cc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
+tracing.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+zwave-sim.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "test-util"] }
+tempfile = "3"
+
+[lints]
+workspace = true

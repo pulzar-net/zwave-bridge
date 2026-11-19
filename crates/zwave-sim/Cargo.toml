@@ -1,6 +1,29 @@
 [package]
 name = "zwave-sim"
+description = "A Z-Wave Serial API controller simulator with simulated nodes (S0, S2, sleeping, SmartStart), for testing host stacks without hardware"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-publish = false
+repository.workspace = true
+authors.workspace = true
+keywords = ["zwave", "z-wave", "simulator", "testing"]
+categories = ["development-tools::testing", "simulation"]
+
+[[bin]]
+name = "zwave-sim"
+path = "src/bin/zwave-sim.rs"
+
+[dependencies]
+zwave-serial.workspace = true
+zwave-security.workspace = true
+zwave-cc.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "io-util", "io-std", "sync", "time", "macros"] }
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
+
+[lints]
+workspace = true

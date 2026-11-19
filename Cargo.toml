@@ -19,7 +19,7 @@ repository = "https://github.com/pulzar-net/zwave-bridge"
 authors = ["Pulzar <oss@pulzr.net>"]
 
 [workspace.dependencies]
-zwave-serial = { path = "crates/zwave-serial", version = "0.1.0" }
+zwave-serial = { path = "crates/zwave-serial", version = "0.1.0", default-features = false }
 zwave-security = { path = "crates/zwave-security", version = "0.1.0" }
 zwave-cc = { path = "crates/zwave-cc", version = "0.1.0" }
 zwave-host = { path = "crates/zwave-host", version = "0.1.0" }

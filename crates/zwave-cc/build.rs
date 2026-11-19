@@ -514,6 +514,9 @@ fn gen_cc(out: &mut String, cc: &CcDef) {
         cc.id
     )
     .unwrap();
+    if cc.id <= 0xff {
+        writeln!(out, "    /// Command class id as the one byte it is on the wire.\n    pub const ID8: u8 = {:#04x};", cc.id).unwrap();
+    }
     writeln!(
         out,
         "    /// Highest version these definitions cover.\n    pub const VERSION: u8 = {};\n",
