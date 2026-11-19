@@ -41,7 +41,8 @@ impl Drop for Broker {
     }
 }
 
-async fn broker(dir: &std::path::Path) -> Option<Broker> {
+/// Starts mosquitto on a free port. `Err` carries why it did not come up.
+async fn broker(dir: &std::path::Path) -> Option<Result<Broker, String>> {
     let bin = mosquitto()?;
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -51,25 +52,51 @@ async fn broker(dir: &std::path::Path) -> Option<Broker> {
     let conf = dir.join("mosquitto.conf");
     std::fs::write(
         &conf,
-        format!("listener {port} 127.0.0.1\nallow_anonymous true\npersistence false\n"),
+        format!(
+            "listener {port} 127.0.0.1\nallow_anonymous true\npersistence false\nlog_dest stderr\n"
+        ),
     )
     .unwrap();
-    let child = tokio::process::Command::new(bin)
+    let mut child = match tokio::process::Command::new(&bin)
         .arg("-c")
         .arg(&conf)
+        .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .ok()?;
-    for _ in 0..100 {
+    {
+        Ok(c) => c,
+        Err(e) => return Some(Err(format!("{}: {e}", bin.display()))),
+    };
+    for _ in 0..200 {
         if tokio::net::TcpStream::connect(("127.0.0.1", port))
             .await
             .is_ok()
         {
-            return Some(Broker { child, port });
+            return Some(Ok(Broker { child, port }));
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            let mut err = String::new();
+            if let Some(mut e) = child.stderr.take() {
+                use tokio::io::AsyncReadExt;
+                let _ = e.read_to_string(&mut err).await;
+            }
+            return Some(Err(format!(
+                "{} exited with {status}: {err}",
+                bin.display()
+            )));
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    None
+    let _ = child.start_kill();
+    let mut err = String::new();
+    if let Some(mut e) = child.stderr.take() {
+        use tokio::io::AsyncReadExt;
+        let _ = tokio::time::timeout(Duration::from_secs(1), e.read_to_string(&mut err)).await;
+    }
+    Some(Err(format!(
+        "{} did not listen on {port} within 10 s: {err}",
+        bin.display()
+    )))
 }
 
 async fn next(
@@ -97,12 +124,16 @@ fn js(p: &[u8]) -> Value {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn include_s2_node_over_mqtt_and_get_a_sensor_report() {
     let dir = tempfile::tempdir().unwrap();
-    let Some(b) = broker(dir.path()).await else {
-        if std::env::var("ZWAVE_BRIDGE_REQUIRE_MQTT").as_deref() == Ok("1") {
-            panic!("mosquitto is required but was not found");
+    let b = match broker(dir.path()).await {
+        Some(Ok(b)) => b,
+        Some(Err(e)) => panic!("mosquitto: {e}"),
+        None => {
+            if std::env::var("ZWAVE_BRIDGE_REQUIRE_MQTT").as_deref() == Ok("1") {
+                panic!("mosquitto is required but was not found");
+            }
+            eprintln!("skipped: no mosquitto");
+            return;
         }
-        eprintln!("skipped: no mosquitto");
-        return;
     };
 
     // The test's own MQTT client.
