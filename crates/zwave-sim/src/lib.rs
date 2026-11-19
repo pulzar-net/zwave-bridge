@@ -44,6 +44,8 @@ pub struct SimConfig {
     pub home_id: u32,
     /// Size of the simulated NVM image.
     pub nvm_size: usize,
+    /// Pause between frames the simulator sends, so a host reads them one by one.
+    pub frame_gap: Duration,
 }
 
 impl Default for SimConfig {
@@ -51,6 +53,7 @@ impl Default for SimConfig {
         SimConfig {
             home_id: 0xc0ff_ee01,
             nvm_size: 4096,
+            frame_gap: Duration::from_millis(2),
         }
     }
 }
@@ -118,6 +121,16 @@ impl Simulator {
         self
     }
 
+    /// Adds a node that is already in the network (insecure), as if included earlier.
+    pub fn with_joined_node(mut self, spec: NodeSpec) -> Self {
+        let mut n = SimNode::new(spec);
+        n.join(self.next_id, self.cfg.home_id);
+        n.lifeline = vec![1];
+        self.next_id += 1;
+        self.nodes.push(n);
+        self
+    }
+
     /// Serves `port` until it closes; control the simulation with the handle.
     pub fn spawn<P: Port>(self, port: P) -> SimHandle {
         let (tx, rx) = mpsc::channel(64);
@@ -139,6 +152,8 @@ impl Simulator {
 
     async fn run(mut self, port: Box<dyn PortBox>, mut rx: mpsc::Receiver<Cmd>) {
         let mut framed = Framed::new(port, FrameCodec::default());
+        // Without a handle the simulator still serves its port.
+        let mut commands_open = true;
         loop {
             let out: Vec<DataFrame> = tokio::select! {
                 f = framed.next() => match f {
@@ -160,10 +175,10 @@ impl Simulator {
                         vec![]
                     }
                 },
-                c = rx.recv() => match c {
+                c = rx.recv(), if commands_open => match c {
                     Some(Cmd::Attach(p)) => { framed = Framed::new(p, FrameCodec::default()); vec![] }
                     Some(c) => self.command(c),
-                    None => return,
+                    None => { commands_open = false; vec![] }
                 },
             };
             for f in out {
@@ -171,7 +186,11 @@ impl Simulator {
                     break;
                 }
                 // Let the host read and acknowledge before the next frame.
-                tokio::time::sleep(Duration::from_millis(2)).await;
+                if self.cfg.frame_gap.is_zero() {
+                    tokio::task::yield_now().await;
+                } else {
+                    tokio::time::sleep(self.cfg.frame_gap).await;
+                }
             }
         }
     }

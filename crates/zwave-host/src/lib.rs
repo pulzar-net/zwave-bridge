@@ -31,7 +31,9 @@ mod nvm;
 pub mod store;
 pub mod values;
 
-pub use controller::{Controller, ControllerInfo, HostConfig, Topology, TopologyNode};
+pub use controller::{
+    Controller, ControllerInfo, Events, HostConfig, Topology, TopologyNode, MAX_PENDING_EVENTS,
+};
 pub use inclusion::{GrantPolicy, InclusionOptions, InclusionResult};
 pub use node::{NodeRecord, NodeStatus};
 pub use values::{ValueId, ValueKind, ValueUpdate};

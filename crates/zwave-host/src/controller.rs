@@ -9,7 +9,7 @@ use crate::values;
 use crate::{Error, Event, NetworkKeys, NodeId};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot, Notify};
@@ -25,6 +25,28 @@ use zwave_serial::message::{
 };
 use zwave_serial::port::Port;
 use zwave_serial::{DataFrame, FunctionId as F, Request, SerialApi};
+
+/// Events kept for a consumer that has fallen behind before new ones are dropped.
+pub const MAX_PENDING_EVENTS: usize = 16 * 1024;
+
+/// The stream of [`Event`]s from a controller. Read it continuously; events
+/// beyond [`MAX_PENDING_EVENTS`] unread ones are dropped.
+#[derive(Debug)]
+pub struct Events {
+    rx: mpsc::UnboundedReceiver<Event>,
+    pending: Arc<AtomicUsize>,
+}
+
+impl Events {
+    /// The next event; `None` once the controller has stopped.
+    pub async fn recv(&mut self) -> Option<Event> {
+        let e = self.rx.recv().await;
+        if e.is_some() {
+            self.pending.fetch_sub(1, Ordering::Relaxed);
+        }
+        e
+    }
+}
 
 /// Largest command class frame sent in one SendData before Transport Service splits it.
 pub const MAX_SEND_PAYLOAD: usize = 46;
@@ -208,7 +230,8 @@ pub(crate) struct Inner {
     pub(crate) keypair: KeyPair,
     waiters: Mutex<Vec<Waiter>>,
     next_waiter: AtomicU32,
-    events: mpsc::Sender<Event>,
+    events: mpsc::UnboundedSender<Event>,
+    pending_events: Arc<AtomicUsize>,
     dirty: Notify,
     store_failed: Mutex<Option<String>>,
     node_locks: Mutex<HashMap<NodeId, Arc<tokio::sync::Mutex<()>>>>,
@@ -256,10 +279,7 @@ impl Controller {
     /// Initializes the controller on `port`, loads the store, starts the
     /// dispatcher and resumes interviews. Events arrive on the returned
     /// channel; read it, or events are dropped when it fills.
-    pub async fn start<P: Port>(
-        port: P,
-        cfg: HostConfig,
-    ) -> Result<(Controller, mpsc::Receiver<Event>), Error> {
+    pub async fn start<P: Port>(port: P, cfg: HostConfig) -> Result<(Controller, Events), Error> {
         let (api, unsolicited) = SerialApi::start(port, cfg.serial.clone());
         let t = Duration::from_secs(2);
         let caps = SerialApiCapabilities::parse(
@@ -402,7 +422,12 @@ impl Controller {
             region,
             nodes: nodes.clone(),
         };
-        let (etx, erx) = mpsc::channel(1024);
+        let (etx, erx) = mpsc::unbounded_channel();
+        let pending_events = Arc::new(AtomicUsize::new(0));
+        let erx = Events {
+            rx: erx,
+            pending: pending_events.clone(),
+        };
         let inner = Arc::new(Inner {
             api,
             cfg,
@@ -416,6 +441,7 @@ impl Controller {
             waiters: Mutex::new(Vec::new()),
             next_waiter: AtomicU32::new(1),
             events: etx,
+            pending_events,
             dirty: Notify::new(),
             store_failed: Mutex::new(None),
             node_locks: Mutex::new(HashMap::new()),
@@ -537,8 +563,12 @@ impl Controller {
     }
 
     pub(crate) fn emit(&self, e: Event) {
-        if let Err(mpsc::error::TrySendError::Full(e)) = self.inner.events.try_send(e) {
-            warn!("event dropped, consumer is not keeping up: {e:?}");
+        if self.inner.pending_events.load(Ordering::Relaxed) >= MAX_PENDING_EVENTS {
+            warn!("event dropped, the consumer is not reading events: {e:?}");
+            return;
+        }
+        if self.inner.events.send(e).is_ok() {
+            self.inner.pending_events.fetch_add(1, Ordering::Relaxed);
         }
     }
 

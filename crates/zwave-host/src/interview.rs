@@ -75,7 +75,6 @@ impl Controller {
             }
         })?;
         self.emit(Event::InterviewStage { node, stage });
-        self.emit(Event::NodeUpdated { node });
         Ok(())
     }
 

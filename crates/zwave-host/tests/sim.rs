@@ -3,8 +3,8 @@
 //! backup and a restart that resumes from the store.
 
 use std::time::Duration;
-use tokio::sync::mpsc::Receiver;
 use zwave_host::node::{InterviewStage, NodeStatus};
+use zwave_host::Events;
 use zwave_host::{
     Controller, Event, GrantPolicy, HostConfig, InclusionOptions, NetworkKeys, SecurityClass,
     ValueId, ValueKind,
@@ -38,10 +38,7 @@ fn config(keys: NetworkKeys, dir: &std::path::Path) -> HostConfig {
     c
 }
 
-async fn start(
-    keys: NetworkKeys,
-    dir: &std::path::Path,
-) -> (Controller, Receiver<Event>, SimHandle) {
+async fn start(keys: NetworkKeys, dir: &std::path::Path) -> (Controller, Events, SimHandle) {
     let (host, dev) = tokio::io::duplex(16 * 1024);
     let h = sim().spawn(dev);
     let (c, ev) = Controller::start(host, config(keys, dir))
@@ -51,11 +48,7 @@ async fn start(
 }
 
 /// Reads events until `f` picks one, failing after `T`.
-async fn expect<R>(
-    ev: &mut Receiver<Event>,
-    what: &str,
-    mut f: impl FnMut(&Event) -> Option<R>,
-) -> R {
+async fn expect<R>(ev: &mut Events, what: &str, mut f: impl FnMut(&Event) -> Option<R>) -> R {
     let deadline = tokio::time::Instant::now() + T;
     loop {
         match tokio::time::timeout_at(deadline, ev.recv()).await {
@@ -72,7 +65,7 @@ async fn expect<R>(
 
 async fn include(
     c: &Controller,
-    ev: &mut Receiver<Event>,
+    ev: &mut Events,
     h: &SimHandle,
     name: &str,
     opts: InclusionOptions,
@@ -87,7 +80,7 @@ async fn include(
     task.await.unwrap().expect("inclusion")
 }
 
-async fn interviewed(ev: &mut Receiver<Event>, node: u16) {
+async fn interviewed(ev: &mut Events, node: u16) {
     expect(ev, "interview completed", |e| {
         matches!(e, Event::InterviewCompleted { node: n } if *n == node).then_some(())
     })
