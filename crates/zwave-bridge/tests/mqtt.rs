@@ -42,24 +42,18 @@ impl Drop for Broker {
 }
 
 /// Starts mosquitto on a free port. `Err` carries why it did not come up.
-async fn broker(dir: &std::path::Path) -> Option<Result<Broker, String>> {
+async fn broker() -> Option<Result<Broker, String>> {
     let bin = mosquitto()?;
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
         .unwrap()
         .port();
-    let conf = dir.join("mosquitto.conf");
-    std::fs::write(
-        &conf,
-        format!(
-            "listener {port} 127.0.0.1\nallow_anonymous true\npersistence false\nlog_dest stderr\n"
-        ),
-    )
-    .unwrap();
+    // No config file: distribution packages confine mosquitto (AppArmor) to
+    // reading its config from /etc, and `-p` alone allows anonymous clients.
     let mut child = match tokio::process::Command::new(&bin)
-        .arg("-c")
-        .arg(&conf)
+        .arg("-p")
+        .arg(port.to_string())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
         .spawn()
@@ -124,7 +118,7 @@ fn js(p: &[u8]) -> Value {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn include_s2_node_over_mqtt_and_get_a_sensor_report() {
     let dir = tempfile::tempdir().unwrap();
-    let b = match broker(dir.path()).await {
+    let b = match broker().await {
         Some(Ok(b)) => b,
         Some(Err(e)) => panic!("mosquitto: {e}"),
         None => {
