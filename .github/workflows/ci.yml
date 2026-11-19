@@ -60,7 +60,7 @@ jobs:
           cd fuzz
           for t in $(cargo +${NIGHTLY} fuzz list); do
             echo "::group::${t}"
-            cargo +${NIGHTLY} fuzz run "${t}" -- -max_total_time=30 -rss_limit_mb=1024
+            cargo +${NIGHTLY} fuzz run --target x86_64-unknown-linux-gnu "${t}" -- -max_total_time=30 -rss_limit_mb=1024
             echo "::endgroup::"
           done
 
