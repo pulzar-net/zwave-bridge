@@ -247,16 +247,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "drbg"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44913d87bbbdb21441377c82de3ec8cfb26249f64fc1486b842e3b03ca425294"
-dependencies = [
- "aes",
- "getrandom 0.4.3",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1231,7 +1221,6 @@ dependencies = [
  "cbc-mac",
  "ccm",
  "cmac",
- "drbg",
  "getrandom 0.3.4",
  "hex",
  "ofb",
