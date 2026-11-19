@@ -362,7 +362,7 @@ fn gen_command(out: &mut String, cc: &CcDef, cmd: &CmdDef) {
                 let is_bool = p.kind.as_deref() == Some("bool");
                 let v = if derived.contains(&p.name) {
                     let t = len_target(&p.name);
-                    present.push(format!("{} != 0", len_expr(&t)));
+                    present.push(format!("!{}.is_empty()", len_expr(&t).trim_end_matches(".len()")));
                     format!("({} as u8)", len_expr(&t))
                 } else if f.optional {
                     present.push(format!("self.{}.is_some()", p.name));
