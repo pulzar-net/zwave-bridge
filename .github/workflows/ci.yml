@@ -18,9 +18,11 @@ env:
   ZIG: 0.16.0
   ZIGBUILD: 0.24.1
 
+# Runs on GitHub-hosted runners. While the repository is private, the
+# repository variable RUNNER can point jobs at a self-hosted runner instead.
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +44,7 @@ jobs:
 
   # A short run of every fuzz target, so a parser that panics fails the build.
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +70,7 @@ jobs:
   # size budget checked. mipsel is a tier 3 target: std is built from source
   # on a pinned nightly and linked against zig's musl.
   cross:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
