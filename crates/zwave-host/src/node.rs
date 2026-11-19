@@ -191,7 +191,10 @@ pub struct NodeRecord {
 impl NodeRecord {
     /// A record for a new node.
     pub fn new(id: NodeId) -> Self {
-        let mut r = NodeRecord { id, ..Default::default() };
+        let mut r = NodeRecord {
+            id,
+            ..Default::default()
+        };
         r.endpoints.insert(0, Endpoint::default());
         r
     }
@@ -199,7 +202,9 @@ impl NodeRecord {
     /// The root endpoint.
     pub fn root(&self) -> &Endpoint {
         static EMPTY: std::sync::OnceLock<Endpoint> = std::sync::OnceLock::new();
-        self.endpoints.get(&0).unwrap_or_else(|| EMPTY.get_or_init(Endpoint::default))
+        self.endpoints
+            .get(&0)
+            .unwrap_or_else(|| EMPTY.get_or_init(Endpoint::default))
     }
 
     /// The root endpoint, mutable.

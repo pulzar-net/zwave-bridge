@@ -1,0 +1,72 @@
+[package]
+name = "zwave-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+bytes = "1"
+tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
+zwave-serial = { path = "../crates/zwave-serial", default-features = false }
+zwave-security = { path = "../crates/zwave-security" }
+zwave-cc = { path = "../crates/zwave-cc" }
+
+# Its own workspace, as cargo-fuzz expects.
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "serial_frames"
+path = "fuzz_targets/serial_frames.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "serial_messages"
+path = "fuzz_targets/serial_messages.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "command_classes"
+path = "fuzz_targets/command_classes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "transport_service"
+path = "fuzz_targets/transport_service.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "s2_frames"
+path = "fuzz_targets/s2_frames.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "s0_frames"
+path = "fuzz_targets/s0_frames.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "qr_and_dsk"
+path = "fuzz_targets/qr_and_dsk.rs"
+test = false
+doc = false
+bench = false

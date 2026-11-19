@@ -41,9 +41,14 @@ impl Default for StoreData {
 pub fn load(path: &Path) -> Result<StoreData, String> {
     match std::fs::read(path) {
         Ok(bytes) => {
-            let d: StoreData = serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+            let d: StoreData =
+                serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
             if d.version > VERSION {
-                return Err(format!("{}: store version {} is newer than this build", path.display(), d.version));
+                return Err(format!(
+                    "{}: store version {} is newer than this build",
+                    path.display(),
+                    d.version
+                ));
             }
             Ok(d)
         }
@@ -80,7 +85,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("zwave-store-{}", std::process::id()));
         let path = dir.join("nodes.json");
         assert_eq!(load(&path).unwrap(), StoreData::default());
-        let mut d = StoreData { home_id: Some(0xc0ffee01), ..Default::default() };
+        let mut d = StoreData {
+            home_id: Some(0xc0ffee01),
+            ..Default::default()
+        };
         d.nodes.insert(5, NodeRecord::new(5));
         save(&path, &d).unwrap();
         assert_eq!(load(&path).unwrap(), d);

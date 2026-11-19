@@ -2,7 +2,10 @@
 //! command class that carried them.
 
 use crate::NodeId;
-use zwave_cc::{basic, battery, binary_sensor, binary_switch, configuration, meter, multilevel_sensor, multilevel_switch, notification, tables, Command};
+use zwave_cc::{
+    basic, battery, binary_sensor, binary_switch, configuration, meter, multilevel_sensor,
+    multilevel_switch, notification, tables, Command,
+};
 
 /// Identifies one value of one node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -21,7 +24,9 @@ pub struct ValueId {
 impl ValueId {
     /// `<cc name>/<property>`, or with an endpoint `<cc name>/<property>/<endpoint>`.
     pub fn key(&self) -> String {
-        let cc = zwave_cc::cc_info(self.cc).map(|c| c.name.to_string()).unwrap_or_else(|| format!("{:#06x}", self.cc));
+        let cc = zwave_cc::cc_info(self.cc)
+            .map(|c| c.name.to_string())
+            .unwrap_or_else(|| format!("{:#06x}", self.cc));
         if self.endpoint == 0 {
             format!("{cc}/{}", self.property)
         } else {
@@ -86,34 +91,46 @@ fn unit_key(unit: &str, label: &str) -> String {
 
 /// The values a command carries. Commands that carry none give an empty list.
 pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdate> {
-    let id = |cc: u16, property: &str| ValueId { node, endpoint, cc, property: property.to_string() };
+    let id = |cc: u16, property: &str| ValueId {
+        node,
+        endpoint,
+        cc,
+        property: property.to_string(),
+    };
     let mut out = Vec::new();
     match cmd {
-        Command::Basic(basic::Command::Report(r)) if r.current <= 99 || r.current == 0xff => out.push(ValueUpdate {
-            id: id(basic::ID, "current"),
-            value: ValueKind::Level(r.current),
-            unit: None,
-            label: "Basic".into(),
-            writable: true,
-        }),
-        Command::BinarySwitch(binary_switch::Command::Report(r)) if r.current != 0xfe => out.push(ValueUpdate {
-            id: id(binary_switch::ID, "current"),
-            value: ValueKind::Bool(r.current != 0),
-            unit: None,
-            label: "Switch".into(),
-            writable: true,
-        }),
-        Command::MultilevelSwitch(multilevel_switch::Command::Report(r)) if r.current != 0xfe => out.push(ValueUpdate {
-            id: id(multilevel_switch::ID, "current"),
-            value: ValueKind::Level(r.current),
-            unit: None,
-            label: "Level".into(),
-            writable: true,
-        }),
+        Command::Basic(basic::Command::Report(r)) if r.current <= 99 || r.current == 0xff => out
+            .push(ValueUpdate {
+                id: id(basic::ID, "current"),
+                value: ValueKind::Level(r.current),
+                unit: None,
+                label: "Basic".into(),
+                writable: true,
+            }),
+        Command::BinarySwitch(binary_switch::Command::Report(r)) if r.current != 0xfe => {
+            out.push(ValueUpdate {
+                id: id(binary_switch::ID, "current"),
+                value: ValueKind::Bool(r.current != 0),
+                unit: None,
+                label: "Switch".into(),
+                writable: true,
+            })
+        }
+        Command::MultilevelSwitch(multilevel_switch::Command::Report(r)) if r.current != 0xfe => {
+            out.push(ValueUpdate {
+                id: id(multilevel_switch::ID, "current"),
+                value: ValueKind::Level(r.current),
+                unit: None,
+                label: "Level".into(),
+                writable: true,
+            })
+        }
         Command::MultilevelSensor(multilevel_sensor::Command::Report(r)) => {
             let t = tables::sensor_type(r.sensor_type);
             let scale = t.and_then(|t| t.scale(r.value.scale));
-            let name = t.map(|t| t.name.to_string()).unwrap_or_else(|| format!("sensor_{}", r.sensor_type));
+            let name = t
+                .map(|t| t.name.to_string())
+                .unwrap_or_else(|| format!("sensor_{}", r.sensor_type));
             out.push(ValueUpdate {
                 id: id(multilevel_sensor::ID, &name),
                 value: ValueKind::Number(r.value.to_f64()),
@@ -131,36 +148,62 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
             }
             let t = tables::meter_type(r.meter_type);
             let s = t.and_then(|t| t.scale(scale));
-            let tname = t.map(|t| t.name.to_string()).unwrap_or_else(|| format!("meter_{}", r.meter_type));
-            let skey = s.map(|s| unit_key(s.unit, s.label)).unwrap_or_else(|| format!("scale_{scale}"));
+            let tname = t
+                .map(|t| t.name.to_string())
+                .unwrap_or_else(|| format!("meter_{}", r.meter_type));
+            let skey = s
+                .map(|s| unit_key(s.unit, s.label))
+                .unwrap_or_else(|| format!("scale_{scale}"));
             out.push(ValueUpdate {
                 id: id(meter::ID, &format!("{tname}_{skey}")),
                 value: ValueKind::Number(r.value.to_f64()),
                 unit: s.map(|s| s.unit).filter(|u| !u.is_empty()),
-                label: format!("{} {}", t.map(|t| t.label).unwrap_or("Meter"), s.map(|s| s.label).unwrap_or("")).trim().to_string(),
+                label: format!(
+                    "{} {}",
+                    t.map(|t| t.label).unwrap_or("Meter"),
+                    s.map(|s| s.label).unwrap_or("")
+                )
+                .trim()
+                .to_string(),
                 writable: false,
             });
         }
         Command::Notification(notification::Command::Report(r)) => {
             if let (Some(ty), Some(event)) = (r.notification_type, r.event) {
                 let t = tables::notification_type(ty);
-                let tname = t.map(|t| t.name.to_string()).unwrap_or_else(|| format!("notification_{ty}"));
+                let tname = t
+                    .map(|t| t.name.to_string())
+                    .unwrap_or_else(|| format!("notification_{ty}"));
                 let ev = t.and_then(|t| t.event(event));
                 // Idle (event 0) clears the variable named in the first parameter byte.
                 let variable = if event == 0 {
-                    r.params.first().and_then(|&p| t.and_then(|t| t.event(p))).map(|e| e.variable)
+                    r.params
+                        .first()
+                        .and_then(|&p| t.and_then(|t| t.event(p)))
+                        .map(|e| e.variable)
                 } else {
                     ev.map(|e| e.variable)
                 };
                 let (prop, label) = match variable {
-                    Some(v) if !v.is_empty() => (format!("{tname}_{}", snake(v)), format!("{} {}", t.map(|t| t.label).unwrap_or(""), v)),
-                    _ => (format!("{tname}_event"), format!("{} event", t.map(|t| t.label).unwrap_or("Notification"))),
+                    Some(v) if !v.is_empty() => (
+                        format!("{tname}_{}", snake(v)),
+                        format!("{} {}", t.map(|t| t.label).unwrap_or(""), v),
+                    ),
+                    _ => (
+                        format!("{tname}_event"),
+                        format!("{} event", t.map(|t| t.label).unwrap_or("Notification")),
+                    ),
                 };
                 out.push(ValueUpdate {
                     id: id(notification::ID, &prop),
                     value: ValueKind::State {
                         id: event,
-                        label: if event == 0 { "Idle".into() } else { ev.map(|e| e.label.to_string()).unwrap_or_else(|| format!("Event {event}")) },
+                        label: if event == 0 {
+                            "Idle".into()
+                        } else {
+                            ev.map(|e| e.label.to_string())
+                                .unwrap_or_else(|| format!("Event {event}"))
+                        },
                     },
                     unit: None,
                     label: label.trim().to_string(),
@@ -179,7 +222,11 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
         Command::Battery(battery::Command::Report(r)) => {
             out.push(ValueUpdate {
                 id: id(battery::ID, "level"),
-                value: ValueKind::Number(if r.level == 0xff { 0.0 } else { f64::from(r.level.min(100)) }),
+                value: ValueKind::Number(if r.level == 0xff {
+                    0.0
+                } else {
+                    f64::from(r.level.min(100))
+                }),
                 unit: Some("%"),
                 label: "Battery".into(),
                 writable: false,
@@ -233,7 +280,13 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
 pub fn set_command(id: &ValueId, value: &ValueKind) -> Option<Command> {
     let level = |v: &ValueKind| -> Option<u8> {
         Some(match v {
-            ValueKind::Bool(b) => if *b { 0xff } else { 0 },
+            ValueKind::Bool(b) => {
+                if *b {
+                    0xff
+                } else {
+                    0
+                }
+            }
             ValueKind::Level(l) => *l,
             ValueKind::Number(n) if (0.0..=99.0).contains(n) => *n as u8,
             ValueKind::Number(n) if *n == 255.0 => 0xff,
@@ -241,9 +294,26 @@ pub fn set_command(id: &ValueId, value: &ValueKind) -> Option<Command> {
         })
     };
     match (id.cc, id.property.as_str()) {
-        (basic::ID, "current") => Some(basic::Set { value: level(value)? }.into()),
-        (binary_switch::ID, "current") => Some(binary_switch::Set { target: level(value)?.min(1) * 0xff, duration: None }.into()),
-        (multilevel_switch::ID, "current") => Some(multilevel_switch::Set { value: level(value)?, duration: None }.into()),
+        (basic::ID, "current") => Some(
+            basic::Set {
+                value: level(value)?,
+            }
+            .into(),
+        ),
+        (binary_switch::ID, "current") => Some(
+            binary_switch::Set {
+                target: level(value)?.min(1) * 0xff,
+                duration: None,
+            }
+            .into(),
+        ),
+        (multilevel_switch::ID, "current") => Some(
+            multilevel_switch::Set {
+                value: level(value)?,
+                duration: None,
+            }
+            .into(),
+        ),
         _ => None,
     }
 }
@@ -279,7 +349,13 @@ mod tests {
         let motion = Command::parse(&[0x71, 0x05, 0, 0, 0, 0xff, 0x07, 0x08, 0x00]).unwrap();
         let v = &from_command(3, 0, &motion)[0];
         assert_eq!(v.id.property, "home_security_motion_sensor_status");
-        assert_eq!(v.value, ValueKind::State { id: 8, label: "Motion detection".into() });
+        assert_eq!(
+            v.value,
+            ValueKind::State {
+                id: 8,
+                label: "Motion detection".into()
+            }
+        );
         let idle = Command::parse(&[0x71, 0x05, 0, 0, 0, 0xff, 0x07, 0x00, 0x01, 0x08]).unwrap();
         let v = &from_command(3, 0, &idle)[0];
         assert_eq!(v.id.property, "home_security_motion_sensor_status");
@@ -288,11 +364,32 @@ mod tests {
 
     #[test]
     fn set_commands() {
-        let id = ValueId { node: 2, endpoint: 0, cc: 0x25, property: "current".into() };
-        assert_eq!(set_command(&id, &ValueKind::Bool(true)).unwrap().encode(), vec![0x25, 0x01, 0xff]);
-        let id = ValueId { node: 2, endpoint: 0, cc: 0x26, property: "current".into() };
-        assert_eq!(set_command(&id, &ValueKind::Number(42.0)).unwrap().encode(), vec![0x26, 0x01, 42]);
-        let id = ValueId { node: 2, endpoint: 0, cc: 0x31, property: "air_temperature".into() };
+        let id = ValueId {
+            node: 2,
+            endpoint: 0,
+            cc: 0x25,
+            property: "current".into(),
+        };
+        assert_eq!(
+            set_command(&id, &ValueKind::Bool(true)).unwrap().encode(),
+            vec![0x25, 0x01, 0xff]
+        );
+        let id = ValueId {
+            node: 2,
+            endpoint: 0,
+            cc: 0x26,
+            property: "current".into(),
+        };
+        assert_eq!(
+            set_command(&id, &ValueKind::Number(42.0)).unwrap().encode(),
+            vec![0x26, 0x01, 42]
+        );
+        let id = ValueId {
+            node: 2,
+            endpoint: 0,
+            cc: 0x31,
+            property: "air_temperature".into(),
+        };
         assert!(set_command(&id, &ValueKind::Number(1.0)).is_none());
     }
 }

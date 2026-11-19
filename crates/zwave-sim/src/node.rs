@@ -3,8 +3,9 @@
 
 use std::collections::BTreeMap;
 use zwave_cc::{
-    association, basic, battery, binary_switch, manufacturer_specific, meter, multilevel_sensor, notification, security, security_2, supervision, version,
-    wake_up, zwave_plus_info, Command, Value,
+    association, basic, battery, binary_switch, manufacturer_specific, meter, multilevel_sensor,
+    notification, security, security_2, supervision, version, wake_up, zwave_plus_info, Command,
+    Value,
 };
 use zwave_security::dsk::Dsk;
 use zwave_security::kex::{bootstrap_keys, KeyPair, ECDH_CURVE25519, KEX_SCHEME_1};
@@ -59,7 +60,16 @@ impl NodeSpec {
             smartstart: false,
             generic: 0x10,
             specific: 0x01,
-            ccs: vec![(0x5e, 2), (0x25, 2), (0x32, 3), (0x72, 2), (0x86, 3), (0x85, 2), (0x6c, 1), (0x20, 2)],
+            ccs: vec![
+                (0x5e, 2),
+                (0x25, 2),
+                (0x32, 3),
+                (0x72, 2),
+                (0x86, 3),
+                (0x85, 2),
+                (0x6c, 1),
+                (0x20, 2),
+            ],
             secure_only: vec![],
             product_id: 1,
             private_key: [0x11; 32],
@@ -75,7 +85,16 @@ impl NodeSpec {
             smartstart: false,
             generic: 0x21,
             specific: 0x01,
-            ccs: vec![(0x5e, 2), (0x98, 1), (0x31, 11), (0x80, 1), (0x84, 2), (0x72, 2), (0x86, 3), (0x85, 2)],
+            ccs: vec![
+                (0x5e, 2),
+                (0x98, 1),
+                (0x31, 11),
+                (0x80, 1),
+                (0x84, 2),
+                (0x72, 2),
+                (0x86, 3),
+                (0x85, 2),
+            ],
             secure_only: vec![0x31, 0x80, 0x84, 0x72, 0x86, 0x85],
             product_id: 2,
             private_key: [0x22; 32],
@@ -91,7 +110,17 @@ impl NodeSpec {
             smartstart: false,
             generic: 0x21,
             specific: 0x01,
-            ccs: vec![(0x5e, 2), (0x9f, 1), (0x6c, 2), (0x55, 2), (0x31, 11), (0x71, 8), (0x72, 2), (0x86, 3), (0x85, 2)],
+            ccs: vec![
+                (0x5e, 2),
+                (0x9f, 1),
+                (0x6c, 2),
+                (0x55, 2),
+                (0x31, 11),
+                (0x71, 8),
+                (0x72, 2),
+                (0x86, 3),
+                (0x85, 2),
+            ],
             secure_only: vec![0x31, 0x71, 0x72, 0x86, 0x85],
             product_id: 3,
             private_key: [0x33; 32],
@@ -113,16 +142,25 @@ impl NodeSpec {
     }
 
     fn version_of(&self, cc: u16) -> u8 {
-        self.ccs.iter().find(|(c, _)| *c == cc).map(|(_, v)| *v).unwrap_or(0)
+        self.ccs
+            .iter()
+            .find(|(c, _)| *c == cc)
+            .map(|(_, v)| *v)
+            .unwrap_or(0)
     }
 
     /// The node information frame: insecure command classes only, as nodes send it.
     pub fn nif(&self) -> NodeInfo {
         NodeInfo {
-            basic: if self.listening { 0x04 } else { 0x04 },
+            basic: 0x04,
             generic: self.generic,
             specific: self.specific,
-            supported: self.ccs.iter().map(|(c, _)| *c).filter(|c| !self.secure_only.contains(c)).collect(),
+            supported: self
+                .ccs
+                .iter()
+                .map(|(c, _)| *c)
+                .filter(|c| !self.secure_only.contains(c))
+                .collect(),
             controlled: vec![],
         }
     }
@@ -259,7 +297,14 @@ impl SimNode {
     fn send(&mut self, plaintext: Vec<u8>, sec: Sec) -> Vec<Vec<u8>> {
         match sec {
             Sec::Plain => vec![plaintext],
-            Sec::S2(key) => match self.s2.encrypt(CTRL, &plaintext, &EncryptOptions { key: Some(key), ..Default::default() }) {
+            Sec::S2(key) => match self.s2.encrypt(
+                CTRL,
+                &plaintext,
+                &EncryptOptions {
+                    key: Some(key),
+                    ..Default::default()
+                },
+            ) {
                 Ok(f) => {
                     self.last_s2 = Some((plaintext, key));
                     vec![f]
@@ -310,7 +355,14 @@ impl SimNode {
                 }
                 let mut out = vec![];
                 for (p, key) in pending {
-                    match self.s2.encrypt(CTRL, &p, &EncryptOptions { key: Some(key), ..Default::default() }) {
+                    match self.s2.encrypt(
+                        CTRL,
+                        &p,
+                        &EncryptOptions {
+                            key: Some(key),
+                            ..Default::default()
+                        },
+                    ) {
                         Ok(f) => out.push(f),
                         Err(_) => self.pending_s2.push((p, key)),
                     }
@@ -347,15 +399,27 @@ impl SimNode {
     }
 
     fn supports(&self, cc: u16, sec: Sec) -> bool {
-        self.spec.version_of(cc) > 0 && (sec != Sec::Plain || !self.spec.secure_only.contains(&cc) || self.granted.is_empty())
+        self.spec.version_of(cc) > 0
+            && (sec != Sec::Plain
+                || !self.spec.secure_only.contains(&cc)
+                || self.granted.is_empty())
     }
 
     fn application(&mut self, frame: &[u8], sec: Sec) -> Vec<Vec<u8>> {
         self.received.push(frame.to_vec());
-        let Ok(cmd) = Command::parse(frame) else { return vec![] };
+        let Ok(cmd) = Command::parse(frame) else {
+            return vec![];
+        };
         if let Command::Supervision(supervision::Command::Get(g)) = &cmd {
             let mut out = self.application(&g.command, sec);
-            let rep: Command = supervision::Report { more_status_updates: false, wake_up_request: false, session_id: g.session_id, status: 0xff, duration: Some(0) }.into();
+            let rep: Command = supervision::Report {
+                more_status_updates: false,
+                wake_up_request: false,
+                session_id: g.session_id,
+                status: 0xff,
+                duration: Some(0),
+            }
+            .into();
             out.extend(self.send(rep.encode(), sec));
             return out;
         }
@@ -364,48 +428,130 @@ impl SimNode {
             Command::Security(c) => return self.s0_kex(c, sec),
             _ if !self.supports(cmd.cc(), sec) => None,
             Command::Version(version::Command::Get(_)) => Some(
-                version::Report { library_type: 3, protocol_version: 7, protocol_sub_version: 18, firmware_version: 1, firmware_sub_version: 2, hardware_version: Some(1), firmware_targets: Some(0), target_versions: vec![] }.into(),
+                version::Report {
+                    library_type: 3,
+                    protocol_version: 7,
+                    protocol_sub_version: 18,
+                    firmware_version: 1,
+                    firmware_sub_version: 2,
+                    hardware_version: Some(1),
+                    firmware_targets: Some(0),
+                    target_versions: vec![],
+                }
+                .into(),
             ),
-            Command::Version(version::Command::CommandClassGet(g)) => {
-                Some(version::CommandClassReport { requested_cc: g.requested_cc, version: self.spec.version_of(u16::from(g.requested_cc)) }.into())
-            }
-            Command::ManufacturerSpecific(manufacturer_specific::Command::Get(_)) => {
-                Some(manufacturer_specific::Report { manufacturer_id: 0xfffe, product_type: 0x5349, product_id: self.spec.product_id }.into())
-            }
+            Command::Version(version::Command::CommandClassGet(g)) => Some(
+                version::CommandClassReport {
+                    requested_cc: g.requested_cc,
+                    version: self.spec.version_of(u16::from(g.requested_cc)),
+                }
+                .into(),
+            ),
+            Command::ManufacturerSpecific(manufacturer_specific::Command::Get(_)) => Some(
+                manufacturer_specific::Report {
+                    manufacturer_id: 0xfffe,
+                    product_type: 0x5349,
+                    product_id: self.spec.product_id,
+                }
+                .into(),
+            ),
             Command::ZwavePlusInfo(zwave_plus_info::Command::Get(_)) => Some(
-                zwave_plus_info::Report { zwave_plus_version: 2, role_type: if self.spec.listening { 5 } else { 6 }, node_type: 0, installer_icon: 0x0c07, user_icon: 0x0c07 }.into(),
+                zwave_plus_info::Report {
+                    zwave_plus_version: 2,
+                    role_type: if self.spec.listening { 5 } else { 6 },
+                    node_type: 0,
+                    installer_icon: 0x0c07,
+                    user_icon: 0x0c07,
+                }
+                .into(),
             ),
-            Command::MultilevelSensor(multilevel_sensor::Command::SupportedSensorGet(_)) => {
-                Some(multilevel_sensor::SupportedSensorReport { sensor_types: self.sensors.keys().map(|&k| u16::from(k)).collect() }.into())
-            }
-            Command::MultilevelSensor(multilevel_sensor::Command::SupportedScaleGet(g)) => Some(multilevel_sensor::SupportedScaleReport { sensor_type: g.sensor_type, scales: 0b01 }.into()),
+            Command::MultilevelSensor(multilevel_sensor::Command::SupportedSensorGet(_)) => Some(
+                multilevel_sensor::SupportedSensorReport {
+                    sensor_types: self.sensors.keys().map(|&k| u16::from(k)).collect(),
+                }
+                .into(),
+            ),
+            Command::MultilevelSensor(multilevel_sensor::Command::SupportedScaleGet(g)) => Some(
+                multilevel_sensor::SupportedScaleReport {
+                    sensor_type: g.sensor_type,
+                    scales: 0b01,
+                }
+                .into(),
+            ),
             Command::MultilevelSensor(multilevel_sensor::Command::Get(g)) => {
                 let t = g.sensor_type.unwrap_or(1);
-                self.sensors.get(&t).map(|v| multilevel_sensor::Report { sensor_type: t, value: Value::from_f64(*v, 1, 0) }.into())
+                self.sensors.get(&t).map(|v| {
+                    multilevel_sensor::Report {
+                        sensor_type: t,
+                        value: Value::from_f64(*v, 1, 0),
+                    }
+                    .into()
+                })
             }
-            Command::Notification(notification::Command::SupportedGet(_)) => Some(notification::SupportedReport { v1_alarm: false, types: vec![7] }.into()),
-            Command::Notification(notification::Command::EventSupportedGet(g)) => Some(notification::EventSupportedReport { notification_type: g.notification_type, events: vec![8] }.into()),
-            Command::Battery(battery::Command::Get(_)) => Some(battery::Report { level: 87, ..Default::default() }.into()),
-            Command::WakeUp(wake_up::Command::IntervalCapabilitiesGet(_)) => {
-                Some(wake_up::IntervalCapabilitiesReport { minimum: 300, maximum: 86_400, default: 3600, step: 60, on_demand: Some(false) }.into())
-            }
+            Command::Notification(notification::Command::SupportedGet(_)) => Some(
+                notification::SupportedReport {
+                    v1_alarm: false,
+                    types: vec![7],
+                }
+                .into(),
+            ),
+            Command::Notification(notification::Command::EventSupportedGet(g)) => Some(
+                notification::EventSupportedReport {
+                    notification_type: g.notification_type,
+                    events: vec![8],
+                }
+                .into(),
+            ),
+            Command::Battery(battery::Command::Get(_)) => Some(
+                battery::Report {
+                    level: 87,
+                    ..Default::default()
+                }
+                .into(),
+            ),
+            Command::WakeUp(wake_up::Command::IntervalCapabilitiesGet(_)) => Some(
+                wake_up::IntervalCapabilitiesReport {
+                    minimum: 300,
+                    maximum: 86_400,
+                    default: 3600,
+                    step: 60,
+                    on_demand: Some(false),
+                }
+                .into(),
+            ),
             Command::WakeUp(wake_up::Command::IntervalSet(s)) => {
                 self.wake_interval = s.seconds;
                 None
             }
-            Command::WakeUp(wake_up::Command::IntervalGet(_)) => Some(wake_up::IntervalReport { seconds: self.wake_interval, node_id: CTRL as u8 }.into()),
+            Command::WakeUp(wake_up::Command::IntervalGet(_)) => Some(
+                wake_up::IntervalReport {
+                    seconds: self.wake_interval,
+                    node_id: CTRL as u8,
+                }
+                .into(),
+            ),
             Command::WakeUp(wake_up::Command::NoMoreInformation(_)) => {
                 self.awake = false;
                 None
             }
-            Command::Association(association::Command::GroupingsGet(_)) => Some(association::GroupingsReport { groups: 1 }.into()),
+            Command::Association(association::Command::GroupingsGet(_)) => {
+                Some(association::GroupingsReport { groups: 1 }.into())
+            }
             Command::Association(association::Command::Set(s)) => {
                 if s.group == 1 {
                     self.lifeline = s.nodes;
                 }
                 None
             }
-            Command::Association(association::Command::Get(g)) => Some(association::Report { group: g.group, max_nodes: 5, reports_to_follow: 0, nodes: self.lifeline.clone() }.into()),
+            Command::Association(association::Command::Get(g)) => Some(
+                association::Report {
+                    group: g.group,
+                    max_nodes: 5,
+                    reports_to_follow: 0,
+                    nodes: self.lifeline.clone(),
+                }
+                .into(),
+            ),
             Command::BinarySwitch(binary_switch::Command::Get(_)) => Some(self.switch_report()),
             Command::BinarySwitch(binary_switch::Command::Set(s)) => {
                 self.switch_on = s.target != 0;
@@ -415,14 +561,43 @@ impl SimNode {
                 self.switch_on = s.value != 0;
                 None
             }
-            Command::Basic(basic::Command::Get(_)) => Some(basic::Report { current: if self.switch_on { 0xff } else { 0 }, target: None, duration: None }.into()),
-            Command::Meter(meter::Command::SupportedGet(_)) => {
-                Some(meter::SupportedReport { meter_reset: true, rate_type: 1, meter_type: 1, more_scale_types: false, scales: 0b101, extra_scales: vec![] }.into())
-            }
+            Command::Basic(basic::Command::Get(_)) => Some(
+                basic::Report {
+                    current: if self.switch_on { 0xff } else { 0 },
+                    target: None,
+                    duration: None,
+                }
+                .into(),
+            ),
+            Command::Meter(meter::Command::SupportedGet(_)) => Some(
+                meter::SupportedReport {
+                    meter_reset: true,
+                    rate_type: 1,
+                    meter_type: 1,
+                    more_scale_types: false,
+                    scales: 0b101,
+                    extra_scales: vec![],
+                }
+                .into(),
+            ),
             Command::Meter(meter::Command::Get(g)) => {
                 let scale = g.scale.unwrap_or(0);
                 let v = if scale == 2 { 12.5 } else { 1.234 };
-                Some(meter::Report { scale_bit2: scale & 4 != 0, rate_type: 1, meter_type: 1, value: Value { scale: scale & 3, ..Value::from_f64(v, 3, 0) }, delta_time: Some(0), previous_value: None, scale2: None }.into())
+                Some(
+                    meter::Report {
+                        scale_bit2: scale & 4 != 0,
+                        rate_type: 1,
+                        meter_type: 1,
+                        value: Value {
+                            scale: scale & 3,
+                            ..Value::from_f64(v, 3, 0)
+                        },
+                        delta_time: Some(0),
+                        previous_value: None,
+                        scale2: None,
+                    }
+                    .into(),
+                )
             }
             _ => None,
         };
@@ -434,24 +609,51 @@ impl SimNode {
 
     fn switch_report(&self) -> Command {
         let v = if self.switch_on { 0xff } else { 0 };
-        binary_switch::Report { current: v, target: Some(v), duration: Some(0) }.into()
+        binary_switch::Report {
+            current: v,
+            target: Some(v),
+            duration: Some(0),
+        }
+        .into()
     }
 
     /// A multilevel sensor report for `sensor_type`, as the node would send it.
     pub fn sensor_report(&self, sensor_type: u8) -> Option<Command> {
-        self.sensors.get(&sensor_type).map(|v| multilevel_sensor::Report { sensor_type, value: Value::from_f64(*v, 1, 0) }.into())
+        self.sensors.get(&sensor_type).map(|v| {
+            multilevel_sensor::Report {
+                sensor_type,
+                value: Value::from_f64(*v, 1, 0),
+            }
+            .into()
+        })
     }
 
     fn kex(&mut self, c: security_2::Command, sec: Sec) -> Vec<Vec<u8>> {
-        let Security::S2(requested) = self.spec.security.clone() else { return vec![] };
+        let Security::S2(requested) = self.spec.security.clone() else {
+            return vec![];
+        };
         match c {
             security_2::Command::KexGet(_) if sec == Sec::Plain => {
-                let report = security_2::KexReport { request_csa: false, echo: false, schemes: KEX_SCHEME_1, curves: ECDH_CURVE25519, keys: SecurityClass::to_key_bits(&requested) };
-                self.kex = Some(Kex { granted: vec![], controller_pub: None, requested_report: report.clone(), pending: vec![], current: None });
+                let report = security_2::KexReport {
+                    request_csa: false,
+                    echo: false,
+                    schemes: KEX_SCHEME_1,
+                    curves: ECDH_CURVE25519,
+                    keys: SecurityClass::to_key_bits(&requested),
+                };
+                self.kex = Some(Kex {
+                    granted: vec![],
+                    controller_pub: None,
+                    requested_report: report.clone(),
+                    pending: vec![],
+                    current: None,
+                });
                 self.send(Command::from(report).encode(), Sec::Plain)
             }
             security_2::Command::KexSet(s) if !s.echo && sec == Sec::Plain => {
-                let Some(k) = self.kex.as_mut() else { return vec![] };
+                let Some(k) = self.kex.as_mut() else {
+                    return vec![];
+                };
                 k.granted = SecurityClass::from_key_bits(s.keys);
                 // Lowest first, as nodes ask for them.
                 let mut pending = k.granted.clone();
@@ -462,30 +664,57 @@ impl SimNode {
                     key[0] = 0;
                     key[1] = 0;
                 }
-                self.send(Command::from(security_2::PublicKeyReport { including_node: false, public_key: key }).encode(), Sec::Plain)
+                self.send(
+                    Command::from(security_2::PublicKeyReport {
+                        including_node: false,
+                        public_key: key,
+                    })
+                    .encode(),
+                    Sec::Plain,
+                )
             }
             security_2::Command::PublicKeyReport(p) if p.including_node && sec == Sec::Plain => {
-                let Some(k) = self.kex.as_mut() else { return vec![] };
-                let Ok(cpub) = <[u8; 32]>::try_from(p.public_key.as_slice()) else { return vec![] };
+                let Some(k) = self.kex.as_mut() else {
+                    return vec![];
+                };
+                let Ok(cpub) = <[u8; 32]>::try_from(p.public_key.as_slice()) else {
+                    return vec![];
+                };
                 k.controller_pub = Some(cpub);
                 let granted = SecurityClass::to_key_bits(&k.granted);
-                let Ok(shared) = self.keypair.shared_secret(&cpub) else { return vec![] };
+                let Ok(shared) = self.keypair.shared_secret(&cpub) else {
+                    return vec![];
+                };
                 let tk = bootstrap_keys(&shared, &cpub, self.keypair.public());
                 self.s2.begin_bootstrap(CTRL, tk);
-                let echo = security_2::KexSet { request_csa: false, echo: true, scheme: KEX_SCHEME_1, curve: ECDH_CURVE25519, keys: granted };
+                let echo = security_2::KexSet {
+                    request_csa: false,
+                    echo: true,
+                    scheme: KEX_SCHEME_1,
+                    curve: ECDH_CURVE25519,
+                    keys: granted,
+                };
                 self.send(Command::from(echo).encode(), Sec::S2(KeyId::Temporary))
             }
             security_2::Command::KexReport(r) if r.echo && sec == Sec::S2(KeyId::Temporary) => {
-                let Some(k) = self.kex.as_mut() else { return vec![] };
+                let Some(k) = self.kex.as_mut() else {
+                    return vec![];
+                };
                 if r.keys != k.requested_report.keys {
                     return vec![];
                 }
                 self.next_key_get()
             }
             security_2::Command::NetworkKeyReport(r) if sec == Sec::S2(KeyId::Temporary) => {
-                let Some(k) = self.kex.as_mut() else { return vec![] };
-                let Some(class) = SecurityClass::from_key_bit(r.granted_key) else { return vec![] };
-                let Ok(key) = <[u8; 16]>::try_from(r.network_key.as_slice()) else { return vec![] };
+                let Some(k) = self.kex.as_mut() else {
+                    return vec![];
+                };
+                let Some(class) = SecurityClass::from_key_bit(r.granted_key) else {
+                    return vec![];
+                };
+                let Ok(key) = <[u8; 16]>::try_from(r.network_key.as_slice()) else {
+                    return vec![];
+                };
                 k.current = Some(class);
                 self.s2.set_network_key(class, &key);
                 if class == SecurityClass::S0Legacy {
@@ -493,15 +722,29 @@ impl SimNode {
                     self.s0_keyed = true;
                 }
                 self.s2.set_peer_classes(CTRL, &[class]);
-                self.send(Command::from(security_2::NetworkKeyVerify {}).encode(), Sec::S2(KeyId::Class(class)))
+                self.send(
+                    Command::from(security_2::NetworkKeyVerify {}).encode(),
+                    Sec::S2(KeyId::Class(class)),
+                )
             }
-            security_2::Command::TransferEnd(t) if t.key_verified && sec == Sec::S2(KeyId::Temporary) => {
-                let Some(k) = self.kex.as_mut() else { return vec![] };
+            security_2::Command::TransferEnd(t)
+                if t.key_verified && sec == Sec::S2(KeyId::Temporary) =>
+            {
+                let Some(k) = self.kex.as_mut() else {
+                    return vec![];
+                };
                 if let Some(c) = k.current.take() {
                     self.granted.push(c);
                 }
                 if k.pending.is_empty() {
-                    let out = self.send(Command::from(security_2::TransferEnd { key_verified: false, key_request_complete: true }).encode(), Sec::S2(KeyId::Temporary));
+                    let out = self.send(
+                        Command::from(security_2::TransferEnd {
+                            key_verified: false,
+                            key_request_complete: true,
+                        })
+                        .encode(),
+                        Sec::S2(KeyId::Temporary),
+                    );
                     self.s2.end_bootstrap(CTRL);
                     self.s2.set_peer_classes(CTRL, &self.granted.clone());
                     self.kex = None;
@@ -515,36 +758,71 @@ impl SimNode {
                 self.s2.end_bootstrap(CTRL);
                 vec![]
             }
-            security_2::Command::CommandsSupportedGet(_) if matches!(sec, Sec::S2(KeyId::Class(_))) => {
+            security_2::Command::CommandsSupportedGet(_)
+                if matches!(sec, Sec::S2(KeyId::Class(_))) =>
+            {
                 let list = self.spec.secure_only.clone();
-                self.send(Command::from(security_2::CommandsSupportedReport { command_classes: list }).encode(), sec)
+                self.send(
+                    Command::from(security_2::CommandsSupportedReport {
+                        command_classes: list,
+                    })
+                    .encode(),
+                    sec,
+                )
             }
             _ => vec![],
         }
     }
 
     fn next_key_get(&mut self) -> Vec<Vec<u8>> {
-        let Some(k) = self.kex.as_mut() else { return vec![] };
-        let Some(class) = k.pending.first().copied() else { return vec![] };
+        let Some(k) = self.kex.as_mut() else {
+            return vec![];
+        };
+        let Some(class) = k.pending.first().copied() else {
+            return vec![];
+        };
         k.pending.remove(0);
-        self.send(Command::from(security_2::NetworkKeyGet { requested_key: class.key_bit() }).encode(), Sec::S2(KeyId::Temporary))
+        self.send(
+            Command::from(security_2::NetworkKeyGet {
+                requested_key: class.key_bit(),
+            })
+            .encode(),
+            Sec::S2(KeyId::Temporary),
+        )
     }
 
     fn s0_kex(&mut self, c: security::Command, sec: Sec) -> Vec<Vec<u8>> {
         match c {
-            security::Command::SchemeGet(_) if sec == Sec::Plain && self.spec.security == Security::S0 => {
-                self.send(Command::from(security::SchemeReport { schemes: 0 }).encode(), Sec::Plain)
+            security::Command::SchemeGet(_)
+                if sec == Sec::Plain && self.spec.security == Security::S0 =>
+            {
+                self.send(
+                    Command::from(security::SchemeReport { schemes: 0 }).encode(),
+                    Sec::Plain,
+                )
             }
             security::Command::NetworkKeySet(s) if sec == Sec::S0 && !self.s0_keyed => {
-                let Ok(key) = <[u8; 16]>::try_from(s.network_key.as_slice()) else { return vec![] };
+                let Ok(key) = <[u8; 16]>::try_from(s.network_key.as_slice()) else {
+                    return vec![];
+                };
                 self.s0.set_network_key(&key);
                 self.s0_keyed = true;
                 self.granted = vec![SecurityClass::S0Legacy];
-                self.send(Command::from(security::NetworkKeyVerify {}).encode(), Sec::S0)
+                self.send(
+                    Command::from(security::NetworkKeyVerify {}).encode(),
+                    Sec::S0,
+                )
             }
             security::Command::CommandsSupportedGet(_) if sec == Sec::S0 => {
                 let list = self.spec.secure_only.clone();
-                self.send(Command::from(security::CommandsSupportedReport { reports_to_follow: 0, command_classes: list }).encode(), Sec::S0)
+                self.send(
+                    Command::from(security::CommandsSupportedReport {
+                        reports_to_follow: 0,
+                        command_classes: list,
+                    })
+                    .encode(),
+                    Sec::S0,
+                )
             }
             _ => vec![],
         }

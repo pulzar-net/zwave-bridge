@@ -13,7 +13,7 @@
 //!   one exchange at a time, ACK within 1.6 s, up to three transmissions with
 //!   back-off, callback ids, response and callback timeouts, and every frame
 //!   the controller sends on its own handed to the caller.
-//! - [`probe`]: say what controller (if any) answers on a port, with one
+//! - [`mod@probe`]: say what controller (if any) answers on a port, with one
 //!   read-only frame.
 //! - [`port`]: open a serial device or a `tcp://host:port` (ser2net) link.
 

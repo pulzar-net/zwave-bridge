@@ -1,0 +1,77 @@
+# Static musl binaries on a tag v*: zwave-bridge and zwave-sim for
+#
+#   x86_64-unknown-linux-musl    PCs, servers, VMs
+#   aarch64-unknown-linux-musl   Raspberry Pi 3/4/5 and other arm64 gateways
+#   mipsel-unknown-linux-musl    MT7628/MT7621-class OpenWrt routers
+#
+# Every target's test suite runs under qemu-user before anything is published.
+
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NIGHTLY: nightly-2026-11-14
+  ZIG: 0.16.0
+  ZIGBUILD: 0.24.1
+
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag is the crate version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          want="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+          [ "${GITHUB_REF_NAME#v}" = "${want}" ] || { echo "tag ${GITHUB_REF_NAME} is not v${want}" >&2; exit 1; }
+      - uses: dtolnay/rust-toolchain@master
+        timeout-minutes: 10
+        with:
+          toolchain: ${{ env.NIGHTLY }}
+          components: rust-src
+          targets: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl
+      - uses: mlugg/setup-zig@v2
+        timeout-minutes: 10
+        with:
+          version: ${{ env.ZIG }}
+      - uses: taiki-e/install-action@v2
+        timeout-minutes: 10
+        with:
+          tool: cargo-zigbuild@${{ env.ZIGBUILD }}
+      - name: qemu-user and mosquitto
+        timeout-minutes: 10
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends qemu-user mosquitto file
+      - name: Test and build
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUNNER: qemu-aarch64
+          CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUNNER: qemu-mipsel
+          CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static -C link-self-contained=no
+          ZWAVE_BRIDGE_REQUIRE_MQTT: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl mipsel-unknown-linux-musl; do
+            std=()
+            case "${target}" in mips*) std=(-Zbuild-std) ;; esac
+            cargo +${NIGHTLY} zigbuild test --workspace --target "${target}" "${std[@]}"
+            case "${target}" in mips*) std=(-Zbuild-std=std,panic_abort) ;; esac
+            cargo +${NIGHTLY} zigbuild --release -p zwave-bridge -p zwave-sim --target "${target}" "${std[@]}"
+            for bin in zwave-bridge zwave-sim; do
+              f="target/${target}/release/${bin}"
+              file "${f}" | grep -q 'statically linked' || { file "${f}"; echo "${target}: ${bin} not static" >&2; exit 1; }
+              cp "${f}" "dist/${bin}-${target%%-*}-linux-musl"
+            done
+          done
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --notes-file CHANGELOG.md

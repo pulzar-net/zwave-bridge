@@ -7,11 +7,12 @@ use crate::{Error, Event, NodeId};
 use std::time::Duration;
 use tracing::{debug, info, warn};
 use zwave_cc::{
-    association, basic, battery, binary_sensor, binary_switch, manufacturer_specific, meter, multi_channel, multilevel_sensor,
-    multilevel_switch, notification, security, security_2, version, wake_up, zwave_plus_info, Command,
+    association, basic, battery, binary_sensor, binary_switch, manufacturer_specific, meter,
+    multi_channel, multilevel_sensor, multilevel_switch, notification, security, security_2,
+    version, wake_up, zwave_plus_info, Command,
 };
-use zwave_security::SecurityClass;
 use zwave_security::s2::KeyId;
+use zwave_security::SecurityClass;
 use zwave_serial::{DataFrame, FunctionId as F};
 
 /// Interview attempts before giving up until the next restart or wake-up.
@@ -37,7 +38,10 @@ impl Controller {
                     Err(Error::UnknownNode(_)) => break,
                     Err(e) => {
                         warn!(node, attempt, "interview failed: {e}");
-                        c.emit(Event::InterviewFailed { node, reason: e.to_string() });
+                        c.emit(Event::InterviewFailed {
+                            node,
+                            reason: e.to_string(),
+                        });
                         if attempt >= MAX_ATTEMPTS {
                             break;
                         }
@@ -60,7 +64,8 @@ impl Controller {
     }
 
     fn stage(&self, node: NodeId) -> Result<InterviewStage, Error> {
-        self.with_node(node, |r| r.stage).ok_or(Error::UnknownNode(node))
+        self.with_node(node, |r| r.stage)
+            .ok_or(Error::UnknownNode(node))
     }
 
     fn reach(&self, node: NodeId, stage: InterviewStage) -> Result<(), Error> {
@@ -100,7 +105,9 @@ impl Controller {
             self.reach(node, InterviewStage::Endpoints)?;
         }
         if self.stage(node)? < InterviewStage::CommandClasses {
-            let eps: Vec<u8> = self.with_node(node, |r| r.endpoints.keys().copied().collect()).unwrap_or_default();
+            let eps: Vec<u8> = self
+                .with_node(node, |r| r.endpoints.keys().copied().collect())
+                .unwrap_or_default();
             for ep in eps {
                 self.interview_endpoint(node, ep).await;
             }
@@ -118,11 +125,16 @@ impl Controller {
     async fn request_node_info(&self, node: NodeId) -> Result<(), Error> {
         let _a = self.activity(node);
         self.wait_awake(node).await;
-        let (_g, rx) = self.wait_for(node, false, |i| matches!(i, Inbound::NodeInfo(_) | Inbound::NodeInfoFailed));
+        let (_g, rx) = self.wait_for(node, false, |i| {
+            matches!(i, Inbound::NodeInfo(_) | Inbound::NodeInfoFailed)
+        });
         let r = self
             .inner
             .api
-            .request(DataFrame::request(F::REQUEST_NODE_INFO, vec![node as u8]), Duration::from_secs(2))
+            .request(
+                DataFrame::request(F::REQUEST_NODE_INFO, vec![node as u8]),
+                Duration::from_secs(2),
+            )
             .await?;
         if r.payload.first() != Some(&1) {
             return Err(Error::Controller("Request Node Info refused".into()));
@@ -154,10 +166,17 @@ impl Controller {
                     Command::from(security_2::CommandsSupportedGet {}).encode(),
                     TxSecurity::S2(KeyId::Class(class)),
                     self.inner.cfg.request_timeout,
-                    |c, _| matches!(c, Command::Security2(security_2::Command::CommandsSupportedReport(_))),
+                    |c, _| {
+                        matches!(
+                            c,
+                            Command::Security2(security_2::Command::CommandsSupportedReport(_))
+                        )
+                    },
                 )
                 .await?;
-            let Command::Security2(security_2::Command::CommandsSupportedReport(r)) = c else { unreachable!() };
+            let Command::Security2(security_2::Command::CommandsSupportedReport(r)) = c else {
+                unreachable!()
+            };
             Some(r.command_classes)
         } else if s0 {
             let (c, _) = self
@@ -166,10 +185,17 @@ impl Controller {
                     Command::from(security::CommandsSupportedGet {}).encode(),
                     TxSecurity::S0 { temp: false },
                     self.inner.cfg.request_timeout,
-                    |c, _| matches!(c, Command::Security(security::Command::CommandsSupportedReport(_))),
+                    |c, _| {
+                        matches!(
+                            c,
+                            Command::Security(security::Command::CommandsSupportedReport(_))
+                        )
+                    },
                 )
                 .await?;
-            let Command::Security(security::Command::CommandsSupportedReport(r)) = c else { unreachable!() };
+            let Command::Security(security::Command::CommandsSupportedReport(r)) = c else {
+                unreachable!()
+            };
             Some(r.command_classes)
         } else {
             None
@@ -185,18 +211,27 @@ impl Controller {
     }
 
     async fn interview_identity(&self, node: NodeId) {
-        let supports = |cc| self.with_node(node, |r| r.root().supports(cc)).unwrap_or(false);
+        let supports = |cc| {
+            self.with_node(node, |r| r.root().supports(cc))
+                .unwrap_or(false)
+        };
         if supports(manufacturer_specific::ID) {
             let r = self
                 .req(node, 0, manufacturer_specific::Get {}, |c| match c {
-                    Command::ManufacturerSpecific(manufacturer_specific::Command::Report(r)) => Some(r.clone()),
+                    Command::ManufacturerSpecific(manufacturer_specific::Command::Report(r)) => {
+                        Some(r.clone())
+                    }
                     _ => None,
                 })
                 .await;
             match r {
                 Ok(m) => {
                     let _ = self.update_node(node, |r| {
-                        r.manufacturer = Some(Manufacturer { manufacturer_id: m.manufacturer_id, product_type: m.product_type, product_id: m.product_id })
+                        r.manufacturer = Some(Manufacturer {
+                            manufacturer_id: m.manufacturer_id,
+                            product_type: m.product_type,
+                            product_id: m.product_id,
+                        })
                     });
                 }
                 Err(e) => warn!(node, "manufacturer: {e}"),
@@ -211,7 +246,10 @@ impl Controller {
                 .await;
             match r {
                 Ok(z) => {
-                    let _ = self.update_node(node, |r| r.zwave_plus = Some((z.role_type, z.node_type, z.installer_icon, z.user_icon)));
+                    let _ = self.update_node(node, |r| {
+                        r.zwave_plus =
+                            Some((z.role_type, z.node_type, z.installer_icon, z.user_icon))
+                    });
                 }
                 Err(e) => warn!(node, "Z-Wave Plus info: {e}"),
             }
@@ -219,7 +257,10 @@ impl Controller {
     }
 
     async fn interview_versions(&self, node: NodeId) {
-        let Some(ccs) = self.with_node(node, |r| r.root().ccs.keys().copied().collect::<Vec<_>>()) else { return };
+        let Some(ccs) = self.with_node(node, |r| r.root().ccs.keys().copied().collect::<Vec<_>>())
+        else {
+            return;
+        };
         if !ccs.contains(&version::ID) {
             return;
         }
@@ -230,14 +271,27 @@ impl Controller {
             })
             .await;
         if let Ok(v) = &r {
-            let _ = self.update_node(node, |r| r.firmware = Some(format!("{}.{}", v.firmware_version, v.firmware_sub_version)));
+            let _ = self.update_node(node, |r| {
+                r.firmware = Some(format!("{}.{}", v.firmware_version, v.firmware_sub_version))
+            });
         }
         for cc in ccs.into_iter().filter(|&c| c <= 0xff) {
             let r = self
-                .req(node, 0, version::CommandClassGet { requested_cc: cc as u8 }, move |c| match c {
-                    Command::Version(version::Command::CommandClassReport(r)) if u16::from(r.requested_cc) == cc => Some(r.version),
-                    _ => None,
-                })
+                .req(
+                    node,
+                    0,
+                    version::CommandClassGet {
+                        requested_cc: cc as u8,
+                    },
+                    move |c| match c {
+                        Command::Version(version::Command::CommandClassReport(r))
+                            if u16::from(r.requested_cc) == cc =>
+                        {
+                            Some(r.version)
+                        }
+                        _ => None,
+                    },
+                )
                 .await;
             match r {
                 Ok(v) => {
@@ -256,32 +310,51 @@ impl Controller {
     }
 
     async fn interview_endpoints(&self, node: NodeId) {
-        if !self.with_node(node, |r| r.root().supports(multi_channel::ID)).unwrap_or(false) {
+        if !self
+            .with_node(node, |r| r.root().supports(multi_channel::ID))
+            .unwrap_or(false)
+        {
             return;
         }
         let r = self
             .req(node, 0, multi_channel::EndPointGet {}, |c| match c {
-                Command::MultiChannel(multi_channel::Command::EndPointReport(r)) => Some(r.individual_end_points),
+                Command::MultiChannel(multi_channel::Command::EndPointReport(r)) => {
+                    Some(r.individual_end_points)
+                }
                 _ => None,
             })
             .await;
         let Ok(count) = r else { return };
         for ep in 1..=count.min(127) {
             let r = self
-                .req(node, 0, multi_channel::CapabilityGet { end_point: ep }, move |c| match c {
-                    Command::MultiChannel(multi_channel::Command::CapabilityReport(r)) if r.end_point == ep => Some(r.clone()),
-                    _ => None,
-                })
+                .req(
+                    node,
+                    0,
+                    multi_channel::CapabilityGet { end_point: ep },
+                    move |c| match c {
+                        Command::MultiChannel(multi_channel::Command::CapabilityReport(r))
+                            if r.end_point == ep =>
+                        {
+                            Some(r.clone())
+                        }
+                        _ => None,
+                    },
+                )
                 .await;
             match r {
                 Ok(cap) => {
                     let _ = self.update_node(node, |r| {
-                        let versions: Vec<(u16, crate::node::CcSupport)> = r.root().ccs.iter().map(|(k, v)| (*k, *v)).collect();
+                        let versions: Vec<(u16, crate::node::CcSupport)> =
+                            r.root().ccs.iter().map(|(k, v)| (*k, *v)).collect();
                         let e = r.endpoints.entry(ep).or_default();
                         e.generic = cap.generic;
                         e.specific = cap.specific;
                         for cc in cap.command_classes {
-                            let root = versions.iter().find(|(k, _)| *k == cc).map(|(_, v)| *v).unwrap_or_default();
+                            let root = versions
+                                .iter()
+                                .find(|(k, _)| *k == cc)
+                                .map(|(_, v)| *v)
+                                .unwrap_or_default();
                             e.ccs.insert(cc, root);
                         }
                     });
@@ -292,29 +365,53 @@ impl Controller {
     }
 
     async fn interview_endpoint(&self, node: NodeId, ep: u8) {
-        let Some(e) = self.with_node(node, |r| r.endpoints.get(&ep).cloned()).flatten() else { return };
+        let Some(e) = self
+            .with_node(node, |r| r.endpoints.get(&ep).cloned())
+            .flatten()
+        else {
+            return;
+        };
         let has = |cc| e.supports(cc);
         if has(multilevel_sensor::ID) {
             if e.version(multilevel_sensor::ID) >= 5 {
                 let types = self
-                    .req(node, ep, multilevel_sensor::SupportedSensorGet {}, |c| match c {
-                        Command::MultilevelSensor(multilevel_sensor::Command::SupportedSensorReport(r)) => Some(r.sensor_types.clone()),
-                        _ => None,
-                    })
+                    .req(
+                        node,
+                        ep,
+                        multilevel_sensor::SupportedSensorGet {},
+                        |c| match c {
+                            Command::MultilevelSensor(
+                                multilevel_sensor::Command::SupportedSensorReport(r),
+                            ) => Some(r.sensor_types.clone()),
+                            _ => None,
+                        },
+                    )
                     .await
                     .unwrap_or_default();
                 for t in types.into_iter().filter_map(|t| u8::try_from(t).ok()) {
                     let scales = self
-                        .req(node, ep, multilevel_sensor::SupportedScaleGet { sensor_type: t }, move |c| match c {
-                            Command::MultilevelSensor(multilevel_sensor::Command::SupportedScaleReport(r)) if r.sensor_type == t => Some(r.scales),
-                            _ => None,
-                        })
+                        .req(
+                            node,
+                            ep,
+                            multilevel_sensor::SupportedScaleGet { sensor_type: t },
+                            move |c| match c {
+                                Command::MultilevelSensor(
+                                    multilevel_sensor::Command::SupportedScaleReport(r),
+                                ) if r.sensor_type == t => Some(r.scales),
+                                _ => None,
+                            },
+                        )
                         .await
                         .unwrap_or(1);
                     let list: Vec<u8> = (0..4).filter(|b| scales & (1 << b) != 0).collect();
                     let first = list.first().copied().unwrap_or(0);
                     let _ = self.update_node(node, |r| {
-                        r.endpoints.entry(ep).or_default().caps.sensors.insert(t, list.clone());
+                        r.endpoints
+                            .entry(ep)
+                            .or_default()
+                            .caps
+                            .sensors
+                            .insert(t, list.clone());
                     });
                     let _ = self
                         .req(node, ep, multilevel_sensor::Get { sensor_type: Some(t), scale: Some(first) }, move |c| {
@@ -324,14 +421,29 @@ impl Controller {
                 }
             } else {
                 let r = self
-                    .req(node, ep, multilevel_sensor::Get { sensor_type: None, scale: None }, |c| match c {
-                        Command::MultilevelSensor(multilevel_sensor::Command::Report(r)) => Some((r.sensor_type, r.value.scale)),
-                        _ => None,
-                    })
+                    .req(
+                        node,
+                        ep,
+                        multilevel_sensor::Get {
+                            sensor_type: None,
+                            scale: None,
+                        },
+                        |c| match c {
+                            Command::MultilevelSensor(multilevel_sensor::Command::Report(r)) => {
+                                Some((r.sensor_type, r.value.scale))
+                            }
+                            _ => None,
+                        },
+                    )
                     .await;
                 if let Ok((t, s)) = r {
                     let _ = self.update_node(node, |r| {
-                        r.endpoints.entry(ep).or_default().caps.sensors.insert(t, vec![s]);
+                        r.endpoints
+                            .entry(ep)
+                            .or_default()
+                            .caps
+                            .sensors
+                            .insert(t, vec![s]);
                     });
                 }
             }
@@ -348,7 +460,10 @@ impl Controller {
                 {
                     Ok(s) => {
                         let list: Vec<u8> = (0..7).filter(|b| s.scales & (1 << b) != 0).collect();
-                        let _ = self.update_node(node, |r| r.endpoints.entry(ep).or_default().caps.meter = Some((s.meter_type, list.clone())));
+                        let _ = self.update_node(node, |r| {
+                            r.endpoints.entry(ep).or_default().caps.meter =
+                                Some((s.meter_type, list.clone()))
+                        });
                         list
                     }
                     Err(_) => vec![],
@@ -357,36 +472,73 @@ impl Controller {
                 vec![0]
             };
             for s in scales {
-                let get = if v >= 2 { meter::Get { rate_type: Some(if v >= 4 { 1 } else { 0 }), scale: Some(s), scale2: None } } else { meter::Get::default() };
-                let _ = self.req(node, ep, get, |c| matches!(c, Command::Meter(meter::Command::Report(_))).then_some(())).await;
+                let get = if v >= 2 {
+                    meter::Get {
+                        rate_type: Some(if v >= 4 { 1 } else { 0 }),
+                        scale: Some(s),
+                        scale2: None,
+                    }
+                } else {
+                    meter::Get::default()
+                };
+                let _ = self
+                    .req(node, ep, get, |c| {
+                        matches!(c, Command::Meter(meter::Command::Report(_))).then_some(())
+                    })
+                    .await;
             }
         }
         if has(notification::ID) && e.version(notification::ID) >= 3 {
             let types = self
                 .req(node, ep, notification::SupportedGet {}, |c| match c {
-                    Command::Notification(notification::Command::SupportedReport(r)) => Some(r.types.clone()),
+                    Command::Notification(notification::Command::SupportedReport(r)) => {
+                        Some(r.types.clone())
+                    }
                     _ => None,
                 })
                 .await
                 .unwrap_or_default();
-            for t in types.into_iter().filter_map(|t| u8::try_from(t).ok()).filter(|&t| t > 0) {
+            for t in types
+                .into_iter()
+                .filter_map(|t| u8::try_from(t).ok())
+                .filter(|&t| t > 0)
+            {
                 let events = self
-                    .req(node, ep, notification::EventSupportedGet { notification_type: t }, move |c| match c {
-                        Command::Notification(notification::Command::EventSupportedReport(r)) if r.notification_type == t => Some(r.events.clone()),
-                        _ => None,
-                    })
+                    .req(
+                        node,
+                        ep,
+                        notification::EventSupportedGet {
+                            notification_type: t,
+                        },
+                        move |c| match c {
+                            Command::Notification(notification::Command::EventSupportedReport(
+                                r,
+                            )) if r.notification_type == t => Some(r.events.clone()),
+                            _ => None,
+                        },
+                    )
                     .await
                     .unwrap_or_default();
-                let events: Vec<u8> = events.into_iter().filter_map(|e| u8::try_from(e).ok()).collect();
+                let events: Vec<u8> = events
+                    .into_iter()
+                    .filter_map(|e| u8::try_from(e).ok())
+                    .collect();
                 let _ = self.update_node(node, |r| {
-                    r.endpoints.entry(ep).or_default().caps.notifications.insert(t, events.clone());
+                    r.endpoints
+                        .entry(ep)
+                        .or_default()
+                        .caps
+                        .notifications
+                        .insert(t, events.clone());
                 });
             }
         }
         if has(binary_sensor::ID) {
             let types: Vec<u8> = if e.version(binary_sensor::ID) >= 2 {
                 self.req(node, ep, binary_sensor::SupportedGet {}, |c| match c {
-                    Command::BinarySensor(binary_sensor::Command::SupportedReport(r)) => Some(r.sensor_types.clone()),
+                    Command::BinarySensor(binary_sensor::Command::SupportedReport(r)) => {
+                        Some(r.sensor_types.clone())
+                    }
                     _ => None,
                 })
                 .await
@@ -398,13 +550,30 @@ impl Controller {
             } else {
                 vec![]
             };
-            let _ = self.update_node(node, |r| r.endpoints.entry(ep).or_default().caps.binary_sensors = types.clone());
+            let _ = self.update_node(node, |r| {
+                r.endpoints.entry(ep).or_default().caps.binary_sensors = types.clone()
+            });
             if types.is_empty() {
-                let _ = self.req(node, ep, binary_sensor::Get { sensor_type: None }, |c| matches!(c, Command::BinarySensor(binary_sensor::Command::Report(_))).then_some(())).await;
+                let _ = self
+                    .req(node, ep, binary_sensor::Get { sensor_type: None }, |c| {
+                        matches!(c, Command::BinarySensor(binary_sensor::Command::Report(_)))
+                            .then_some(())
+                    })
+                    .await;
             }
             for t in types {
                 let _ = self
-                    .req(node, ep, binary_sensor::Get { sensor_type: Some(t) }, |c| matches!(c, Command::BinarySensor(binary_sensor::Command::Report(_))).then_some(()))
+                    .req(
+                        node,
+                        ep,
+                        binary_sensor::Get {
+                            sensor_type: Some(t),
+                        },
+                        |c| {
+                            matches!(c, Command::BinarySensor(binary_sensor::Command::Report(_)))
+                                .then_some(())
+                        },
+                    )
                     .await;
             }
         }
@@ -412,32 +581,71 @@ impl Controller {
             if e.version(multilevel_switch::ID) >= 3 {
                 if let Ok(t) = self
                     .req(node, ep, multilevel_switch::SupportedGet {}, |c| match c {
-                        Command::MultilevelSwitch(multilevel_switch::Command::SupportedReport(r)) => Some(r.primary_switch_type),
+                        Command::MultilevelSwitch(multilevel_switch::Command::SupportedReport(
+                            r,
+                        )) => Some(r.primary_switch_type),
                         _ => None,
                     })
                     .await
                 {
-                    let _ = self.update_node(node, |r| r.endpoints.entry(ep).or_default().caps.switch_type = Some(t));
+                    let _ = self.update_node(node, |r| {
+                        r.endpoints.entry(ep).or_default().caps.switch_type = Some(t)
+                    });
                 }
             }
-            let _ = self.req(node, ep, multilevel_switch::Get {}, |c| matches!(c, Command::MultilevelSwitch(multilevel_switch::Command::Report(_))).then_some(())).await;
+            let _ = self
+                .req(node, ep, multilevel_switch::Get {}, |c| {
+                    matches!(
+                        c,
+                        Command::MultilevelSwitch(multilevel_switch::Command::Report(_))
+                    )
+                    .then_some(())
+                })
+                .await;
         }
         if has(binary_switch::ID) {
-            let _ = self.req(node, ep, binary_switch::Get {}, |c| matches!(c, Command::BinarySwitch(binary_switch::Command::Report(_))).then_some(())).await;
+            let _ = self
+                .req(node, ep, binary_switch::Get {}, |c| {
+                    matches!(c, Command::BinarySwitch(binary_switch::Command::Report(_)))
+                        .then_some(())
+                })
+                .await;
         }
-        let actuator_or_sensor = [binary_switch::ID, multilevel_switch::ID, multilevel_sensor::ID, binary_sensor::ID, notification::ID, meter::ID]
-            .iter()
-            .any(|&c| has(c));
+        let actuator_or_sensor = [
+            binary_switch::ID,
+            multilevel_switch::ID,
+            multilevel_sensor::ID,
+            binary_sensor::ID,
+            notification::ID,
+            meter::ID,
+        ]
+        .iter()
+        .any(|&c| has(c));
         if has(basic::ID) && !actuator_or_sensor {
-            let _ = self.req(node, ep, basic::Get {}, |c| matches!(c, Command::Basic(basic::Command::Report(_))).then_some(())).await;
+            let _ = self
+                .req(node, ep, basic::Get {}, |c| {
+                    matches!(c, Command::Basic(basic::Command::Report(_))).then_some(())
+                })
+                .await;
         }
         if ep == 0 && has(battery::ID) {
-            let _ = self.req(node, 0, battery::Get {}, |c| matches!(c, Command::Battery(battery::Command::Report(_))).then_some(())).await;
+            let _ = self
+                .req(node, 0, battery::Get {}, |c| {
+                    matches!(c, Command::Battery(battery::Command::Report(_))).then_some(())
+                })
+                .await;
         }
     }
 
     async fn configure_wake_up(&self, node: NodeId) {
-        let Some((has, v)) = self.with_node(node, |r| (r.root().supports(wake_up::ID), r.root().version(wake_up::ID))) else { return };
+        let Some((has, v)) = self.with_node(node, |r| {
+            (
+                r.root().supports(wake_up::ID),
+                r.root().version(wake_up::ID),
+            )
+        }) else {
+            return;
+        };
         if !has {
             return;
         }
@@ -445,19 +653,32 @@ impl Controller {
         if v >= 2 {
             if let Ok(c) = self
                 .req(node, 0, wake_up::IntervalCapabilitiesGet {}, |c| match c {
-                    Command::WakeUp(wake_up::Command::IntervalCapabilitiesReport(r)) => Some(r.clone()),
+                    Command::WakeUp(wake_up::Command::IntervalCapabilitiesReport(r)) => {
+                        Some(r.clone())
+                    }
                     _ => None,
                 })
                 .await
             {
                 want = want.clamp(c.minimum, c.maximum.max(c.minimum));
-                if c.step > 0 {
-                    want = c.minimum + (want - c.minimum) / c.step * c.step;
+                if let Some(steps) = (want - c.minimum).checked_div(c.step) {
+                    want = c.minimum + steps * c.step;
                 }
             }
         }
         let own = self.info().node_id as u8;
-        if let Err(e) = self.send(node, 0, &wake_up::IntervalSet { seconds: want, node_id: own }.into()).await {
+        if let Err(e) = self
+            .send(
+                node,
+                0,
+                &wake_up::IntervalSet {
+                    seconds: want,
+                    node_id: own,
+                }
+                .into(),
+            )
+            .await
+        {
             warn!(node, "wake-up interval: {e}");
             return;
         }
@@ -473,7 +694,10 @@ impl Controller {
     }
 
     async fn configure_lifeline(&self, node: NodeId) {
-        if !self.with_node(node, |r| r.root().supports(association::ID)).unwrap_or(false) {
+        if !self
+            .with_node(node, |r| r.root().supports(association::ID))
+            .unwrap_or(false)
+        {
             return;
         }
         let groups = self
@@ -487,13 +711,25 @@ impl Controller {
             return;
         }
         let own = self.info().node_id as u8;
-        if let Err(e) = self.send(node, 0, &association::Set { group: 1, nodes: vec![own] }.into()).await {
+        if let Err(e) = self
+            .send(
+                node,
+                0,
+                &association::Set {
+                    group: 1,
+                    nodes: vec![own],
+                }
+                .into(),
+            )
+            .await
+        {
             warn!(node, "lifeline: {e}");
         }
     }
 
     /// The classes a node was granted, for callers that need them.
     pub fn security_classes(&self, node: NodeId) -> Vec<SecurityClass> {
-        self.with_node(node, |r| r.security.clone()).unwrap_or_default()
+        self.with_node(node, |r| r.security.clone())
+            .unwrap_or_default()
     }
 }

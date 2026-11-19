@@ -1,0 +1,38 @@
+zwave-bridge
+Copyright (c) 2026 Pulzar LLC and the zwave-bridge contributors. MIT License.
+
+The code is written for this project. Two data files come from elsewhere:
+
+- crates/zwave-cc/defs/tables/*.toml: the multilevel sensor, meter and
+  notification types and scales assigned by the Z-Wave Alliance, converted to
+  TOML from the tables in Z-Wave JS (packages/core/src/registries), which is
+  distributed under this license:
+
+    MIT License
+    
+    Copyright (c) 2018-2024 AlCalzone
+    
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+- crates/zwave-security/tests/data/ctr_drbg_aes128_nodf.rsp: NIST CAVP
+  CTR_DRBG test vectors (public domain).
+
+Z-Wave is a registered trademark of Silicon Labs and its subsidiaries. This
+project is not affiliated with or certified by the Z-Wave Alliance or
+Silicon Labs.

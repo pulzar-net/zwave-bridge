@@ -12,7 +12,9 @@ use zwave_sim::{SimConfig, Simulator};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::from_default_env()).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
     let mut args = std::env::args().skip(1);
     let addr = match args.next().as_deref() {
         Some("--version") => {
@@ -25,7 +27,13 @@ async fn main() -> std::io::Result<()> {
     let specs = vec![
         NodeSpec::switch("switch"),
         NodeSpec::sleeping_sensor("sleeper"),
-        NodeSpec::s2_sensor("s2", vec![SecurityClass::S2Authenticated, SecurityClass::S2Unauthenticated]),
+        NodeSpec::s2_sensor(
+            "s2",
+            vec![
+                SecurityClass::S2Authenticated,
+                SecurityClass::S2Unauthenticated,
+            ],
+        ),
         NodeSpec::smartstart_sensor("smartstart"),
     ];
     for s in &specs {

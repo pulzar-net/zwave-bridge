@@ -27,8 +27,9 @@ use zwave_cc::Command;
 use zwave_security::SecurityClass;
 use zwave_serial::frame::{DataFrame, Frame, FrameCodec, FrameType};
 use zwave_serial::message::{
-    add_mode, AddNodeStatus, ApplicationCommand, ApplicationUpdate, ControllerId, ControllerVersion, InitData, NvmResponse, RemoveNodeStatus, RxStatus,
-    SerialApiCapabilities, TxReport,
+    add_mode, AddNodeStatus, ApplicationCommand, ApplicationUpdate, ControllerId,
+    ControllerVersion, InitData, NvmResponse, RemoveNodeStatus, RxStatus, SerialApiCapabilities,
+    TxReport,
 };
 use zwave_serial::FunctionId as F;
 
@@ -47,7 +48,10 @@ pub struct SimConfig {
 
 impl Default for SimConfig {
     fn default() -> Self {
-        SimConfig { home_id: 0xc0ff_ee01, nvm_size: 4096 }
+        SimConfig {
+            home_id: 0xc0ff_ee01,
+            nvm_size: 4096,
+        }
     }
 }
 
@@ -59,13 +63,15 @@ enum Mode {
     Removing { cb: u8 },
 }
 
+type Inspector = Box<dyn FnOnce(Option<&SimNode>) + Send>;
+
 enum Cmd {
     Press(String, oneshot::Sender<Option<u16>>),
     PowerOn(String, oneshot::Sender<bool>),
     Wake(String, oneshot::Sender<bool>),
     SetSensor(String, u8, f64, oneshot::Sender<bool>),
     Motion(String, oneshot::Sender<bool>),
-    Inspect(String, Box<dyn FnOnce(Option<&SimNode>) + Send>),
+    Inspect(String, Inspector),
     Nvm(oneshot::Sender<Vec<u8>>),
     Attach(Box<dyn PortBox>),
 }
@@ -95,7 +101,15 @@ impl Simulator {
     /// A controller with no nodes in its network.
     pub fn new(cfg: SimConfig) -> Self {
         let nvm = (0..cfg.nvm_size).map(|i| (i * 7 + 3) as u8).collect();
-        Simulator { cfg, nodes: vec![], mode: Mode::Idle, next_id: 2, suc: 0, nvm, last_added: 0 }
+        Simulator {
+            cfg,
+            nodes: vec![],
+            mode: Mode::Idle,
+            next_id: 2,
+            suc: 0,
+            nvm,
+            last_added: 0,
+        }
     }
 
     /// Adds a node that is not in the network yet.
@@ -165,7 +179,16 @@ impl Simulator {
     fn app_frames(id: u16, frames: Vec<Vec<u8>>) -> Vec<DataFrame> {
         frames
             .into_iter()
-            .map(|c| ApplicationCommand { rx_status: RxStatus(0), source: id, destination: None, command: c, rssi: Some(-58) }.to_frame())
+            .map(|c| {
+                ApplicationCommand {
+                    rx_status: RxStatus(0),
+                    source: id,
+                    destination: None,
+                    command: c,
+                    rssi: Some(-58),
+                }
+                .to_frame()
+            })
             .collect()
     }
 
@@ -189,7 +212,12 @@ impl Simulator {
                 let nwi = n.spec.dsk().nwi_home_id();
                 let info = n.spec.nif();
                 let _ = reply.send(true);
-                vec![ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id: nwi, long_range: false, info }.to_frame()]
+                vec![ApplicationUpdate::SmartStartHomeIdReceived {
+                    nwi_home_id: nwi,
+                    long_range: false,
+                    info,
+                }
+                .to_frame()]
             }
             Cmd::Wake(name, reply) => {
                 let Some(n) = self.by_name(&name) else {
@@ -265,7 +293,9 @@ impl Simulator {
         match self.mode {
             Mode::Adding { cb } => {
                 let next = self.next_id;
-                let Some(n) = self.by_name(name) else { return (vec![], None) };
+                let Some(n) = self.by_name(name) else {
+                    return (vec![], None);
+                };
                 if n.id.is_some() {
                     return (vec![], None);
                 }
@@ -284,7 +314,9 @@ impl Simulator {
                 )
             }
             Mode::Removing { cb } => {
-                let Some(n) = self.by_name(name) else { return (vec![], None) };
+                let Some(n) = self.by_name(name) else {
+                    return (vec![], None);
+                };
                 let id = n.id.unwrap_or(0);
                 n.leave();
                 self.mode = Mode::Idle;
@@ -333,18 +365,51 @@ impl Simulator {
                     F::GET_ROUTING_INFO,
                     F::EXTENDED_NVM_OPERATIONS,
                 ]);
-                let c = SerialApiCapabilities { firmware_major: 7, firmware_minor: 22, manufacturer_id: 0x0000, product_type: 0x0004, product_id: 0x0004, functions };
+                let c = SerialApiCapabilities {
+                    firmware_major: 7,
+                    firmware_minor: 22,
+                    manufacturer_id: 0x0000,
+                    product_type: 0x0004,
+                    product_id: 0x0004,
+                    functions,
+                };
                 vec![Self::response(F::GET_SERIAL_API_CAPABILITIES, c.encode())]
             }
-            F::GET_CONTROLLER_VERSION => vec![Self::response(F::GET_CONTROLLER_VERSION, ControllerVersion { version: "Z-Wave 7.22".into(), library_type: 7 }.encode())],
-            F::GET_CONTROLLER_ID => vec![Self::response(F::GET_CONTROLLER_ID, ControllerId { home_id: home, node_id: 1 }.encode())],
+            F::GET_CONTROLLER_VERSION => vec![Self::response(
+                F::GET_CONTROLLER_VERSION,
+                ControllerVersion {
+                    version: "Z-Wave 7.22".into(),
+                    library_type: 7,
+                }
+                .encode(),
+            )],
+            F::GET_CONTROLLER_ID => vec![Self::response(
+                F::GET_CONTROLLER_ID,
+                ControllerId {
+                    home_id: home,
+                    node_id: 1,
+                }
+                .encode(),
+            )],
             F::GET_INIT_DATA => {
                 let mut nodes = vec![1];
                 nodes.extend(self.included());
                 let caps = if self.suc == 1 { 0x08 } else { 0 };
-                vec![Self::response(F::GET_INIT_DATA, InitData { api_version: 9, capabilities: caps, nodes, chip_type: Some(8), chip_version: Some(0) }.encode())]
+                vec![Self::response(
+                    F::GET_INIT_DATA,
+                    InitData {
+                        api_version: 9,
+                        capabilities: caps,
+                        nodes,
+                        chip_type: Some(8),
+                        chip_version: Some(0),
+                    }
+                    .encode(),
+                )]
             }
-            F::GET_CONTROLLER_CAPABILITIES => vec![Self::response(F::GET_CONTROLLER_CAPABILITIES, vec![0x1c])],
+            F::GET_CONTROLLER_CAPABILITIES => {
+                vec![Self::response(F::GET_CONTROLLER_CAPABILITIES, vec![0x1c])]
+            }
             F::SERIAL_API_SETUP => match p.first() {
                 Some(&0x02) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x02, 0x01])],
                 Some(&0x20) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x20, 0x01])],
@@ -357,20 +422,38 @@ impl Simulator {
             }
             F::GET_NODE_PROTOCOL_INFO => {
                 let id = u16::from(p.first().copied().unwrap_or(0));
-                let info = self.node_mut(id).map(|n| n.spec.protocol_info().encode()).unwrap_or(vec![0; 6]);
+                let info = self
+                    .node_mut(id)
+                    .map(|n| n.spec.protocol_info().encode())
+                    .unwrap_or(vec![0; 6]);
                 vec![Self::response(F::GET_NODE_PROTOCOL_INFO, info)]
             }
             F::GET_ROUTING_INFO => {
                 let id = u16::from(p.first().copied().unwrap_or(0));
                 let mut neighbors: Vec<u16> = vec![1];
-                neighbors.extend(self.nodes.iter().filter(|n| n.spec.listening).filter_map(|n| n.id).filter(|&n| n != id));
-                vec![Self::response(F::GET_ROUTING_INFO, zwave_serial::message::encode_node_mask(&neighbors, 29))]
+                neighbors.extend(
+                    self.nodes
+                        .iter()
+                        .filter(|n| n.spec.listening)
+                        .filter_map(|n| n.id)
+                        .filter(|&n| n != id),
+                );
+                vec![Self::response(
+                    F::GET_ROUTING_INFO,
+                    zwave_serial::message::encode_node_mask(&neighbors, 29),
+                )]
             }
             F::REQUEST_NODE_INFO => {
                 let id = u16::from(p.first().copied().unwrap_or(0));
                 let mut out = vec![Self::response(F::REQUEST_NODE_INFO, vec![0x01])];
                 match self.node_mut(id) {
-                    Some(n) if n.reachable() => out.push(ApplicationUpdate::NodeInfoReceived { node: id, info: n.spec.nif() }.to_frame()),
+                    Some(n) if n.reachable() => out.push(
+                        ApplicationUpdate::NodeInfoReceived {
+                            node: id,
+                            info: n.spec.nif(),
+                        }
+                        .to_frame(),
+                    ),
                     _ => out.push(ApplicationUpdate::NodeInfoRequestFailed.to_frame()),
                 }
                 out
@@ -389,7 +472,10 @@ impl Simulator {
                         vec![]
                     }
                     add_mode::SMART_START_DSK => {
-                        let nwi: [u8; 4] = p.get(2..6).and_then(|s| s.try_into().ok()).unwrap_or([0; 4]);
+                        let nwi: [u8; 4] = p
+                            .get(2..6)
+                            .and_then(|s| s.try_into().ok())
+                            .unwrap_or([0; 4]);
                         self.mode = Mode::AddingDsk { cb, nwi };
                         self.include_smartstart()
                     }
@@ -397,7 +483,10 @@ impl Simulator {
                         let was_listening = matches!(self.mode, Mode::Listening);
                         self.mode = Mode::Idle;
                         if cb != 0 && !was_listening {
-                            vec![AddNodeStatus::Done { node: self.last_added }.to_frame(cb)]
+                            vec![AddNodeStatus::Done {
+                                node: self.last_added,
+                            }
+                            .to_frame(cb)]
                         } else {
                             vec![]
                         }
@@ -437,16 +526,35 @@ impl Simulator {
             F::EXTENDED_NVM_OPERATIONS => {
                 let op = p.first().copied().unwrap_or(0xff);
                 let r = match op {
-                    0x00 => NvmResponse { status: 0, offset_or_size: self.nvm.len() as u32, data: vec![] },
+                    0x00 => NvmResponse {
+                        status: 0,
+                        offset_or_size: self.nvm.len() as u32,
+                        data: vec![],
+                    },
                     0x01 => {
                         let len = usize::from(p.get(1).copied().unwrap_or(0));
-                        let off = p.get(2..6).map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]])).unwrap_or(0) as usize;
+                        let off = p
+                            .get(2..6)
+                            .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
+                            .unwrap_or(0) as usize;
                         let end = (off + len).min(self.nvm.len());
                         let data = self.nvm.get(off..end).unwrap_or(&[]).to_vec();
-                        NvmResponse { status: if end >= self.nvm.len() { 0xff } else { 0 }, offset_or_size: off as u32, data }
+                        NvmResponse {
+                            status: if end >= self.nvm.len() { 0xff } else { 0 },
+                            offset_or_size: off as u32,
+                            data,
+                        }
                     }
-                    0x03 => NvmResponse { status: 0, offset_or_size: 0, data: vec![] },
-                    _ => NvmResponse { status: 0x04, offset_or_size: 0, data: vec![] },
+                    0x03 => NvmResponse {
+                        status: 0,
+                        offset_or_size: 0,
+                        data: vec![],
+                    },
+                    _ => NvmResponse {
+                        status: 0x04,
+                        offset_or_size: 0,
+                        data: vec![],
+                    },
                 };
                 vec![Self::response(F::EXTENDED_NVM_OPERATIONS, r.encode(true))]
             }
@@ -458,10 +566,16 @@ impl Simulator {
     }
 
     fn include_smartstart(&mut self) -> Vec<DataFrame> {
-        let Mode::AddingDsk { cb, nwi } = self.mode else { return vec![] };
+        let Mode::AddingDsk { cb, nwi } = self.mode else {
+            return vec![];
+        };
         let next = self.next_id;
         let home = self.cfg.home_id;
-        let Some(n) = self.nodes.iter_mut().find(|n| n.spec.smartstart && n.id.is_none() && n.spec.dsk().nwi_home_id() == nwi) else {
+        let Some(n) = self
+            .nodes
+            .iter_mut()
+            .find(|n| n.spec.smartstart && n.id.is_none() && n.spec.dsk().nwi_home_id() == nwi)
+        else {
             return vec![AddNodeStatus::Failed.to_frame(cb)];
         };
         n.join(next, home);
@@ -491,7 +605,19 @@ impl Simulator {
         };
         let status = if reply.is_some() { 0x00 } else { 0x01 };
         if cb != 0 {
-            let report = TxReport { ticks: 2, repeaters: vec![], ack_rssi: Some(-55), repeater_rssi: vec![], ack_channel: Some(0), tx_channel: 0, route_scheme: 0, speed: 3, attempts: 1, failed_from: None, failed_to: None };
+            let report = TxReport {
+                ticks: 2,
+                repeaters: vec![],
+                ack_rssi: Some(-55),
+                repeater_rssi: vec![],
+                ack_channel: Some(0),
+                tx_channel: 0,
+                route_scheme: 0,
+                speed: 3,
+                attempts: 1,
+                failed_from: None,
+                failed_to: None,
+            };
             let mut cbp = vec![cb, status];
             cbp.extend_from_slice(&report.encode());
             out.push(DataFrame::request(F::SEND_DATA, cbp));
@@ -518,26 +644,38 @@ impl SimHandle {
 
     /// Powers on a SmartStart node: it asks for inclusion while the controller listens.
     pub async fn power_on(&self, name: &str) -> bool {
-        self.ask(|tx| Cmd::PowerOn(name.into(), tx)).await.unwrap_or(false)
+        self.ask(|tx| Cmd::PowerOn(name.into(), tx))
+            .await
+            .unwrap_or(false)
     }
 
     /// Wakes a sleeping node: it sends a Wake Up Notification.
     pub async fn wake_up(&self, name: &str) -> bool {
-        self.ask(|tx| Cmd::Wake(name.into(), tx)).await.unwrap_or(false)
+        self.ask(|tx| Cmd::Wake(name.into(), tx))
+            .await
+            .unwrap_or(false)
     }
 
     /// Changes a sensor reading; a node with a lifeline reports it.
     pub async fn set_sensor(&self, name: &str, sensor_type: u8, value: f64) -> bool {
-        self.ask(|tx| Cmd::SetSensor(name.into(), sensor_type, value, tx)).await.unwrap_or(false)
+        self.ask(|tx| Cmd::SetSensor(name.into(), sensor_type, value, tx))
+            .await
+            .unwrap_or(false)
     }
 
     /// The node detects motion and sends a Notification Report.
     pub async fn motion(&self, name: &str) -> bool {
-        self.ask(|tx| Cmd::Motion(name.into(), tx)).await.unwrap_or(false)
+        self.ask(|tx| Cmd::Motion(name.into(), tx))
+            .await
+            .unwrap_or(false)
     }
 
     /// Reads something from a node's state.
-    pub async fn inspect<T: Send + 'static>(&self, name: &str, f: impl FnOnce(&SimNode) -> T + Send + 'static) -> Option<T> {
+    pub async fn inspect<T: Send + 'static>(
+        &self,
+        name: &str,
+        f: impl FnOnce(&SimNode) -> T + Send + 'static,
+    ) -> Option<T> {
         let (tx, rx) = oneshot::channel();
         let cmd = Cmd::Inspect(
             name.into(),
@@ -556,7 +694,9 @@ impl SimHandle {
 
     /// The classes the node holds keys for.
     pub async fn granted(&self, name: &str) -> Vec<SecurityClass> {
-        self.inspect(name, |n| n.granted.clone()).await.unwrap_or_default()
+        self.inspect(name, |n| n.granted.clone())
+            .await
+            .unwrap_or_default()
     }
 
     /// The simulated NVM image.

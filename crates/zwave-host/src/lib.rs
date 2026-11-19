@@ -106,10 +106,13 @@ mod hex_key {
         s.serialize_str(&hex::encode(k))
     }
 
-    pub fn deserialize<'de, D: Deserializer<'de>, const N: usize>(d: D) -> Result<[u8; N], D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>, const N: usize>(
+        d: D,
+    ) -> Result<[u8; N], D::Error> {
         let s = String::deserialize(d)?;
         let v = hex::decode(s.trim()).map_err(serde::de::Error::custom)?;
-        v.try_into().map_err(|_| serde::de::Error::custom(format!("expected {N} bytes")))
+        v.try_into()
+            .map_err(|_| serde::de::Error::custom(format!("expected {N} bytes")))
     }
 }
 

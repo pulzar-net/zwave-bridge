@@ -1,0 +1,118 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  NIGHTLY: nightly-2026-11-14
+  ZIG: 0.16.0
+  ZIGBUILD: 0.24.1
+
+jobs:
+  test:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      # Installs rustup too where the runner has none (the self-hosted one).
+      - uses: dtolnay/rust-toolchain@stable
+        timeout-minutes: 10
+        with:
+          components: rustfmt, clippy
+      - name: Mosquitto for the MQTT end-to-end test
+        timeout-minutes: 10
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mosquitto
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+        env:
+          ZWAVE_BRIDGE_REQUIRE_MQTT: "1"
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # A short run of every fuzz target, so a parser that panics fails the build.
+  fuzz:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        timeout-minutes: 10
+        with:
+          toolchain: ${{ env.NIGHTLY }}
+      - uses: taiki-e/install-action@v2
+        timeout-minutes: 10
+        with:
+          tool: cargo-fuzz
+      - name: Fuzz each target for 30 s
+        run: |
+          set -euo pipefail
+          cd fuzz
+          for t in $(cargo +${NIGHTLY} fuzz list); do
+            echo "::group::${t}"
+            cargo +${NIGHTLY} fuzz run "${t}" -- -max_total_time=30 -rss_limit_mb=1024
+            echo "::endgroup::"
+          done
+
+  # Static musl builds for gateways, with the tests run under qemu, and the
+  # size budget checked. mipsel is a tier 3 target: std is built from source
+  # on a pinned nightly and linked against zig's musl.
+  cross:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: [aarch64-unknown-linux-musl, mipsel-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        timeout-minutes: 10
+        with:
+          toolchain: ${{ env.NIGHTLY }}
+          components: rust-src
+          targets: aarch64-unknown-linux-musl
+      - uses: mlugg/setup-zig@v2
+        timeout-minutes: 10
+        with:
+          version: ${{ env.ZIG }}
+      - uses: taiki-e/install-action@v2
+        timeout-minutes: 10
+        with:
+          tool: cargo-zigbuild@${{ env.ZIGBUILD }}
+      - name: qemu-user and mosquitto
+        timeout-minutes: 10
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends qemu-user mosquitto file
+      - name: Test under qemu, build, check static and size
+        env:
+          TARGET: ${{ matrix.target }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUNNER: qemu-aarch64
+          CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUNNER: qemu-mipsel
+          CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_RUSTFLAGS: -C target-feature=+crt-static -C link-self-contained=no
+          ZWAVE_BRIDGE_REQUIRE_MQTT: "1"
+        run: |
+          set -euo pipefail
+          std=()
+          case "${TARGET}" in mips*) std=(-Zbuild-std) ;; esac
+          cargo +${NIGHTLY} zigbuild test --workspace --target "${TARGET}" "${std[@]}"
+          case "${TARGET}" in mips*) std=(-Zbuild-std=std,panic_abort) ;; esac
+          cargo +${NIGHTLY} zigbuild --release -p zwave-bridge -p zwave-sim --target "${TARGET}" "${std[@]}"
+          runner="CARGO_TARGET_$(echo "${TARGET}" | tr 'a-z-' 'A-Z_')_RUNNER"
+          for bin in zwave-bridge zwave-sim; do
+            f="target/${TARGET}/release/${bin}"
+            file "${f}" | grep -q 'statically linked' || { file "${f}"; echo "${bin} is not static" >&2; exit 1; }
+            "${!runner}" "${f}" --version
+            size=$(stat -c %s "${f}")
+            echo "${bin}: ${size} bytes"
+          done
+          size=$(stat -c %s "target/${TARGET}/release/zwave-bridge")
+          [ "${size}" -lt 4194304 ] || { echo "zwave-bridge is ${size} bytes, over the 4 MiB budget" >&2; exit 1; }

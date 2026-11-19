@@ -16,7 +16,7 @@ edition = "2021"
 rust-version = "1.89"
 license = "MIT"
 repository = "https://github.com/pulzar-net/zwave-bridge"
-authors = ["Pulzar <oss@pulzr.net>"]
+authors = ["Pulzar LLC"]
 
 [workspace.dependencies]
 zwave-serial = { path = "crates/zwave-serial", version = "0.1.0", default-features = false }

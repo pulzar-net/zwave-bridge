@@ -1,6 +1,38 @@
 [package]
 name = "zwave-bridge"
+description = "Z-Wave to MQTT bridge: a Z-Wave controller on a serial port, Home Assistant discovery and a plain JSON topic scheme"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-publish = false
+repository.workspace = true
+authors.workspace = true
+keywords = ["zwave", "z-wave", "mqtt", "home-assistant", "bridge"]
+categories = ["command-line-utilities", "network-programming", "embedded"]
+
+[[bin]]
+name = "zwave-bridge"
+path = "src/main.rs"
+
+[dependencies]
+zwave-host.workspace = true
+zwave-serial = { workspace = true, features = ["serialport"] }
+zwave-security = { workspace = true, features = ["serde"] }
+zwave-cc.workspace = true
+rumqttc = { version = "0.25", default-features = false }
+tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "signal", "fs"] }
+serde.workspace = true
+serde_json.workspace = true
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
+lexopt = "0.3"
+anyhow = "1"
+
+[dev-dependencies]
+zwave-sim.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "process", "net"] }
+tempfile = "3"
+
+[lints]
+workspace = true

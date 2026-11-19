@@ -9,7 +9,7 @@ use crate::values;
 use crate::{Error, Event, NetworkKeys, NodeId};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot, Notify};
@@ -20,8 +20,8 @@ use zwave_security::s0::{S0Manager, S0Payload};
 use zwave_security::s2::{EncryptOptions, KeyId, S2Manager};
 use zwave_security::SecurityClass;
 use zwave_serial::message::{
-    self, tx_options, ApplicationCommand, ApplicationUpdate, ControllerId, ControllerVersion, InitData, NodeProtocolInfo,
-    SendDataResult, SerialApiCapabilities, TransmitStatus,
+    self, tx_options, ApplicationCommand, ApplicationUpdate, ControllerId, ControllerVersion,
+    InitData, NodeProtocolInfo, SendDataResult, SerialApiCapabilities, TransmitStatus,
 };
 use zwave_serial::port::Port;
 use zwave_serial::{DataFrame, FunctionId as F, Request, SerialApi};
@@ -139,7 +139,9 @@ pub(crate) enum RxSecurity {
 pub(crate) enum TxSecurity {
     Plain,
     S2(KeyId),
-    S0 { temp: bool },
+    S0 {
+        temp: bool,
+    },
     /// Whatever the node's record says for this command class.
     Auto,
 }
@@ -147,7 +149,11 @@ pub(crate) enum TxSecurity {
 /// Something a waiter can receive.
 #[derive(Debug, Clone)]
 pub(crate) enum Inbound {
-    Command { endpoint: u8, command: Command, security: Option<RxSecurity> },
+    Command {
+        endpoint: u8,
+        command: Command,
+        security: Option<RxSecurity>,
+    },
     S2Nonce,
     S0Nonce,
     NodeInfo(message::NodeInfo),
@@ -157,7 +163,7 @@ pub(crate) enum Inbound {
 type Matcher = Box<dyn Fn(&Inbound) -> bool + Send>;
 
 struct Waiter {
-    id: u64,
+    id: u32,
     node: NodeId,
     broadcast: bool,
     matcher: Matcher,
@@ -167,7 +173,7 @@ struct Waiter {
 /// Removes its waiter when dropped.
 pub(crate) struct WaitGuard {
     inner: Arc<Inner>,
-    id: u64,
+    id: u32,
 }
 
 impl Drop for WaitGuard {
@@ -201,7 +207,7 @@ pub(crate) struct Inner {
     pub(crate) s0: Mutex<S0Manager>,
     pub(crate) keypair: KeyPair,
     waiters: Mutex<Vec<Waiter>>,
-    next_waiter: AtomicU64,
+    next_waiter: AtomicU32,
     events: mpsc::Sender<Event>,
     dirty: Notify,
     store_failed: Mutex<Option<String>>,
@@ -250,41 +256,89 @@ impl Controller {
     /// Initializes the controller on `port`, loads the store, starts the
     /// dispatcher and resumes interviews. Events arrive on the returned
     /// channel; read it, or events are dropped when it fills.
-    pub async fn start<P: Port>(port: P, cfg: HostConfig) -> Result<(Controller, mpsc::Receiver<Event>), Error> {
+    pub async fn start<P: Port>(
+        port: P,
+        cfg: HostConfig,
+    ) -> Result<(Controller, mpsc::Receiver<Event>), Error> {
         let (api, unsolicited) = SerialApi::start(port, cfg.serial.clone());
         let t = Duration::from_secs(2);
-        let caps = SerialApiCapabilities::parse(&api.request(DataFrame::request(F::GET_SERIAL_API_CAPABILITIES, vec![]), t).await?.payload)
-            .map_err(|e| Error::Controller(e.to_string()))?;
-        let version = ControllerVersion::parse(&api.request(DataFrame::request(F::GET_CONTROLLER_VERSION, vec![]), t).await?.payload)
-            .map_err(|e| Error::Controller(e.to_string()))?;
-        let id = ControllerId::parse(&api.request(DataFrame::request(F::GET_CONTROLLER_ID, vec![]), t).await?.payload, 1)
-            .map_err(|e| Error::Controller(e.to_string()))?;
-        let init = InitData::parse(&api.request(DataFrame::request(F::GET_INIT_DATA, vec![]), t).await?.payload)
-            .map_err(|e| Error::Controller(e.to_string()))?;
+        let caps = SerialApiCapabilities::parse(
+            &api.request(
+                DataFrame::request(F::GET_SERIAL_API_CAPABILITIES, vec![]),
+                t,
+            )
+            .await?
+            .payload,
+        )
+        .map_err(|e| Error::Controller(e.to_string()))?;
+        let version = ControllerVersion::parse(
+            &api.request(DataFrame::request(F::GET_CONTROLLER_VERSION, vec![]), t)
+                .await?
+                .payload,
+        )
+        .map_err(|e| Error::Controller(e.to_string()))?;
+        let id = ControllerId::parse(
+            &api.request(DataFrame::request(F::GET_CONTROLLER_ID, vec![]), t)
+                .await?
+                .payload,
+            1,
+        )
+        .map_err(|e| Error::Controller(e.to_string()))?;
+        let init = InitData::parse(
+            &api.request(DataFrame::request(F::GET_INIT_DATA, vec![]), t)
+                .await?
+                .payload,
+        )
+        .map_err(|e| Error::Controller(e.to_string()))?;
         if init.is_end_node() {
-            return Err(Error::Controller("the device runs the end node API, not a controller".into()));
+            return Err(Error::Controller(
+                "the device runs the end node API, not a controller".into(),
+            ));
         }
         let mut region = None;
         if caps.supports(F::SERIAL_API_SETUP) {
             let r = api
-                .request(DataFrame::request(F::SERIAL_API_SETUP, vec![message::setup::SET_TX_STATUS_REPORT, 0xff]), t)
+                .request(
+                    DataFrame::request(
+                        F::SERIAL_API_SETUP,
+                        vec![message::setup::SET_TX_STATUS_REPORT, 0xff],
+                    ),
+                    t,
+                )
                 .await;
             if let Err(e) = r {
                 warn!("could not enable transmit reports: {e}");
             }
-            if let Ok(r) = api.request(DataFrame::request(F::SERIAL_API_SETUP, vec![message::setup::GET_RF_REGION]), t).await {
+            if let Ok(r) = api
+                .request(
+                    DataFrame::request(F::SERIAL_API_SETUP, vec![message::setup::GET_RF_REGION]),
+                    t,
+                )
+                .await
+            {
                 if r.payload.first() == Some(&message::setup::GET_RF_REGION) {
-                    region = r.payload.get(1).map(|&b| region_name(message::RfRegion::from_u8(b)));
+                    region = r
+                        .payload
+                        .get(1)
+                        .map(|&b| region_name(message::RfRegion::from_u8(b)));
                 }
             }
         }
         let mut sis = init.is_sis();
         if !init.is_secondary() && caps.supports(F::GET_SUC_NODE_ID) {
-            let suc = api.request(DataFrame::request(F::GET_SUC_NODE_ID, vec![]), t).await?;
+            let suc = api
+                .request(DataFrame::request(F::GET_SUC_NODE_ID, vec![]), t)
+                .await?;
             if suc.payload.first() == Some(&0) && caps.supports(F::SET_SUC_NODE_ID) {
                 // No SUC in the network: make the controller the SIS, as hosts do.
                 let r = api
-                    .request(DataFrame::request(F::SET_SUC_NODE_ID, vec![id.node_id as u8, 0x01, 0x00, 0x01, 0x00]), t)
+                    .request(
+                        DataFrame::request(
+                            F::SET_SUC_NODE_ID,
+                            vec![id.node_id as u8, 0x01, 0x00, 0x01, 0x00],
+                        ),
+                        t,
+                    )
                     .await?;
                 sis = r.payload.first() == Some(&1);
                 info!("controller made SIS: {sis}");
@@ -300,13 +354,23 @@ impl Controller {
         if let (Some(h), Some(p)) = (data.home_id, &cfg.store_path) {
             if h != id.home_id {
                 let aside = p.with_extension(format!("json.{h:08x}"));
-                warn!("store {} is for home {h:08x}, the controller is in {:08x}; moving it to {}", p.display(), id.home_id, aside.display());
+                warn!(
+                    "store {} is for home {h:08x}, the controller is in {:08x}; moving it to {}",
+                    p.display(),
+                    id.home_id,
+                    aside.display()
+                );
                 std::fs::rename(p, &aside).map_err(|e| Error::Store(e.to_string()))?;
                 data = StoreData::default();
             }
         }
         data.home_id = Some(id.home_id);
-        let nodes: Vec<NodeId> = init.nodes.iter().copied().filter(|&n| n != id.node_id).collect();
+        let nodes: Vec<NodeId> = init
+            .nodes
+            .iter()
+            .copied()
+            .filter(|&n| n != id.node_id)
+            .collect();
         data.nodes.retain(|n, _| nodes.contains(n));
         for &n in &nodes {
             data.nodes.entry(n).or_insert_with(|| NodeRecord::new(n));
@@ -350,7 +414,7 @@ impl Controller {
             s0: Mutex::new(s0),
             keypair,
             waiters: Mutex::new(Vec::new()),
-            next_waiter: AtomicU64::new(1),
+            next_waiter: AtomicU32::new(1),
             events: etx,
             dirty: Notify::new(),
             store_failed: Mutex::new(None),
@@ -367,15 +431,26 @@ impl Controller {
         tokio::spawn(c.clone().dispatch(unsolicited));
         c.emit(Event::Ready(info));
         for n in nodes {
-            let needs_protocol = c.with_node(n, |r| r.stage < InterviewStage::ProtocolInfo).unwrap_or(false);
+            let needs_protocol = c
+                .with_node(n, |r| r.stage < InterviewStage::ProtocolInfo)
+                .unwrap_or(false);
             if needs_protocol {
                 if let Err(e) = c.fetch_protocol_info(n).await {
                     warn!(node = n, "protocol info: {e}");
                 }
             }
             let sleeping = c.with_node(n, |r| r.protocol.sleeping()).unwrap_or(false);
-            c.set_status(n, if sleeping { NodeStatus::Asleep } else { NodeStatus::Unknown });
-            if c.with_node(n, |r| r.stage < InterviewStage::Complete).unwrap_or(false) {
+            c.set_status(
+                n,
+                if sleeping {
+                    NodeStatus::Asleep
+                } else {
+                    NodeStatus::Unknown
+                },
+            );
+            if c.with_node(n, |r| r.stage < InterviewStage::Complete)
+                .unwrap_or(false)
+            {
                 c.spawn_interview(n);
             }
         }
@@ -400,21 +475,45 @@ impl Controller {
 
     /// A node's record.
     pub fn node(&self, node: NodeId) -> Option<NodeRecord> {
-        self.inner.store.lock().expect("store lock").nodes.get(&node).cloned()
+        self.inner
+            .store
+            .lock()
+            .expect("store lock")
+            .nodes
+            .get(&node)
+            .cloned()
     }
 
     /// Every node's record.
     pub fn nodes(&self) -> Vec<NodeRecord> {
-        self.inner.store.lock().expect("store lock").nodes.values().cloned().collect()
+        self.inner
+            .store
+            .lock()
+            .expect("store lock")
+            .nodes
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// A node's runtime status.
     pub fn status(&self, node: NodeId) -> NodeStatus {
-        self.inner.runtime.lock().expect("runtime lock").get(&node).map(|r| r.status).unwrap_or_default()
+        self.inner
+            .runtime
+            .lock()
+            .expect("runtime lock")
+            .get(&node)
+            .map(|r| r.status)
+            .unwrap_or_default()
     }
 
     /// Sets a node's name and location (persisted).
-    pub fn set_name(&self, node: NodeId, name: Option<String>, location: Option<String>) -> Result<(), Error> {
+    pub fn set_name(
+        &self,
+        node: NodeId,
+        name: Option<String>,
+        location: Option<String>,
+    ) -> Result<(), Error> {
         self.update_node(node, |r| {
             r.name = name;
             r.location = location;
@@ -430,7 +529,9 @@ impl Controller {
 
     /// Writes the store now (e.g. before shutting down).
     pub fn flush(&self) -> Result<(), Error> {
-        let Some(path) = self.inner.cfg.store_path.clone() else { return Ok(()) };
+        let Some(path) = self.inner.cfg.store_path.clone() else {
+            return Ok(());
+        };
         let data = self.inner.store.lock().expect("store lock").clone();
         store::save(&path, &data).map_err(Error::Store)
     }
@@ -446,7 +547,9 @@ impl Controller {
     }
 
     async fn store_writer(self) {
-        let Some(path) = self.inner.cfg.store_path.clone() else { return };
+        let Some(path) = self.inner.cfg.store_path.clone() else {
+            return;
+        };
         let weak = Arc::downgrade(&self.inner);
         drop(self);
         loop {
@@ -472,10 +575,20 @@ impl Controller {
     }
 
     pub(crate) fn with_node<T>(&self, node: NodeId, f: impl FnOnce(&NodeRecord) -> T) -> Option<T> {
-        self.inner.store.lock().expect("store lock").nodes.get(&node).map(f)
+        self.inner
+            .store
+            .lock()
+            .expect("store lock")
+            .nodes
+            .get(&node)
+            .map(f)
     }
 
-    pub(crate) fn update_node(&self, node: NodeId, f: impl FnOnce(&mut NodeRecord)) -> Result<(), Error> {
+    pub(crate) fn update_node(
+        &self,
+        node: NodeId,
+        f: impl FnOnce(&mut NodeRecord),
+    ) -> Result<(), Error> {
         {
             let mut s = self.inner.store.lock().expect("store lock");
             let r = s.nodes.get_mut(&node).ok_or(Error::UnknownNode(node))?;
@@ -512,11 +625,20 @@ impl Controller {
         let r = rt.entry(node).or_default();
         r.inflight += 1;
         r.last_activity = Some(Instant::now());
-        Activity { inner: self.inner.clone(), node }
+        Activity {
+            inner: self.inner.clone(),
+            node,
+        }
     }
 
     fn node_lock(&self, node: NodeId) -> Arc<tokio::sync::Mutex<()>> {
-        self.inner.node_locks.lock().expect("lock").entry(node).or_default().clone()
+        self.inner
+            .node_locks
+            .lock()
+            .expect("lock")
+            .entry(node)
+            .or_default()
+            .clone()
     }
 
     /// Registers a waiter for something from `node`.
@@ -528,8 +650,24 @@ impl Controller {
     ) -> (WaitGuard, oneshot::Receiver<Inbound>) {
         let id = self.inner.next_waiter.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
-        self.inner.waiters.lock().expect("waiters lock").push(Waiter { id, node, broadcast, matcher: Box::new(matcher), tx: Some(tx) });
-        (WaitGuard { inner: self.inner.clone(), id }, rx)
+        self.inner
+            .waiters
+            .lock()
+            .expect("waiters lock")
+            .push(Waiter {
+                id,
+                node,
+                broadcast,
+                matcher: Box::new(matcher),
+                tx: Some(tx),
+            });
+        (
+            WaitGuard {
+                inner: self.inner.clone(),
+                id,
+            },
+            rx,
+        )
     }
 
     /// Hands `what` to waiters for `node`; true if one took it.
@@ -560,10 +698,12 @@ impl Controller {
                     Ok(ac) => self.on_application_command(ac).await,
                     Err(e) => debug!("{e}"),
                 },
-                F::BRIDGE_APPLICATION_COMMAND_HANDLER => match ApplicationCommand::parse_bridge(&f.payload, 1) {
-                    Ok(ac) => self.on_application_command(ac).await,
-                    Err(e) => debug!("{e}"),
-                },
+                F::BRIDGE_APPLICATION_COMMAND_HANDLER => {
+                    match ApplicationCommand::parse_bridge(&f.payload, 1) {
+                        Ok(ac) => self.on_application_command(ac).await,
+                        Err(e) => debug!("{e}"),
+                    }
+                }
                 F::APPLICATION_UPDATE => match ApplicationUpdate::parse(&f.payload, 1) {
                     Ok(u) => self.on_application_update(u).await,
                     Err(e) => debug!("{e}"),
@@ -590,19 +730,35 @@ impl Controller {
                 }
             }
             ApplicationUpdate::NodeInfoRequestFailed => {
-                let waiting: Vec<NodeId> = self.inner.waiters.lock().expect("lock").iter().map(|w| w.node).collect();
+                let waiting: Vec<NodeId> = self
+                    .inner
+                    .waiters
+                    .lock()
+                    .expect("lock")
+                    .iter()
+                    .map(|w| w.node)
+                    .collect();
                 for n in waiting {
                     self.deliver(n, Inbound::NodeInfoFailed);
                 }
             }
-            ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id, .. } => self.on_smartstart_request(nwi_home_id),
+            ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id, .. } => {
+                self.on_smartstart_request(nwi_home_id)
+            }
             ApplicationUpdate::NodeRemoved { node } => self.forget_node(node),
             other => debug!("application update {other:?}"),
         }
     }
 
     pub(crate) fn forget_node(&self, node: NodeId) {
-        let existed = self.inner.store.lock().expect("store lock").nodes.remove(&node).is_some();
+        let existed = self
+            .inner
+            .store
+            .lock()
+            .expect("store lock")
+            .nodes
+            .remove(&node)
+            .is_some();
         self.inner.runtime.lock().expect("lock").remove(&node);
         self.inner.s2.lock().expect("lock").forget_peer(node);
         {
@@ -615,7 +771,12 @@ impl Controller {
                 }
             }
         }
-        self.inner.info.lock().expect("lock").nodes.retain(|&n| n != node);
+        self.inner
+            .info
+            .lock()
+            .expect("lock")
+            .nodes
+            .retain(|&n| n != node);
         if existed {
             self.mark_dirty();
             self.emit(Event::NodeRemoved { node });
@@ -636,18 +797,28 @@ impl Controller {
         let mut security: Option<RxSecurity> = None;
         let mut supervision: Option<(u8, bool)> = None;
         for _ in 0..8 {
-            let (Some(&cc), cmd) = (frame.first(), frame.get(1).copied()) else { return };
+            let (Some(&cc), cmd) = (frame.first(), frame.get(1).copied()) else {
+                return;
+            };
             match (cc, cmd) {
                 (transport_service::CC, _) => match transport_service::parse(&frame) {
-                    Ok(seg @ (transport_service::Segment::First { .. } | transport_service::Segment::Subsequent { .. })) => {
+                    Ok(
+                        seg @ (transport_service::Segment::First { .. }
+                        | transport_service::Segment::Subsequent { .. }),
+                    ) => {
                         let session = match &seg {
-                            transport_service::Segment::First { session, .. } | transport_service::Segment::Subsequent { session, .. } => *session,
+                            transport_service::Segment::First { session, .. }
+                            | transport_service::Segment::Subsequent { session, .. } => *session,
                             _ => 0,
                         };
                         let r = self.inner.reassembler.lock().expect("lock").push(node, seg);
                         match r {
                             Ok(transport_service::Reassembly::Done(d)) => {
-                                self.send_detached(node, transport_service::complete(session), TxSecurity::Plain);
+                                self.send_detached(
+                                    node,
+                                    transport_service::complete(session),
+                                    TxSecurity::Plain,
+                                );
                                 frame = d;
                                 continue;
                             }
@@ -676,14 +847,24 @@ impl Controller {
                 },
                 (0x9f, Some(0x01)) => {
                     // The node wants to send us something encrypted.
-                    let report = self.inner.s2.lock().expect("lock").nonce_report(node, false);
+                    let report = self
+                        .inner
+                        .s2
+                        .lock()
+                        .expect("lock")
+                        .nonce_report(node, false);
                     if let Ok(r) = report {
                         self.transmit_logged(node, r).await;
                     }
                     return;
                 }
                 (0x9f, Some(0x02)) => {
-                    let r = self.inner.s2.lock().expect("lock").handle_nonce_report(node, &frame);
+                    let r = self
+                        .inner
+                        .s2
+                        .lock()
+                        .expect("lock")
+                        .handle_nonce_report(node, &frame);
                     match r {
                         Ok(report) => {
                             let ours = self.deliver(node, Inbound::S2Nonce);
@@ -707,7 +888,11 @@ impl Controller {
                 }
                 (0x9f, Some(0x03)) => {
                     let r = if ac.rx_status.multicast() {
-                        self.inner.s2.lock().expect("lock").decrypt_multicast(node, &frame)
+                        self.inner
+                            .s2
+                            .lock()
+                            .expect("lock")
+                            .decrypt_multicast(node, &frame)
                     } else {
                         self.inner.s2.lock().expect("lock").decrypt(node, &frame)
                     };
@@ -720,7 +905,8 @@ impl Controller {
                         Err(e) => {
                             debug!(node, "S2 decryption failed: {e}; asking for a resync");
                             let mos = ac.rx_status.multicast();
-                            let report = self.inner.s2.lock().expect("lock").nonce_report(node, mos);
+                            let report =
+                                self.inner.s2.lock().expect("lock").nonce_report(node, mos);
                             if let Ok(r) = report {
                                 self.transmit_logged(node, r).await;
                             }
@@ -736,13 +922,25 @@ impl Controller {
                     return;
                 }
                 (0x98, Some(0x80)) => {
-                    if self.inner.s0.lock().expect("lock").handle_nonce_report(node, &frame).is_ok() {
+                    if self
+                        .inner
+                        .s0
+                        .lock()
+                        .expect("lock")
+                        .handle_nonce_report(node, &frame)
+                        .is_ok()
+                    {
                         self.deliver(node, Inbound::S0Nonce);
                     }
                     return;
                 }
                 (0x98, Some(c @ (0x81 | 0xc1))) => {
-                    let r = self.inner.s0.lock().expect("lock").decapsulate(node, &frame, false);
+                    let r = self
+                        .inner
+                        .s0
+                        .lock()
+                        .expect("lock")
+                        .decapsulate(node, &frame, false);
                     if c == 0xc1 {
                         let report = self.inner.s0.lock().expect("lock").nonce_report(node);
                         if let Ok(r) = report {
@@ -761,26 +959,30 @@ impl Controller {
                         }
                     }
                 }
-                (multi_channel::ID8, Some(multi_channel::CommandEncapsulation::ID)) => match multi_channel::CommandEncapsulation::parse(&frame[2..]) {
-                    Ok(e) => {
-                        endpoint = e.source_end_point;
-                        frame = e.command;
+                (multi_channel::ID8, Some(multi_channel::CommandEncapsulation::ID)) => {
+                    match multi_channel::CommandEncapsulation::parse(&frame[2..]) {
+                        Ok(e) => {
+                            endpoint = e.source_end_point;
+                            frame = e.command;
+                        }
+                        Err(e) => {
+                            debug!(node, "{e}");
+                            return;
+                        }
                     }
-                    Err(e) => {
-                        debug!(node, "{e}");
-                        return;
+                }
+                (supervision::ID8, Some(supervision::Get::ID)) => {
+                    match supervision::Get::parse(&frame[2..]) {
+                        Ok(g) => {
+                            supervision = Some((g.session_id, g.status_updates));
+                            frame = g.command;
+                        }
+                        Err(e) => {
+                            debug!(node, "{e}");
+                            return;
+                        }
                     }
-                },
-                (supervision::ID8, Some(supervision::Get::ID)) => match supervision::Get::parse(&frame[2..]) {
-                    Ok(g) => {
-                        supervision = Some((g.session_id, g.status_updates));
-                        frame = g.command;
-                    }
-                    Err(e) => {
-                        debug!(node, "{e}");
-                        return;
-                    }
-                },
+                }
                 _ => break,
             }
         }
@@ -795,15 +997,31 @@ impl Controller {
         let cc = command.cc();
         if security.is_none() {
             let must_be_secure = self
-                .with_node(node, |r| r.secure_ccs_known && r.endpoints.get(&endpoint).and_then(|e| e.ccs.get(&cc)).is_some_and(|s| s.secure))
+                .with_node(node, |r| {
+                    r.secure_ccs_known
+                        && r.endpoints
+                            .get(&endpoint)
+                            .and_then(|e| e.ccs.get(&cc))
+                            .is_some_and(|s| s.secure)
+                })
                 .unwrap_or(false);
             if must_be_secure {
-                warn!(node, cc, "dropped a secure command class sent without security");
+                warn!(
+                    node,
+                    cc, "dropped a secure command class sent without security"
+                );
                 return;
             }
         }
         if let Some((session, _)) = supervision {
-            let report: Command = supervision::Report { more_status_updates: false, wake_up_request: false, session_id: session, status: 0xff, duration: Some(0) }.into();
+            let report: Command = supervision::Report {
+                more_status_updates: false,
+                wake_up_request: false,
+                session_id: session,
+                status: 0xff,
+                duration: Some(0),
+            }
+            .into();
             let sec = match security {
                 Some(RxSecurity::S2(k)) => TxSecurity::S2(k),
                 Some(RxSecurity::S0) => TxSecurity::S0 { temp: false },
@@ -815,13 +1033,21 @@ impl Controller {
         self.on_command(node, endpoint, command, security).await;
     }
 
-    async fn on_command(&self, node: NodeId, endpoint: u8, command: Command, security: Option<RxSecurity>) {
+    async fn on_command(
+        &self,
+        node: NodeId,
+        endpoint: u8,
+        command: Command,
+        security: Option<RxSecurity>,
+    ) {
         {
             let mut rt = self.inner.runtime.lock().expect("lock");
             let r = rt.entry(node).or_default();
             r.last_activity = Some(Instant::now());
         }
-        let listening = self.with_node(node, |r| !r.protocol.sleeping()).unwrap_or(true);
+        let listening = self
+            .with_node(node, |r| !r.protocol.sleeping())
+            .unwrap_or(true);
         if listening && self.status(node) != NodeStatus::Alive {
             self.set_status(node, NodeStatus::Alive);
         }
@@ -829,13 +1055,27 @@ impl Controller {
             self.on_wake_up(node);
         }
         if let Command::DeviceResetLocally(_) = &command {
-            warn!(node, "the node was reset locally; remove it with remove_failed_node");
+            warn!(
+                node,
+                "the node was reset locally; remove it with remove_failed_node"
+            );
         }
         let updates = values::from_command(node, endpoint, &command);
-        let taken = self.deliver(node, Inbound::Command { endpoint, command: command.clone(), security });
+        let taken = self.deliver(
+            node,
+            Inbound::Command {
+                endpoint,
+                command: command.clone(),
+                security,
+            },
+        );
         if updates.is_empty() {
             if !taken {
-                self.emit(Event::Command { node, endpoint, command });
+                self.emit(Event::Command {
+                    node,
+                    endpoint,
+                    command,
+                });
             }
         } else {
             for u in updates {
@@ -865,7 +1105,9 @@ impl Controller {
             let ready = {
                 let rt = self.inner.runtime.lock().expect("lock");
                 let Some(r) = rt.get(&node) else { return };
-                r.inflight == 0 && r.wake_tickets.is_empty() && r.last_activity.is_none_or(|t| t.elapsed() >= idle)
+                r.inflight == 0
+                    && r.wake_tickets.is_empty()
+                    && r.last_activity.is_none_or(|t| t.elapsed() >= idle)
             };
             if ready {
                 break;
@@ -886,7 +1128,10 @@ impl Controller {
 
     /// Marks a just-included sleeping node awake so its interview can run.
     pub(crate) fn assume_awake(&self, node: NodeId) {
-        if self.with_node(node, |r| r.protocol.sleeping()).unwrap_or(false) {
+        if self
+            .with_node(node, |r| r.protocol.sleeping())
+            .unwrap_or(false)
+        {
             self.on_wake_up(node);
         } else {
             self.set_status(node, NodeStatus::Alive);
@@ -915,7 +1160,9 @@ impl Controller {
     pub(crate) async fn transmit(&self, node: NodeId, frame: Vec<u8>) -> Result<(), Error> {
         if frame.len() > MAX_SEND_PAYLOAD {
             let session = self.inner.transport_session.fetch_add(1, Ordering::Relaxed) & 0x0f;
-            for seg in transport_service::segment(&frame, session, transport_service::DEFAULT_SEGMENT) {
+            for seg in
+                transport_service::segment(&frame, session, transport_service::DEFAULT_SEGMENT)
+            {
                 self.send_data(node, seg).await?;
             }
             return Ok(());
@@ -933,13 +1180,23 @@ impl Controller {
             Duration::from_secs(65),
         );
         let ex = api.execute(req).await?;
-        let resp = ex.response.ok_or(Error::Controller("no SendData response".into()))?;
+        let resp = ex
+            .response
+            .ok_or(Error::Controller("no SendData response".into()))?;
         if resp.payload.first() != Some(&1) {
-            return Err(Error::TransmitFailed(node, "controller refused SendData".into()));
+            return Err(Error::TransmitFailed(
+                node,
+                "controller refused SendData".into(),
+            ));
         }
-        let cbf = ex.callback.ok_or(Error::Controller("no SendData callback".into()))?;
-        let res = SendDataResult::parse(&cbf.payload).map_err(|e| Error::Controller(e.to_string()))?;
-        let listening = self.with_node(node, |r| !r.protocol.sleeping()).unwrap_or(true);
+        let cbf = ex
+            .callback
+            .ok_or(Error::Controller("no SendData callback".into()))?;
+        let res =
+            SendDataResult::parse(&cbf.payload).map_err(|e| Error::Controller(e.to_string()))?;
+        let listening = self
+            .with_node(node, |r| !r.protocol.sleeping())
+            .unwrap_or(true);
         match res.status {
             TransmitStatus::Ok => {
                 if let Some(rep) = res.report {
@@ -966,12 +1223,20 @@ impl Controller {
         let changed = {
             let mut rt = self.inner.runtime.lock().expect("lock");
             let r = rt.entry(node).or_default();
-            let changed = r.last_route.as_ref().map(|(rep, _)| rep != &repeaters).unwrap_or(true);
+            let changed = r
+                .last_route
+                .as_ref()
+                .map(|(rep, _)| rep != &repeaters)
+                .unwrap_or(true);
             r.last_route = Some((repeaters.clone(), rssi));
             changed
         };
         if changed {
-            self.emit(Event::Route { node, repeaters, rssi });
+            self.emit(Event::Route {
+                node,
+                repeaters,
+                rssi,
+            });
         }
     }
 
@@ -980,7 +1245,9 @@ impl Controller {
         if sec != TxSecurity::Auto {
             return sec;
         }
-        let Some((needs, s2, s0)) = self.with_node(node, |r| (r.needs_security(endpoint, cc), r.highest_s2(), r.s0_only())) else {
+        let Some((needs, s2, s0)) = self.with_node(node, |r| {
+            (r.needs_security(endpoint, cc), r.highest_s2(), r.s0_only())
+        }) else {
             return TxSecurity::Plain;
         };
         match (needs, s2, s0) {
@@ -992,7 +1259,12 @@ impl Controller {
 
     /// Encrypts as needed and transmits, holding the node's lock so nonce
     /// exchanges for one node never interleave.
-    pub(crate) async fn send_bytes(&self, node: NodeId, bytes: Vec<u8>, sec: TxSecurity) -> Result<(), Error> {
+    pub(crate) async fn send_bytes(
+        &self,
+        node: NodeId,
+        bytes: Vec<u8>,
+        sec: TxSecurity,
+    ) -> Result<(), Error> {
         let lock = self.node_lock(node);
         let _g = lock.lock().await;
         match sec {
@@ -1011,14 +1283,30 @@ impl Controller {
 
     async fn s2_encrypt(&self, node: NodeId, bytes: &[u8], key: KeyId) -> Result<Vec<u8>, Error> {
         for attempt in 0..3 {
-            let r = self.inner.s2.lock().expect("lock").encrypt(node, bytes, &EncryptOptions { key: Some(key), ..Default::default() });
+            let r = self.inner.s2.lock().expect("lock").encrypt(
+                node,
+                bytes,
+                &EncryptOptions {
+                    key: Some(key),
+                    ..Default::default()
+                },
+            );
             match r {
                 Ok(f) => return Ok(f),
                 Err(zwave_security::Error::NoSpan) if attempt < 2 => {
                     let (_g, rx) = self.wait_for(node, true, |i| matches!(i, Inbound::S2Nonce));
-                    let get = self.inner.s2.lock().expect("lock").nonce_get(node).map_err(|e| Error::Security(e.to_string()))?;
+                    let get = self
+                        .inner
+                        .s2
+                        .lock()
+                        .expect("lock")
+                        .nonce_get(node)
+                        .map_err(|e| Error::Security(e.to_string()))?;
                     self.transmit(node, get).await?;
-                    tokio::time::timeout(self.inner.cfg.nonce_timeout, rx).await.map_err(|_| Error::Timeout(node))?.map_err(|_| Error::Stopped)?;
+                    tokio::time::timeout(self.inner.cfg.nonce_timeout, rx)
+                        .await
+                        .map_err(|_| Error::Timeout(node))?
+                        .map_err(|_| Error::Stopped)?;
                 }
                 Err(e) => return Err(Error::Security(e.to_string())),
             }
@@ -1029,7 +1317,10 @@ impl Controller {
     async fn s0_nonce(&self, node: NodeId) -> Result<(), Error> {
         let (_g, rx) = self.wait_for(node, true, |i| matches!(i, Inbound::S0Nonce));
         self.transmit(node, S0Manager::nonce_get()).await?;
-        tokio::time::timeout(self.inner.cfg.nonce_timeout, rx).await.map_err(|_| Error::Timeout(node))?.map_err(|_| Error::Stopped)?;
+        tokio::time::timeout(self.inner.cfg.nonce_timeout, rx)
+            .await
+            .map_err(|_| Error::Timeout(node))?
+            .map_err(|_| Error::Stopped)?;
         Ok(())
     }
 
@@ -1046,7 +1337,11 @@ impl Controller {
                 self.s0_nonce(node).await?;
             }
             // With a second part to come, the receiver answers the first with a nonce.
-            let next = if more { Some(self.wait_for(node, true, |i| matches!(i, Inbound::S0Nonce))) } else { None };
+            let next = if more {
+                Some(self.wait_for(node, true, |i| matches!(i, Inbound::S0Nonce)))
+            } else {
+                None
+            };
             let frame = self
                 .inner
                 .s0
@@ -1056,7 +1351,10 @@ impl Controller {
                 .map_err(|e| Error::Security(e.to_string()))?;
             self.transmit(node, frame).await?;
             if let Some((_g, rx)) = next {
-                tokio::time::timeout(self.inner.cfg.nonce_timeout, rx).await.map_err(|_| Error::Timeout(node))?.map_err(|_| Error::Stopped)?;
+                tokio::time::timeout(self.inner.cfg.nonce_timeout, rx)
+                    .await
+                    .map_err(|_| Error::Timeout(node))?
+                    .map_err(|_| Error::Stopped)?;
                 have_nonce = true;
             }
         }
@@ -1066,7 +1364,9 @@ impl Controller {
     /// Waits until a sleeping node is awake.
     pub(crate) async fn wait_awake(&self, node: NodeId) {
         let rx = {
-            let sleeping = self.with_node(node, |r| r.protocol.sleeping()).unwrap_or(false);
+            let sleeping = self
+                .with_node(node, |r| r.protocol.sleeping())
+                .unwrap_or(false);
             let mut rt = self.inner.runtime.lock().expect("lock");
             let r = rt.entry(node).or_default();
             if !sleeping || r.status == NodeStatus::Awake {
@@ -1081,15 +1381,22 @@ impl Controller {
     }
 
     /// Sends a command to an endpoint now, without waiting for a sleeping node.
-    pub(crate) async fn send_now(&self, node: NodeId, endpoint: u8, cmd: &Command) -> Result<(), Error> {
+    pub(crate) async fn send_now(
+        &self,
+        node: NodeId,
+        endpoint: u8,
+        cmd: &Command,
+    ) -> Result<(), Error> {
         let sec = self.resolve(node, endpoint, cmd.cc(), TxSecurity::Auto);
-        self.send_bytes(node, wrap_endpoint(cmd.encode(), endpoint), sec).await
+        self.send_bytes(node, wrap_endpoint(cmd.encode(), endpoint), sec)
+            .await
     }
 
     /// Sends a command to a node's endpoint. For a sleeping node this waits
     /// until the node wakes up.
     pub async fn send(&self, node: NodeId, endpoint: u8, cmd: &Command) -> Result<(), Error> {
-        self.with_node(node, |_| ()).ok_or(Error::UnknownNode(node))?;
+        self.with_node(node, |_| ())
+            .ok_or(Error::UnknownNode(node))?;
         let _a = self.activity(node);
         self.wait_awake(node).await;
         self.send_now(node, endpoint, cmd).await
@@ -1097,18 +1404,36 @@ impl Controller {
 
     /// Sends a command with Supervision and returns the node's status
     /// (`0xFF` success, `0x01` working; failure and no support are errors).
-    pub async fn send_supervised(&self, node: NodeId, endpoint: u8, cmd: &Command) -> Result<u8, Error> {
-        let session = self.inner.supervision_session.fetch_add(1, Ordering::Relaxed) & 0x3f;
-        let get: Command = supervision::Get { status_updates: false, session_id: session, command: cmd.encode() }.into();
+    pub async fn send_supervised(
+        &self,
+        node: NodeId,
+        endpoint: u8,
+        cmd: &Command,
+    ) -> Result<u8, Error> {
+        let session = self
+            .inner
+            .supervision_session
+            .fetch_add(1, Ordering::Relaxed)
+            & 0x3f;
+        let get: Command = supervision::Get {
+            status_updates: false,
+            session_id: session,
+            command: cmd.encode(),
+        }
+        .into();
         let reply = self
             .request_with(node, endpoint, get, cmd.cc(), self.inner.cfg.request_timeout, move |c| {
                 matches!(c, Command::Supervision(supervision::Command::Report(r)) if r.session_id == session)
             })
             .await?;
-        let Command::Supervision(supervision::Command::Report(r)) = reply else { unreachable!() };
+        let Command::Supervision(supervision::Command::Report(r)) = reply else {
+            unreachable!()
+        };
         match r.status {
             0xff | 0x01 => Ok(r.status),
-            0x00 => Err(Error::Controller(format!("node {node} does not support the command"))),
+            0x00 => Err(Error::Controller(format!(
+                "node {node} does not support the command"
+            ))),
             _ => Err(Error::Controller(format!("node {node} failed the command"))),
         }
     }
@@ -1122,7 +1447,15 @@ impl Controller {
         expect: impl Fn(&Command) -> bool + Send + Sync + 'static,
     ) -> Result<Command, Error> {
         let cc = cmd.cc();
-        self.request_with(node, endpoint, cmd, cc, self.inner.cfg.request_timeout, expect).await
+        self.request_with(
+            node,
+            endpoint,
+            cmd,
+            cc,
+            self.inner.cfg.request_timeout,
+            expect,
+        )
+        .await
     }
 
     /// Like [`request`](Self::request), extracting the reply with `f`.
@@ -1135,7 +1468,9 @@ impl Controller {
     ) -> Result<T, Error> {
         let f = Arc::new(f);
         let m = f.clone();
-        let c = self.request(node, endpoint, cmd.into(), move |c| m(c).is_some()).await?;
+        let c = self
+            .request(node, endpoint, cmd.into(), move |c| m(c).is_some())
+            .await?;
         Ok(f(&c).expect("matched"))
     }
 
@@ -1148,7 +1483,8 @@ impl Controller {
         timeout: Duration,
         expect: impl Fn(&Command) -> bool + Send + Sync + 'static,
     ) -> Result<Command, Error> {
-        self.with_node(node, |_| ()).ok_or(Error::UnknownNode(node))?;
+        self.with_node(node, |_| ())
+            .ok_or(Error::UnknownNode(node))?;
         let _a = self.activity(node);
         self.wait_awake(node).await;
         let expect = Arc::new(expect);
@@ -1190,16 +1526,30 @@ impl Controller {
         let (_g, rx) = self.wait_for(node, false, move |i| matches!(i, Inbound::Command { command, security, .. } if expect(command, *security)));
         self.send_bytes(node, bytes, sec).await?;
         match tokio::time::timeout(timeout, rx).await {
-            Ok(Ok(Inbound::Command { command, security, .. })) => Ok((command, security)),
+            Ok(Ok(Inbound::Command {
+                command, security, ..
+            })) => Ok((command, security)),
             Ok(_) => Err(Error::Stopped),
             Err(_) => Err(Error::Timeout(node)),
         }
     }
 
     /// Sets a value (switches, levels) and refreshes it.
-    pub async fn set_value(&self, id: &values::ValueId, value: &values::ValueKind) -> Result<(), Error> {
-        let cmd = values::set_command(id, value).ok_or(Error::Controller(format!("{} is not writable", id.key())))?;
-        let supervised = self.with_node(id.node, |r| r.endpoints.get(&id.endpoint).or(Some(r.root())).is_some_and(|e| e.supports(supervision::ID))).unwrap_or(false);
+    pub async fn set_value(
+        &self,
+        id: &values::ValueId,
+        value: &values::ValueKind,
+    ) -> Result<(), Error> {
+        let cmd = values::set_command(id, value)
+            .ok_or(Error::Controller(format!("{} is not writable", id.key())))?;
+        let supervised = self
+            .with_node(id.node, |r| {
+                r.endpoints
+                    .get(&id.endpoint)
+                    .or(Some(r.root()))
+                    .is_some_and(|e| e.supports(supervision::ID))
+            })
+            .unwrap_or(false);
         if supervised {
             self.send_supervised(id.node, id.endpoint, &cmd).await?;
         } else {
@@ -1207,7 +1557,11 @@ impl Controller {
         }
         if let Some(get) = values::get_command(id) {
             let cc = get.cc();
-            let _ = self.request(id.node, id.endpoint, get, move |c| c.cc() == cc && c.name().ends_with(".report")).await;
+            let _ = self
+                .request(id.node, id.endpoint, get, move |c| {
+                    c.cc() == cc && c.name().ends_with(".report")
+                })
+                .await;
         }
         Ok(())
     }
@@ -1221,10 +1575,16 @@ impl Controller {
         let r = self
             .inner
             .api
-            .request(DataFrame::request(F::GET_NODE_PROTOCOL_INFO, vec![node as u8]), Duration::from_secs(2))
+            .request(
+                DataFrame::request(F::GET_NODE_PROTOCOL_INFO, vec![node as u8]),
+                Duration::from_secs(2),
+            )
             .await?;
-        let p = NodeProtocolInfo::parse(&r.payload).map_err(|e| Error::Controller(e.to_string()))?;
-        let Some(p) = p else { return Err(Error::UnknownNode(node)) };
+        let p =
+            NodeProtocolInfo::parse(&r.payload).map_err(|e| Error::Controller(e.to_string()))?;
+        let Some(p) = p else {
+            return Err(Error::UnknownNode(node));
+        };
         self.update_node(node, |r| {
             r.protocol = ProtocolInfo {
                 listening: p.listening,
@@ -1243,8 +1603,13 @@ impl Controller {
 
     /// Reads a node's neighbor table from the controller (no radio traffic).
     pub async fn refresh_neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, Error> {
-        let r = self.inner.api.request(message::get_routing_info(node), Duration::from_secs(2)).await?;
-        let n = message::parse_routing_info(&r.payload).map_err(|e| Error::Controller(e.to_string()))?;
+        let r = self
+            .inner
+            .api
+            .request(message::get_routing_info(node), Duration::from_secs(2))
+            .await?;
+        let n = message::parse_routing_info(&r.payload)
+            .map_err(|e| Error::Controller(e.to_string()))?;
         let own = self.info().node_id;
         let n: Vec<NodeId> = n.into_iter().filter(|&x| x != node).collect();
         let _ = own;
@@ -1281,5 +1646,11 @@ pub(crate) fn wrap_endpoint(bytes: Vec<u8>, endpoint: u8) -> Vec<u8> {
     if endpoint == 0 {
         return bytes;
     }
-    Command::from(multi_channel::CommandEncapsulation { source_end_point: 0, bit_address: false, destination_end_point: endpoint, command: bytes }).encode()
+    Command::from(multi_channel::CommandEncapsulation {
+        source_end_point: 0,
+        bit_address: false,
+        destination_end_point: endpoint,
+        command: bytes,
+    })
+    .encode()
 }

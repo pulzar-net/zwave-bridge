@@ -121,7 +121,13 @@ impl Controller {
     }
 
     async fn add_node(&self, payload: Vec<u8>) -> Result<(), Error> {
-        self.inner.api.execute(Request::ack_only(DataFrame::request(F::ADD_NODE_TO_NETWORK, payload))).await?;
+        self.inner
+            .api
+            .execute(Request::ack_only(DataFrame::request(
+                F::ADD_NODE_TO_NETWORK,
+                payload,
+            )))
+            .await?;
         Ok(())
     }
 
@@ -167,9 +173,19 @@ impl Controller {
             st.cancel = Some(ctx);
         }
         let cb = self.inner.api.next_callback_id();
-        self.add_node(vec![add_mode::ANY | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE, cb]).await?;
+        self.add_node(vec![
+            add_mode::ANY | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE,
+            cb,
+        ])
+        .await?;
         self.emit(Event::InclusionStarted);
-        let r = self.run_add(rx, crx, opts.timeout.unwrap_or(self.inner.cfg.inclusion_timeout)).await;
+        let r = self
+            .run_add(
+                rx,
+                crx,
+                opts.timeout.unwrap_or(self.inner.cfg.inclusion_timeout),
+            )
+            .await;
         self.emit(Event::InclusionStopped);
         let r = match r {
             Ok((node, info)) => Ok(self.on_node_added(node, info, &opts, None).await),
@@ -229,7 +245,13 @@ impl Controller {
         }
     }
 
-    async fn on_node_added(&self, node: NodeId, info: NodeInfo, opts: &InclusionOptions, entry: Option<Entry>) -> InclusionResult {
+    async fn on_node_added(
+        &self,
+        node: NodeId,
+        info: NodeInfo,
+        opts: &InclusionOptions,
+        entry: Option<Entry>,
+    ) -> InclusionResult {
         {
             let mut s = self.inner.store.lock().expect("store lock");
             let mut r = NodeRecord::new(node);
@@ -263,11 +285,18 @@ impl Controller {
             Ok(c) => (c, None),
             Err(e) => {
                 warn!(node, "security bootstrap failed: {e}");
-                self.emit(Event::SecurityFailed { node, reason: e.to_string() });
+                self.emit(Event::SecurityFailed {
+                    node,
+                    reason: e.to_string(),
+                });
                 (vec![], Some(e.to_string()))
             }
         };
-        self.inner.s2.lock().expect("lock").set_peer_classes(node, &security);
+        self.inner
+            .s2
+            .lock()
+            .expect("lock")
+            .set_peer_classes(node, &security);
         let dsk = entry.map(|e| e.dsk.to_string());
         let _ = self.update_node(node, |r| {
             r.security = security.clone();
@@ -279,24 +308,47 @@ impl Controller {
             }
         });
         if security_error.is_none() {
-            self.emit(Event::SecurityBootstrapped { node, classes: security.clone() });
+            self.emit(Event::SecurityBootstrapped {
+                node,
+                classes: security.clone(),
+            });
         }
         info!(node, ?security, "node included");
         self.spawn_interview(node);
-        InclusionResult { node, security, security_error }
+        InclusionResult {
+            node,
+            security,
+            security_error,
+        }
     }
 
     async fn kex_fail(&self, node: NodeId, why: KexFail, sec: TxSecurity) {
-        let _ = self.send_bytes(node, s2_cmd(security_2::KexFail { fail_type: why as u8 }), sec).await;
+        let _ = self
+            .send_bytes(
+                node,
+                s2_cmd(security_2::KexFail {
+                    fail_type: why as u8,
+                }),
+                sec,
+            )
+            .await;
         self.inner.s2.lock().expect("lock").end_bootstrap(node);
     }
 
     async fn ask<T>(&self, rx: oneshot::Receiver<T>) -> Option<T> {
-        tokio::time::timeout(self.inner.cfg.user_timeout, rx).await.ok().and_then(Result::ok)
+        tokio::time::timeout(self.inner.cfg.user_timeout, rx)
+            .await
+            .ok()
+            .and_then(Result::ok)
     }
 
     /// The controller side of the S2 key exchange.
-    async fn bootstrap_s2(&self, node: NodeId, opts: &InclusionOptions, entry: Option<&Entry>) -> Result<Vec<SecurityClass>, Error> {
+    async fn bootstrap_s2(
+        &self,
+        node: NodeId,
+        opts: &InclusionOptions,
+        entry: Option<&Entry>,
+    ) -> Result<Vec<SecurityClass>, Error> {
         let plain = TxSecurity::Plain;
         let temp = TxSecurity::S2(KeyId::Temporary);
         let (report, _) = self
@@ -304,7 +356,9 @@ impl Controller {
                 matches!(c, Command::Security2(security_2::Command::KexReport(r)) if !r.echo)
             })
             .await?;
-        let Command::Security2(security_2::Command::KexReport(report)) = report else { unreachable!() };
+        let Command::Security2(security_2::Command::KexReport(report)) = report else {
+            unreachable!()
+        };
         if report.schemes & KEX_SCHEME_1 == 0 {
             self.kex_fail(node, KexFail::Scheme, plain).await;
             return Err(Error::Security("no supported KEX scheme".into()));
@@ -314,7 +368,13 @@ impl Controller {
             return Err(Error::Security("no supported ECDH curve".into()));
         }
         let requested = SecurityClass::from_key_bits(report.keys);
-        let intersect = |allowed: &[SecurityClass]| -> Vec<SecurityClass> { requested.iter().copied().filter(|c| allowed.contains(c)).collect() };
+        let intersect = |allowed: &[SecurityClass]| -> Vec<SecurityClass> {
+            requested
+                .iter()
+                .copied()
+                .filter(|c| allowed.contains(c))
+                .collect()
+        };
         let granted = match (entry, &opts.grant) {
             (Some(e), _) => intersect(&e.granted),
             (None, GrantPolicy::Requested) => requested.clone(),
@@ -322,7 +382,10 @@ impl Controller {
             (None, GrantPolicy::Ask) => {
                 let (tx, rx) = oneshot::channel();
                 self.inner.inclusion.lock().expect("lock").grant = Some(tx);
-                self.emit(Event::GrantSecurityClasses { node, requested: requested.clone() });
+                self.emit(Event::GrantSecurityClasses {
+                    node,
+                    requested: requested.clone(),
+                });
                 match self.ask(rx).await {
                     Some(v) => intersect(&v),
                     None => {
@@ -348,7 +411,9 @@ impl Controller {
                 matches!(c, Command::Security2(security_2::Command::PublicKeyReport(r)) if !r.including_node)
             })
             .await?;
-        let Command::Security2(security_2::Command::PublicKeyReport(pk)) = pk else { unreachable!() };
+        let Command::Security2(security_2::Command::PublicKeyReport(pk)) = pk else {
+            unreachable!()
+        };
         let Ok(mut node_pub) = <[u8; 32]>::try_from(pk.public_key.as_slice()) else {
             self.kex_fail(node, KexFail::Cancel, plain).await;
             return Err(Error::Security("public key is not 32 bytes".into()));
@@ -358,7 +423,9 @@ impl Controller {
                 (Some(e), _) => {
                     if e.dsk.0[2..] != node_pub[2..16] {
                         self.kex_fail(node, KexFail::Auth, plain).await;
-                        return Err(Error::Security("the node's key does not match its provisioned DSK".into()));
+                        return Err(Error::Security(
+                            "the node's key does not match its provisioned DSK".into(),
+                        ));
                     }
                     e.dsk.pin()
                 }
@@ -366,7 +433,10 @@ impl Controller {
                 (None, None) => {
                     let (tx, rx) = oneshot::channel();
                     self.inner.inclusion.lock().expect("lock").pin = Some(tx);
-                    self.emit(Event::ValidateDsk { node, dsk: Dsk::from_public_key(&node_pub).masked() });
+                    self.emit(Event::ValidateDsk {
+                        node,
+                        dsk: Dsk::from_public_key(&node_pub).masked(),
+                    });
                     match self.ask(rx).await.flatten() {
                         Some(p) => p,
                         None => {
@@ -380,7 +450,9 @@ impl Controller {
         } else if let Some(e) = entry {
             if e.dsk.0[..] != node_pub[..16] {
                 self.kex_fail(node, KexFail::Auth, plain).await;
-                return Err(Error::Security("the node's key does not match its provisioned DSK".into()));
+                return Err(Error::Security(
+                    "the node's key does not match its provisioned DSK".into(),
+                ));
             }
         }
         let shared = match self.inner.keypair.shared_secret(&node_pub) {
@@ -391,7 +463,11 @@ impl Controller {
             }
         };
         let tk = bootstrap_keys(&shared, self.inner.keypair.public(), &node_pub);
-        self.inner.s2.lock().expect("lock").begin_bootstrap(node, tk);
+        self.inner
+            .s2
+            .lock()
+            .expect("lock")
+            .begin_bootstrap(node, tk);
         let result = self.exchange_keys(node, &set, &report, &granted).await;
         match result {
             Ok(()) => {
@@ -420,23 +496,40 @@ impl Controller {
         let (echo, _) = self
             .request_secured(
                 node,
-                s2_cmd(security_2::PublicKeyReport { including_node: true, public_key: own_pub.to_vec() }),
+                s2_cmd(security_2::PublicKeyReport {
+                    including_node: true,
+                    public_key: own_pub.to_vec(),
+                }),
                 TxSecurity::Plain,
                 KEX_TIMEOUT,
-                move |c, s| is_temp(s) && matches!(c, Command::Security2(security_2::Command::KexSet(k)) if k.echo),
+                move |c, s| {
+                    is_temp(s)
+                        && matches!(c, Command::Security2(security_2::Command::KexSet(k)) if k.echo)
+                },
             )
             .await
             .map_err(|e| (KexFail::Decrypt, e))?;
-        let Command::Security2(security_2::Command::KexSet(echo)) = echo else { unreachable!() };
+        let Command::Security2(security_2::Command::KexSet(echo)) = echo else {
+            unreachable!()
+        };
         if echo.scheme != set.scheme || echo.curve != set.curve || echo.keys != set.keys {
-            return Err((KexFail::Auth, Error::Security("the echoed KEX Set differs".into())));
+            return Err((
+                KexFail::Auth,
+                Error::Security("the echoed KEX Set differs".into()),
+            ));
         }
         let mut next = self.wait_for(node, false, move |i| {
             matches!(i, crate::controller::Inbound::Command { command: Command::Security2(security_2::Command::NetworkKeyGet(_)), security, .. } if is_temp(*security))
         });
         self.send_bytes(
             node,
-            s2_cmd(security_2::KexReport { request_csa: report.request_csa, echo: true, schemes: report.schemes, curves: report.curves, keys: report.keys }),
+            s2_cmd(security_2::KexReport {
+                request_csa: report.request_csa,
+                echo: true,
+                schemes: report.schemes,
+                curves: report.curves,
+                keys: report.keys,
+            }),
             temp,
         )
         .await
@@ -450,19 +543,42 @@ impl Controller {
             };
             match command {
                 Command::Security2(security_2::Command::NetworkKeyGet(g)) => {
-                    let Some(class) = SecurityClass::from_key_bit(g.requested_key).filter(|c| granted.contains(c) && !sent.contains(c)) else {
-                        return Err((KexFail::KeyGet, Error::Security(format!("the node asked for key {:#04x}", g.requested_key))));
+                    let Some(class) = SecurityClass::from_key_bit(g.requested_key)
+                        .filter(|c| granted.contains(c) && !sent.contains(c))
+                    else {
+                        return Err((
+                            KexFail::KeyGet,
+                            Error::Security(format!(
+                                "the node asked for key {:#04x}",
+                                g.requested_key
+                            )),
+                        ));
                     };
                     let mut classes = sent.clone();
                     classes.push(class);
-                    self.inner.s2.lock().expect("lock").set_peer_classes(node, &classes);
+                    self.inner
+                        .s2
+                        .lock()
+                        .expect("lock")
+                        .set_peer_classes(node, &classes);
                     let (verify, _) = self
                         .request_secured(
                             node,
-                            s2_cmd(security_2::NetworkKeyReport { granted_key: class.key_bit(), network_key: self.inner.cfg.keys.key(class).to_vec() }),
+                            s2_cmd(security_2::NetworkKeyReport {
+                                granted_key: class.key_bit(),
+                                network_key: self.inner.cfg.keys.key(class).to_vec(),
+                            }),
                             temp,
                             KEX_TIMEOUT,
-                            move |c, s| s == Some(RxSecurity::S2(KeyId::Class(class))) && matches!(c, Command::Security2(security_2::Command::NetworkKeyVerify(_))),
+                            move |c, s| {
+                                s == Some(RxSecurity::S2(KeyId::Class(class)))
+                                    && matches!(
+                                        c,
+                                        Command::Security2(security_2::Command::NetworkKeyVerify(
+                                            _
+                                        ))
+                                    )
+                            },
                         )
                         .await
                         .map_err(|e| (KexFail::KeyVerify, e))?;
@@ -471,31 +587,62 @@ impl Controller {
                     next = self.wait_for(node, false, move |i| {
                         matches!(i, crate::controller::Inbound::Command { command: Command::Security2(security_2::Command::NetworkKeyGet(_) | security_2::Command::TransferEnd(_)), security, .. } if is_temp(*security))
                     });
-                    self.send_bytes(node, s2_cmd(security_2::TransferEnd { key_verified: true, key_request_complete: false }), temp)
-                        .await
-                        .map_err(|e| (KexFail::Cancel, e))?;
+                    self.send_bytes(
+                        node,
+                        s2_cmd(security_2::TransferEnd {
+                            key_verified: true,
+                            key_request_complete: false,
+                        }),
+                        temp,
+                    )
+                    .await
+                    .map_err(|e| (KexFail::Cancel, e))?;
                 }
-                Command::Security2(security_2::Command::TransferEnd(t)) if t.key_request_complete => {
+                Command::Security2(security_2::Command::TransferEnd(t))
+                    if t.key_request_complete =>
+                {
                     if sent.len() != granted.len() {
-                        return Err((KexFail::Key, Error::Security("the node did not take every granted key".into())));
+                        return Err((
+                            KexFail::Key,
+                            Error::Security("the node did not take every granted key".into()),
+                        ));
                     }
                     return Ok(());
                 }
-                other => return Err((KexFail::Cancel, Error::Security(format!("unexpected {}", other.name())))),
+                other => {
+                    return Err((
+                        KexFail::Cancel,
+                        Error::Security(format!("unexpected {}", other.name())),
+                    ))
+                }
             }
         }
     }
 
     /// The controller side of the S0 key exchange.
     async fn bootstrap_s0(&self, node: NodeId) -> Result<Vec<SecurityClass>, Error> {
-        self.request_secured(node, Command::from(security::SchemeGet { schemes: 0 }).encode(), TxSecurity::Plain, KEX_TIMEOUT, |c, _| {
-            matches!(c, Command::Security(security::Command::SchemeReport(_)))
-        })
+        self.request_secured(
+            node,
+            Command::from(security::SchemeGet { schemes: 0 }).encode(),
+            TxSecurity::Plain,
+            KEX_TIMEOUT,
+            |c, _| matches!(c, Command::Security(security::Command::SchemeReport(_))),
+        )
         .await?;
-        let set = Command::from(security::NetworkKeySet { network_key: self.inner.cfg.keys.s0.to_vec() }).encode();
-        self.request_secured(node, set, TxSecurity::S0 { temp: true }, KEX_TIMEOUT, |c, s| {
-            s == Some(RxSecurity::S0) && matches!(c, Command::Security(security::Command::NetworkKeyVerify(_)))
+        let set = Command::from(security::NetworkKeySet {
+            network_key: self.inner.cfg.keys.s0.to_vec(),
         })
+        .encode();
+        self.request_secured(
+            node,
+            set,
+            TxSecurity::S0 { temp: true },
+            KEX_TIMEOUT,
+            |c, s| {
+                s == Some(RxSecurity::S0)
+                    && matches!(c, Command::Security(security::Command::NetworkKeyVerify(_)))
+            },
+        )
         .await?;
         Ok(vec![SecurityClass::S0Legacy])
     }
@@ -512,11 +659,21 @@ impl Controller {
             st.cancel = Some(ctx);
         }
         let api = &self.inner.api;
-        let remove = |p: Vec<u8>| api.execute(Request::ack_only(DataFrame::request(F::REMOVE_NODE_FROM_NETWORK, p)));
+        let remove = |p: Vec<u8>| {
+            api.execute(Request::ack_only(DataFrame::request(
+                F::REMOVE_NODE_FROM_NETWORK,
+                p,
+            )))
+        };
         let cb = api.next_callback_id();
-        remove(vec![add_mode::ANY | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE, cb]).await?;
+        remove(vec![
+            add_mode::ANY | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE,
+            cb,
+        ])
+        .await?;
         self.emit(Event::ExclusionStarted);
-        let deadline = tokio::time::Instant::now() + timeout.unwrap_or(self.inner.cfg.inclusion_timeout);
+        let deadline =
+            tokio::time::Instant::now() + timeout.unwrap_or(self.inner.cfg.inclusion_timeout);
         let mut removed = None;
         let result = loop {
             tokio::select! {
@@ -558,7 +715,9 @@ impl Controller {
                 self.forget_node(node);
                 Ok(())
             }
-            _ => Err(Error::Controller(format!("node {node} was not removed (it may still be answering)"))),
+            _ => Err(Error::Controller(format!(
+                "node {node} was not removed (it may still be answering)"
+            ))),
         }
     }
 
@@ -578,25 +737,45 @@ impl Controller {
 
     /// Removes a provisioning list entry.
     pub async fn unprovision(&self, dsk: &Dsk) -> Option<Entry> {
-        let e = self.inner.store.lock().expect("store lock").provisioning.remove(dsk);
+        let e = self
+            .inner
+            .store
+            .lock()
+            .expect("store lock")
+            .provisioning
+            .remove(dsk);
         self.provisioning_changed().await;
         e
     }
 
     /// The provisioning list.
     pub fn provisioning_list(&self) -> Vec<Entry> {
-        self.inner.store.lock().expect("store lock").provisioning.entries().to_vec()
+        self.inner
+            .store
+            .lock()
+            .expect("store lock")
+            .provisioning
+            .entries()
+            .to_vec()
     }
 
     async fn provisioning_changed(&self) {
         self.mark_dirty();
-        self.emit(Event::ProvisioningChanged { entries: self.provisioning_list() });
+        self.emit(Event::ProvisioningChanged {
+            entries: self.provisioning_list(),
+        });
         self.update_smartstart().await;
     }
 
     /// Listens for SmartStart requests while the provisioning list has active entries.
     pub(crate) async fn update_smartstart(&self) {
-        let want = self.inner.store.lock().expect("store lock").provisioning.has_active();
+        let want = self
+            .inner
+            .store
+            .lock()
+            .expect("store lock")
+            .provisioning
+            .has_active();
         let change = {
             let st = self.inner.inclusion.lock().expect("lock");
             !st.busy && st.listening != want
@@ -604,7 +783,14 @@ impl Controller {
         if !change {
             return;
         }
-        let payload = if want { vec![add_mode::SMART_START_LISTEN | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE, 0] } else { vec![add_mode::STOP, 0] };
+        let payload = if want {
+            vec![
+                add_mode::SMART_START_LISTEN | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE,
+                0,
+            ]
+        } else {
+            vec![add_mode::STOP, 0]
+        };
         match self.add_node(payload).await {
             Ok(()) => self.inner.inclusion.lock().expect("lock").listening = want,
             Err(e) => warn!("SmartStart listen mode: {e}"),
@@ -612,7 +798,14 @@ impl Controller {
     }
 
     pub(crate) fn on_smartstart_request(&self, nwi: [u8; 4]) {
-        let entry = self.inner.store.lock().expect("store lock").provisioning.match_nwi_home_id(&nwi).cloned();
+        let entry = self
+            .inner
+            .store
+            .lock()
+            .expect("store lock")
+            .provisioning
+            .match_nwi_home_id(&nwi)
+            .cloned();
         let Some(entry) = entry else {
             debug!("SmartStart request from a node not on the provisioning list");
             return;
@@ -639,17 +832,36 @@ impl Controller {
             st.cancel = Some(ctx);
         }
         let cb = self.inner.api.next_callback_id();
-        let mut p = vec![add_mode::SMART_START_DSK | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE, cb];
+        let mut p = vec![
+            add_mode::SMART_START_DSK | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE,
+            cb,
+        ];
         p.extend_from_slice(&entry.dsk.nwi_home_id());
         p.extend_from_slice(&entry.dsk.auth_home_id());
         self.add_node(p).await?;
         self.emit(Event::InclusionStarted);
-        let r = self.run_add(rx, crx, self.inner.cfg.inclusion_timeout).await;
+        let r = self
+            .run_add(rx, crx, self.inner.cfg.inclusion_timeout)
+            .await;
         self.emit(Event::InclusionStopped);
         let r = match r {
             Ok((node, info)) => {
-                let res = self.on_node_added(node, info, &InclusionOptions::default(), Some(entry.clone())).await;
-                if let Some(e) = self.inner.store.lock().expect("store lock").provisioning.get_mut(&entry.dsk) {
+                let res = self
+                    .on_node_added(
+                        node,
+                        info,
+                        &InclusionOptions::default(),
+                        Some(entry.clone()),
+                    )
+                    .await;
+                if let Some(e) = self
+                    .inner
+                    .store
+                    .lock()
+                    .expect("store lock")
+                    .provisioning
+                    .get_mut(&entry.dsk)
+                {
                     e.node_id = Some(node);
                 }
                 self.mark_dirty();
