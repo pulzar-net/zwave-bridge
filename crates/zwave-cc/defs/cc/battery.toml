@@ -1,0 +1,40 @@
+id = 0x80
+name = "battery"
+title = "Battery"
+version = 3
+
+[[command]]
+id = 0x02
+name = "get"
+
+# A level of 0xFF means "battery low".
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "level", type = "u8" },
+  { type = "bits", optional = true, parts = [
+    { name = "charging_status", shift = 6, width = 2 },
+    { name = "rechargeable", shift = 5, width = 1, kind = "bool" },
+    { name = "backup", shift = 4, width = 1, kind = "bool" },
+    { name = "overheating", shift = 3, width = 1, kind = "bool" },
+    { name = "low_fluid", shift = 2, width = 1, kind = "bool" },
+    { name = "replace_recharge", shift = 0, width = 2 },
+  ] },
+  { type = "bits", optional = true, parts = [
+    { name = "low_temperature", shift = 1, width = 1, kind = "bool" },
+    { name = "disconnected", shift = 0, width = 1, kind = "bool" },
+  ] },
+]
+
+[[command]]
+id = 0x04
+name = "health_get"
+
+[[command]]
+id = 0x05
+name = "health_report"
+fields = [
+  { name = "maximum_capacity", type = "u8" },
+  { name = "temperature", type = "value" },
+]

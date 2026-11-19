@@ -38,7 +38,9 @@ impl ControllerIdentity {
 /// Names of a few common sticks, by (manufacturer, product type, product id).
 pub fn known_name(manufacturer: u16, product_type: u16, product_id: u16) -> Option<&'static str> {
     Some(match (manufacturer, product_type, product_id) {
-        (0x0000, 0x0004, 0x0004) => "Silicon Labs 800 series controller (e.g. Zooz ZST39 LR, HomeSeer SmartStick G8)",
+        (0x0000, 0x0004, 0x0004) => {
+            "Silicon Labs 800 series controller (e.g. Zooz ZST39 LR, HomeSeer SmartStick G8)"
+        }
         (0x0000, 0x0004, 0x0001) | (0x0000, 0x0004, 0x0002) => "Silicon Labs 700 series controller",
         (0x0086, 0x0001, 0x005a) => "Aeotec Z-Stick Gen5",
         (0x0086, 0x0001, 0x005d) => "Aeotec Z-Stick 7",
@@ -66,7 +68,9 @@ pub async fn probe_port<P: Port>(port: P) -> Result<Option<ControllerIdentity>, 
             })),
             Err(_) => Ok(None),
         },
-        Err(SerialError::NoAck(_) | SerialError::Rejected(_) | SerialError::ResponseTimeout) => Ok(None),
+        Err(SerialError::NoAck(_) | SerialError::Rejected(_) | SerialError::ResponseTimeout) => {
+            Ok(None)
+        }
         Err(e) => Err(e),
     }
 }

@@ -151,8 +151,16 @@ mod tests {
     fn both_ends_derive_the_same_temp_keys() {
         let ctrl = KeyPair::generate().unwrap();
         let node = KeyPair::generate().unwrap();
-        let a = bootstrap_keys(&ctrl.shared_secret(node.public()).unwrap(), ctrl.public(), node.public());
-        let b = bootstrap_keys(&node.shared_secret(ctrl.public()).unwrap(), ctrl.public(), node.public());
+        let a = bootstrap_keys(
+            &ctrl.shared_secret(node.public()).unwrap(),
+            ctrl.public(),
+            node.public(),
+        );
+        let b = bootstrap_keys(
+            &node.shared_secret(ctrl.public()).unwrap(),
+            ctrl.public(),
+            node.public(),
+        );
         assert_eq!(a, b);
     }
 }

@@ -134,7 +134,9 @@ impl Extension {
         };
         out.push((2 + payload.len()) as u8);
         out.push(
-            if more { 0x80 } else { 0 } | if self.critical() { 0x40 } else { 0 } | (self.kind() & 0x3f),
+            if more { 0x80 } else { 0 }
+                | if self.critical() { 0x40 } else { 0 }
+                | (self.kind() & 0x3f),
         );
         out.extend_from_slice(&payload);
     }
@@ -146,7 +148,9 @@ fn parse_extensions(data: &[u8]) -> Result<(Vec<Extension>, usize), Error> {
     let mut at = 0;
     loop {
         let len = *data.get(at).ok_or(Error::Malformed("extension length"))? as usize;
-        let head = *data.get(at + 1).ok_or(Error::Malformed("extension header"))?;
+        let head = *data
+            .get(at + 1)
+            .ok_or(Error::Malformed("extension header"))?;
         if len < 2 || at + len > data.len() {
             return Err(Error::Malformed("extension length"));
         }
@@ -386,7 +390,11 @@ impl S2Manager {
 
     /// Records the classes a peer was granted (any order).
     pub fn set_peer_classes(&mut self, peer: u16, classes: &[SecurityClass]) {
-        let mut c: Vec<SecurityClass> = classes.iter().copied().filter(|c| c.is_s2() || *c == SecurityClass::S0Legacy).collect();
+        let mut c: Vec<SecurityClass> = classes
+            .iter()
+            .copied()
+            .filter(|c| c.is_s2() || *c == SecurityClass::S0Legacy)
+            .collect();
         c.sort_by(|a, b| b.cmp(a));
         c.dedup();
         self.peer_classes.insert(peer, c);
@@ -452,7 +460,10 @@ impl S2Manager {
 
     fn keys_for(&self, peer: u16, key: KeyId) -> Result<&DerivedKeys, Error> {
         match key {
-            KeyId::Temporary => self.temp.get(&peer).ok_or(Error::NoKey(SecurityClass::S2Unauthenticated)),
+            KeyId::Temporary => self
+                .temp
+                .get(&peer)
+                .ok_or(Error::NoKey(SecurityClass::S2Unauthenticated)),
             KeyId::Class(c) => self.keys.get(&c).ok_or(Error::NoKey(c)),
         }
     }
@@ -478,7 +489,12 @@ impl S2Manager {
         let seq = self.next_sequence(peer)?;
         let rei = random_bytes::<16>()?;
         self.spans.insert(peer, Span::LocalEi(rei));
-        let mut v = vec![CC_SECURITY_2, cmd::NONCE_REPORT, seq, 0x01 | if mos { 0x02 } else { 0 }];
+        let mut v = vec![
+            CC_SECURITY_2,
+            cmd::NONCE_REPORT,
+            seq,
+            0x01 | if mos { 0x02 } else { 0 },
+        ];
         v.extend_from_slice(&rei);
         Ok(v)
     }
@@ -508,9 +524,18 @@ impl S2Manager {
         Ok(NonceReport { sos, mos })
     }
 
-    fn span_drbg(&self, peer: u16, key: KeyId, sei: &[u8; 16], rei: &[u8; 16]) -> Result<CtrDrbg, Error> {
+    fn span_drbg(
+        &self,
+        peer: u16,
+        key: KeyId,
+        sei: &[u8; 16],
+        rei: &[u8; 16],
+    ) -> Result<CtrDrbg, Error> {
         let keys = self.keys_for(peer, key)?;
-        Ok(CtrDrbg::new(&mei(&nonce_prk(sei, rei)), &keys.personalization))
+        Ok(CtrDrbg::new(
+            &mei(&nonce_prk(sei, rei)),
+            &keys.personalization,
+        ))
     }
 
     /// Encrypts `command` (command class id first) for `peer`.
@@ -518,10 +543,17 @@ impl S2Manager {
     /// Fails with [`Error::NoSpan`] when no nonce is shared yet; send
     /// [`nonce_get`](Self::nonce_get), feed the answer to
     /// [`handle_nonce_report`](Self::handle_nonce_report) and retry.
-    pub fn encrypt(&mut self, peer: u16, command: &[u8], opts: &EncryptOptions) -> Result<Vec<u8>, Error> {
+    pub fn encrypt(
+        &mut self,
+        peer: u16,
+        command: &[u8],
+        opts: &EncryptOptions,
+    ) -> Result<Vec<u8>, Error> {
         let key = match opts.key {
             Some(k) => k,
-            None => self.default_key(peer).ok_or(Error::NoKey(SecurityClass::S2Unauthenticated))?,
+            None => self
+                .default_key(peer)
+                .ok_or(Error::NoKey(SecurityClass::S2Unauthenticated))?,
         };
         let keys = self.keys_for(peer, key)?.clone();
         let mut unencrypted: Vec<Extension> = Vec::new();
@@ -554,11 +586,25 @@ impl S2Manager {
         }
         let mut encrypted: Vec<Extension> = Vec::new();
         if let Some(group) = opts.send_mpan {
-            let (_, state) = self.groups.get(&group).ok_or(Error::Malformed("unknown multicast group"))?;
-            encrypted.push(Extension::Mpan { group, inner_state: *state });
+            let (_, state) = self
+                .groups
+                .get(&group)
+                .ok_or(Error::Malformed("unknown multicast group"))?;
+            encrypted.push(Extension::Mpan {
+                group,
+                inner_state: *state,
+            });
         }
         let seq = self.next_sequence(peer)?;
-        self.seal(peer, seq, &unencrypted, &encrypted, command, &keys.key_ccm, &nonce)
+        self.seal(
+            peer,
+            seq,
+            &unencrypted,
+            &encrypted,
+            command,
+            &keys.key_ccm,
+            &nonce,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -611,8 +657,22 @@ impl S2Manager {
         c
     }
 
-    fn open(&self, frame: &[u8], enc: &Encapsulation, sender: u16, dest: u16, key: &[u8; 16], nonce: &[u8; 13]) -> Option<Vec<u8>> {
-        let a = aad(sender, dest, self.home_id, frame.len(), &frame[2..2 + enc.header_len]);
+    fn open(
+        &self,
+        frame: &[u8],
+        enc: &Encapsulation,
+        sender: u16,
+        dest: u16,
+        key: &[u8; 16],
+        nonce: &[u8; 13],
+    ) -> Option<Vec<u8>> {
+        let a = aad(
+            sender,
+            dest,
+            self.home_id,
+            frame.len(),
+            &frame[2..2 + enc.header_len],
+        );
         ccm_decrypt(key, nonce, &a, &frame[2 + enc.header_len..])
     }
 
@@ -631,7 +691,8 @@ impl S2Manager {
                 let mut found = None;
                 for key in self.candidates(peer) {
                     let keys = self.keys_for(peer, key)?;
-                    let mut drbg = CtrDrbg::new(&mei(&nonce_prk(&sei, &rei)), &keys.personalization);
+                    let mut drbg =
+                        CtrDrbg::new(&mei(&nonce_prk(&sei, &rei)), &keys.personalization);
                     let nonce = drbg.next_nonce();
                     if let Some(p) = self.open(frame, &enc, peer, own, &keys.key_ccm, &nonce) {
                         found = Some((key, drbg, p));
@@ -704,7 +765,10 @@ impl S2Manager {
 
     /// Encrypts a multicast frame for an own group (MGRP extension, nonce from the MPAN).
     pub fn encrypt_multicast(&mut self, group: u8, command: &[u8]) -> Result<Vec<u8>, Error> {
-        let (class, state) = self.groups.get_mut(&group).ok_or(Error::Malformed("unknown multicast group"))?;
+        let (class, state) = self
+            .groups
+            .get_mut(&group)
+            .ok_or(Error::Malformed("unknown multicast group"))?;
         let class = *class;
         let keys = self.keys.get(&class).ok_or(Error::NoKey(class))?;
         let mut nonce = [0u8; 13];
@@ -713,7 +777,15 @@ impl S2Manager {
         let key = keys.key_ccm;
         // Multicast frames carry no sequence state per peer; use group 0x100+ as the counter key.
         let seq = self.next_sequence(0xff00 | u16::from(group))?;
-        self.seal(u16::from(group), seq, &[Extension::Mgrp { group }], &[], command, &key, &nonce)
+        self.seal(
+            u16::from(group),
+            seq,
+            &[Extension::Mgrp { group }],
+            &[],
+            command,
+            &key,
+            &nonce,
+        )
     }
 
     /// Decrypts a multicast frame from `peer` for `group` using the MPAN the peer gave us.
@@ -722,7 +794,9 @@ impl S2Manager {
     /// caller answers with [`nonce_report_mos`](Self::nonce_report_mos).
     pub fn decrypt_multicast(&mut self, peer: u16, frame: &[u8]) -> Result<Decrypted, Error> {
         let enc = Encapsulation::parse(frame)?;
-        let group = enc.multicast_group().ok_or(Error::Malformed("multicast without MGRP"))?;
+        let group = enc
+            .multicast_group()
+            .ok_or(Error::Malformed("multicast without MGRP"))?;
         let mut state = *self.peer_mpans.get(&(peer, group)).ok_or(Error::NoSpan)?;
         let class = self.highest_class(peer).ok_or(Error::NoSpan)?;
         let keys = self.keys.get(&class).ok_or(Error::NoKey(class))?;
@@ -774,18 +848,34 @@ mod tests {
     #[test]
     fn span_roundtrip_both_directions() {
         let (mut c, mut n) = pair();
-        assert_eq!(c.encrypt(5, &[0x31, 0x04], &EncryptOptions::default()), Err(Error::NoSpan));
+        assert_eq!(
+            c.encrypt(5, &[0x31, 0x04], &EncryptOptions::default()),
+            Err(Error::NoSpan)
+        );
         sync(&mut c, 1, &mut n, 5);
-        let f1 = c.encrypt(5, &[0x31, 0x04], &EncryptOptions::default()).unwrap();
+        let f1 = c
+            .encrypt(5, &[0x31, 0x04], &EncryptOptions::default())
+            .unwrap();
         assert!(Encapsulation::parse(&f1).unwrap().sender_ei().is_some());
         let d = n.decrypt(1, &f1).unwrap();
         assert_eq!(d.command, vec![0x31, 0x04]);
         assert_eq!(d.key, KeyId::Class(SecurityClass::S2Authenticated));
         // Same SPAN, no extension, both directions draw from one generator.
-        let f2 = n.encrypt(1, &[0x31, 0x05, 0x01, 0x22, 0x00, 0xd2], &EncryptOptions::default()).unwrap();
+        let f2 = n
+            .encrypt(
+                1,
+                &[0x31, 0x05, 0x01, 0x22, 0x00, 0xd2],
+                &EncryptOptions::default(),
+            )
+            .unwrap();
         assert!(Encapsulation::parse(&f2).unwrap().extensions.is_empty());
-        assert_eq!(c.decrypt(5, &f2).unwrap().command, vec![0x31, 0x05, 0x01, 0x22, 0x00, 0xd2]);
-        let f3 = c.encrypt(5, &[0x25, 0x01, 0xff], &EncryptOptions::default()).unwrap();
+        assert_eq!(
+            c.decrypt(5, &f2).unwrap().command,
+            vec![0x31, 0x05, 0x01, 0x22, 0x00, 0xd2]
+        );
+        let f3 = c
+            .encrypt(5, &[0x25, 0x01, 0xff], &EncryptOptions::default())
+            .unwrap();
         assert_eq!(n.decrypt(1, &f3).unwrap().command, vec![0x25, 0x01, 0xff]);
         // A retransmission is a duplicate.
         assert_eq!(n.decrypt(1, &f3), Err(Error::Duplicate));
@@ -795,10 +885,16 @@ mod tests {
     fn receiver_skips_lost_frames() {
         let (mut c, mut n) = pair();
         sync(&mut c, 1, &mut n, 5);
-        let f1 = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
+        let f1 = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
         n.decrypt(1, &f1).unwrap();
-        let _lost = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
-        let f3 = c.encrypt(5, &[0x20, 0x01, 0x10], &EncryptOptions::default()).unwrap();
+        let _lost = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
+        let f3 = c
+            .encrypt(5, &[0x20, 0x01, 0x10], &EncryptOptions::default())
+            .unwrap();
         assert_eq!(n.decrypt(1, &f3).unwrap().command, vec![0x20, 0x01, 0x10]);
     }
 
@@ -806,21 +902,27 @@ mod tests {
     fn tampering_and_wrong_key_fail() {
         let (mut c, mut n) = pair();
         sync(&mut c, 1, &mut n, 5);
-        let mut f = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
+        let mut f = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
         let last = f.len() - 1;
         f[last] ^= 0x01;
         assert_eq!(n.decrypt(1, &f), Err(Error::DecryptFailed));
         // After a failure the receiver answers with a fresh REI and the sender resyncs.
         let report = n.nonce_report(1, false).unwrap();
         c.handle_nonce_report(5, &report).unwrap();
-        let f = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
+        let f = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
         assert_eq!(n.decrypt(1, &f).unwrap().command, vec![0x20, 0x02]);
 
         let mut other = S2Manager::new(5, HOME);
         other.set_network_key(SecurityClass::S2Authenticated, &[0x43; 16]);
         other.set_peer_classes(1, &[SecurityClass::S2Authenticated]);
         sync(&mut c, 1, &mut other, 5);
-        let f = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
+        let f = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
         assert_eq!(other.decrypt(1, &f), Err(Error::DecryptFailed));
     }
 
@@ -831,7 +933,9 @@ mod tests {
         n.set_network_key(SecurityClass::S2Authenticated, &[0x42; 16]);
         n.set_peer_classes(1, &[SecurityClass::S2Authenticated]);
         sync(&mut c, 1, &mut n, 5);
-        let f = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
+        let f = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
         assert_eq!(n.decrypt(1, &f), Err(Error::DecryptFailed));
     }
 
@@ -842,8 +946,13 @@ mod tests {
         n.set_network_key(SecurityClass::S2Unauthenticated, &[0x11; 16]);
         n.set_network_key(SecurityClass::S2Authenticated, &[0x42; 16]);
         sync(&mut c, 1, &mut n, 5);
-        let f = c.encrypt(5, &[0x20, 0x02], &EncryptOptions::default()).unwrap();
-        assert_eq!(n.decrypt(1, &f).unwrap().key, KeyId::Class(SecurityClass::S2Authenticated));
+        let f = c
+            .encrypt(5, &[0x20, 0x02], &EncryptOptions::default())
+            .unwrap();
+        assert_eq!(
+            n.decrypt(1, &f).unwrap().key,
+            KeyId::Class(SecurityClass::S2Authenticated)
+        );
     }
 
     #[test]
@@ -852,10 +961,30 @@ mod tests {
         let nkp = KeyPair::generate().unwrap();
         let mut c = S2Manager::new(1, HOME);
         let mut n = S2Manager::new(5, HOME);
-        c.begin_bootstrap(5, bootstrap_keys(&ckp.shared_secret(nkp.public()).unwrap(), ckp.public(), nkp.public()));
-        n.begin_bootstrap(1, bootstrap_keys(&nkp.shared_secret(ckp.public()).unwrap(), ckp.public(), nkp.public()));
+        c.begin_bootstrap(
+            5,
+            bootstrap_keys(
+                &ckp.shared_secret(nkp.public()).unwrap(),
+                ckp.public(),
+                nkp.public(),
+            ),
+        );
+        n.begin_bootstrap(
+            1,
+            bootstrap_keys(
+                &nkp.shared_secret(ckp.public()).unwrap(),
+                ckp.public(),
+                nkp.public(),
+            ),
+        );
         sync(&mut n, 5, &mut c, 1);
-        let f = n.encrypt(1, &[0x9f, 0x06, 0x01, 0x02, 0x01, 0x02], &EncryptOptions::default()).unwrap();
+        let f = n
+            .encrypt(
+                1,
+                &[0x9f, 0x06, 0x01, 0x02, 0x01, 0x02],
+                &EncryptOptions::default(),
+            )
+            .unwrap();
         let d = c.decrypt(5, &f).unwrap();
         assert_eq!(d.key, KeyId::Temporary);
         assert_eq!(d.command, vec![0x9f, 0x06, 0x01, 0x02, 0x01, 0x02]);
@@ -870,13 +999,23 @@ mod tests {
         assert_eq!(n.decrypt_multicast(1, &m), Err(Error::NoSpan));
         // The follow-up singlecast hands it over in an encrypted extension.
         sync(&mut c, 1, &mut n, 5);
-        let opts = EncryptOptions { follow_up_group: Some(3), send_mpan: Some(3), ..Default::default() };
+        let opts = EncryptOptions {
+            follow_up_group: Some(3),
+            send_mpan: Some(3),
+            ..Default::default()
+        };
         let fu = c.encrypt(5, &[0x25, 0x01, 0xff], &opts).unwrap();
         let d = n.decrypt(1, &fu).unwrap();
         assert_eq!(d.command, vec![0x25, 0x01, 0xff]);
-        assert!(d.extensions.iter().any(|e| matches!(e, Extension::Mpan { group: 3, .. })));
+        assert!(d
+            .extensions
+            .iter()
+            .any(|e| matches!(e, Extension::Mpan { group: 3, .. })));
         let m2 = c.encrypt_multicast(3, &[0x25, 0x01, 0x00]).unwrap();
-        assert_eq!(n.decrypt_multicast(1, &m2).unwrap().command, vec![0x25, 0x01, 0x00]);
+        assert_eq!(
+            n.decrypt_multicast(1, &m2).unwrap().command,
+            vec![0x25, 0x01, 0x00]
+        );
     }
 
     #[test]
@@ -884,10 +1023,19 @@ mod tests {
         assert!(parse_extensions(&[]).is_err());
         assert!(parse_extensions(&[1, 0x41]).is_err());
         assert!(parse_extensions(&[18, 0x41, 0]).is_err());
-        assert_eq!(parse_extensions(&[2, 0x7f]), Err(Error::UnsupportedExtension(0x3f)));
+        assert_eq!(
+            parse_extensions(&[2, 0x7f]),
+            Err(Error::UnsupportedExtension(0x3f))
+        );
         let (e, used) = parse_extensions(&[3, 0x3e, 9, 0xaa]).unwrap();
         assert_eq!(used, 3);
-        assert_eq!(e, vec![Extension::Unknown { kind: 0x3e, data: vec![9] }]);
+        assert_eq!(
+            e,
+            vec![Extension::Unknown {
+                kind: 0x3e,
+                data: vec![9]
+            }]
+        );
         assert!(Encapsulation::parse(&[0x9f, 0x03, 0, 0x01, 2, 0x84]).is_err());
     }
 }

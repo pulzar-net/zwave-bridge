@@ -1,0 +1,88 @@
+id = 0x70
+name = "configuration"
+title = "Configuration"
+version = 4
+
+[[command]]
+id = 0x01
+name = "default_reset"
+
+[[command]]
+id = 0x04
+name = "set"
+fields = [
+  { name = "parameter", type = "u8" },
+  { type = "bits", parts = [
+    { name = "default", shift = 7, width = 1, kind = "bool" },
+    { name = "size", shift = 0, width = 3 },
+  ] },
+  { name = "value", type = "sized", size = "size" },
+]
+
+[[command]]
+id = 0x05
+name = "get"
+fields = [{ name = "parameter", type = "u8" }]
+
+[[command]]
+id = 0x06
+name = "report"
+fields = [
+  { name = "parameter", type = "u8" },
+  { type = "bits", parts = [{ name = "size", shift = 0, width = 3 }] },
+  { name = "value", type = "sized", size = "size" },
+]
+
+[[command]]
+id = 0x0a
+name = "name_get"
+fields = [{ name = "parameter", type = "u16" }]
+
+[[command]]
+id = 0x0b
+name = "name_report"
+fields = [
+  { name = "parameter", type = "u16" },
+  { name = "reports_to_follow", type = "u8" },
+  { name = "name", type = "bytes" },
+]
+
+[[command]]
+id = 0x0c
+name = "info_get"
+fields = [{ name = "parameter", type = "u16" }]
+
+[[command]]
+id = 0x0d
+name = "info_report"
+fields = [
+  { name = "parameter", type = "u16" },
+  { name = "reports_to_follow", type = "u8" },
+  { name = "info", type = "bytes" },
+]
+
+[[command]]
+id = 0x0e
+name = "properties_get"
+fields = [{ name = "parameter", type = "u16" }]
+
+[[command]]
+id = 0x0f
+name = "properties_report"
+fields = [
+  { name = "parameter", type = "u16" },
+  { type = "bits", parts = [
+    { name = "alters_capabilities", shift = 7, width = 1, kind = "bool" },
+    { name = "read_only", shift = 6, width = 1, kind = "bool" },
+    { name = "format", shift = 3, width = 3 },
+    { name = "size", shift = 0, width = 3 },
+  ] },
+  { name = "min", type = "sized", size = "size" },
+  { name = "max", type = "sized", size = "size" },
+  { name = "default", type = "sized", size = "size" },
+  { name = "next_parameter", type = "u16" },
+  { type = "bits", optional = true, parts = [
+    { name = "no_bulk_support", shift = 1, width = 1, kind = "bool" },
+    { name = "advanced", shift = 0, width = 1, kind = "bool" },
+  ] },
+]

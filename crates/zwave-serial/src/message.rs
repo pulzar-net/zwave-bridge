@@ -229,7 +229,10 @@ pub struct ControllerVersion {
 impl ControllerVersion {
     /// Parses the response payload.
     pub fn parse(p: &[u8]) -> Result<Self> {
-        let nul = p.iter().position(|&b| b == 0).ok_or(Malformed("controller version"))?;
+        let nul = p
+            .iter()
+            .position(|&b| b == 0)
+            .ok_or(Malformed("controller version"))?;
         let version = String::from_utf8_lossy(&p[..nul]).trim().to_string();
         Ok(ControllerVersion {
             version,
@@ -368,7 +371,14 @@ impl NodeProtocolInfo {
             | (if self.controller { 0x02 } else { 0 })
             | (if self.security { 0x01 } else { 0 })
             | 0x04;
-        vec![cap, sec, if self.speeds & 0b100 != 0 { 1 } else { 0 }, self.basic, self.generic, self.specific]
+        vec![
+            cap,
+            sec,
+            if self.speeds & 0b100 != 0 { 1 } else { 0 },
+            self.basic,
+            self.generic,
+            self.specific,
+        ]
     }
 }
 
@@ -464,7 +474,9 @@ impl ApplicationCommand {
         let source = node_id(p, 1, node_id_len, "application command")?;
         let at = 1 + node_id_len;
         let len = usize::from(p[at]);
-        let body = p.get(at + 1..at + 1 + len).ok_or(Malformed("application command"))?;
+        let body = p
+            .get(at + 1..at + 1 + len)
+            .ok_or(Malformed("application command"))?;
         Ok(ApplicationCommand {
             rx_status: RxStatus(p[0]),
             source,
@@ -478,10 +490,17 @@ impl ApplicationCommand {
     pub fn parse_bridge(p: &[u8], node_id_len: usize) -> Result<Self> {
         need(p, 2 + 2 * node_id_len, "bridge application command")?;
         let destination = node_id(p, 1, node_id_len, "bridge application command")?;
-        let source = node_id(p, 1 + node_id_len, node_id_len, "bridge application command")?;
+        let source = node_id(
+            p,
+            1 + node_id_len,
+            node_id_len,
+            "bridge application command",
+        )?;
         let at = 1 + 2 * node_id_len;
         let len = usize::from(p[at]);
-        let body = p.get(at + 1..at + 1 + len).ok_or(Malformed("bridge application command"))?;
+        let body = p
+            .get(at + 1..at + 1 + len)
+            .ok_or(Malformed("bridge application command"))?;
         let mut rest = at + 1 + len;
         // Multicast node mask: length byte and mask.
         if let Some(&mlen) = p.get(rest) {
@@ -498,7 +517,11 @@ impl ApplicationCommand {
 
     /// Encodes as an `APPLICATION_COMMAND_HANDLER` request frame (simulators, classic ids).
     pub fn to_frame(&self) -> DataFrame {
-        let mut v = vec![self.rx_status.0, self.source as u8, self.command.len() as u8];
+        let mut v = vec![
+            self.rx_status.0,
+            self.source as u8,
+            self.command.len() as u8,
+        ];
         v.extend_from_slice(&self.command);
         if let Some(r) = self.rssi {
             v.push(r as u8);
@@ -613,7 +636,11 @@ impl ApplicationUpdate {
                 v
             }
             ApplicationUpdate::NodeInfoRequestFailed => vec![0x81, 0, 0],
-            ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id, long_range, info } => {
+            ApplicationUpdate::SmartStartHomeIdReceived {
+                nwi_home_id,
+                long_range,
+                info,
+            } => {
                 let body = info.encode();
                 let mut v = vec![if *long_range { 0x87 } else { 0x85 }, 0, 0];
                 v.extend_from_slice(nwi_home_id);
@@ -714,7 +741,11 @@ impl TxReport {
         }
         let n = usize::from(p[2]).min(4);
         let repeaters: Vec<NodeId> = p[11..11 + n].iter().map(|&b| NodeId::from(b)).collect();
-        let repeater_rssi = p[4..4 + n].iter().map(|&b| b as i8).filter(|v| *v < 0x7d).collect();
+        let repeater_rssi = p[4..4 + n]
+            .iter()
+            .map(|&b| b as i8)
+            .filter(|v| *v < 0x7d)
+            .collect();
         let failed = |i: usize| p.get(i).copied().filter(|&b| b != 0).map(NodeId::from);
         Some(TxReport {
             ticks: u16::from_be_bytes([p[0], p[1]]),
@@ -864,10 +895,18 @@ impl AddNodeStatus {
         Ok(match p[1] {
             0x01 => AddNodeStatus::Ready,
             0x02 => AddNodeStatus::NodeFound,
-            0x03 => AddNodeStatus::AddingEndNode { node: node()?, info: info()? },
-            0x04 => AddNodeStatus::AddingController { node: node()?, info: info()? },
+            0x03 => AddNodeStatus::AddingEndNode {
+                node: node()?,
+                info: info()?,
+            },
+            0x04 => AddNodeStatus::AddingController {
+                node: node()?,
+                info: info()?,
+            },
             0x05 => AddNodeStatus::ProtocolDone,
-            0x06 => AddNodeStatus::Done { node: node().unwrap_or(0) },
+            0x06 => AddNodeStatus::Done {
+                node: node().unwrap_or(0),
+            },
             0x07 => AddNodeStatus::Failed,
             o => AddNodeStatus::Other(o),
         })
@@ -950,7 +989,10 @@ impl RemoveNodeStatus {
             RemoveNodeStatus::Failed => (0x07, 0),
             RemoveNodeStatus::Other(o) => (o, 0),
         };
-        DataFrame::request(F::REMOVE_NODE_FROM_NETWORK, vec![callback_id, s, n as u8, 0])
+        DataFrame::request(
+            F::REMOVE_NODE_FROM_NETWORK,
+            vec![callback_id, s, n as u8, 0],
+        )
     }
 }
 
@@ -1095,7 +1137,11 @@ impl NvmResponse {
         };
         let start = (2 + off_len).min(p.len());
         let data = p[start..p.len().min(start + len)].to_vec();
-        Ok(NvmResponse { status, offset_or_size, data })
+        Ok(NvmResponse {
+            status,
+            offset_or_size,
+            data,
+        })
     }
 
     /// Encodes (simulators).
@@ -1113,7 +1159,11 @@ impl NvmResponse {
 
 /// Builds an NVM operation request.
 pub fn nvm_request(extended: bool, op: u8, length: u8, offset: u32) -> DataFrame {
-    let f = if extended { F::EXTENDED_NVM_OPERATIONS } else { F::NVM_OPERATIONS };
+    let f = if extended {
+        F::EXTENDED_NVM_OPERATIONS
+    } else {
+        F::NVM_OPERATIONS
+    };
     let mut v = vec![op];
     if op == nvm::READ {
         v.push(length);
@@ -1143,7 +1193,11 @@ mod tests {
             manufacturer_id: 0,
             product_type: 4,
             product_id: 1,
-            functions: SerialApiCapabilities::mask(&[F::SEND_DATA, F::GET_ROUTING_INFO, F::NVM_OPERATIONS]),
+            functions: SerialApiCapabilities::mask(&[
+                F::SEND_DATA,
+                F::GET_ROUTING_INFO,
+                F::NVM_OPERATIONS,
+            ]),
         };
         let back = SerialApiCapabilities::parse(&c.encode()).unwrap();
         assert!(back.supports(F::SEND_DATA));
@@ -1154,7 +1208,13 @@ mod tests {
 
     #[test]
     fn init_data_and_masks() {
-        let d = InitData { api_version: 9, capabilities: 0x08, nodes: vec![1, 2, 5, 232], chip_type: Some(8), chip_version: Some(0) };
+        let d = InitData {
+            api_version: 9,
+            capabilities: 0x08,
+            nodes: vec![1, 2, 5, 232],
+            chip_type: Some(8),
+            chip_version: Some(0),
+        };
         let back = InitData::parse(&d.encode()).unwrap();
         assert_eq!(back, d);
         assert!(back.is_sis());
@@ -1172,7 +1232,13 @@ mod tests {
 
     #[test]
     fn application_command_variants() {
-        let a = ApplicationCommand { rx_status: RxStatus(0), source: 4, destination: None, command: vec![0x31, 0x05, 0x01, 0x22, 0x00, 0xe1], rssi: Some(-60) };
+        let a = ApplicationCommand {
+            rx_status: RxStatus(0),
+            source: 4,
+            destination: None,
+            command: vec![0x31, 0x05, 0x01, 0x22, 0x00, 0xe1],
+            rssi: Some(-60),
+        };
         let f = a.to_frame();
         assert_eq!(ApplicationCommand::parse(&f.payload, 1).unwrap(), a);
         // Length byte beyond the payload.
@@ -1187,7 +1253,19 @@ mod tests {
 
     #[test]
     fn tx_report_roundtrip() {
-        let r = TxReport { ticks: 3, repeaters: vec![7, 9], ack_rssi: Some(-71), repeater_rssi: vec![-50, -60], ack_channel: Some(1), tx_channel: 1, route_scheme: 3, speed: 3, attempts: 1, failed_from: None, failed_to: None };
+        let r = TxReport {
+            ticks: 3,
+            repeaters: vec![7, 9],
+            ack_rssi: Some(-71),
+            repeater_rssi: vec![-50, -60],
+            ack_channel: Some(1),
+            tx_channel: 1,
+            route_scheme: 3,
+            speed: 3,
+            attempts: 1,
+            failed_from: None,
+            failed_to: None,
+        };
         let mut p = vec![0x01, 0x00];
         p.extend_from_slice(&r.encode());
         let res = SendDataResult::parse(&p).unwrap();
@@ -1198,33 +1276,82 @@ mod tests {
 
     #[test]
     fn add_node_status() {
-        let info = NodeInfo { basic: 4, generic: 0x21, specific: 1, supported: vec![0x5e, 0x9f], controlled: vec![] };
+        let info = NodeInfo {
+            basic: 4,
+            generic: 0x21,
+            specific: 1,
+            supported: vec![0x5e, 0x9f],
+            controlled: vec![],
+        };
         let s = AddNodeStatus::AddingEndNode { node: 7, info };
         assert_eq!(AddNodeStatus::parse(&s.to_frame(3).payload, 1).unwrap(), s);
-        assert_eq!(AddNodeStatus::parse(&[3, 6, 7, 0], 1).unwrap(), AddNodeStatus::Done { node: 7 });
+        assert_eq!(
+            AddNodeStatus::parse(&[3, 6, 7, 0], 1).unwrap(),
+            AddNodeStatus::Done { node: 7 }
+        );
     }
 
     #[test]
     fn application_updates() {
-        let info = NodeInfo { basic: 4, generic: 0x07, specific: 1, supported: vec![0x5e, 0x71], controlled: vec![] };
-        let u = ApplicationUpdate::NodeInfoReceived { node: 3, info: info.clone() };
-        assert_eq!(ApplicationUpdate::parse(&u.to_frame().payload, 1).unwrap(), u);
-        let s = ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id: [0xc1, 2, 3, 4], long_range: false, info };
-        assert_eq!(ApplicationUpdate::parse(&s.to_frame().payload, 1).unwrap(), s);
+        let info = NodeInfo {
+            basic: 4,
+            generic: 0x07,
+            specific: 1,
+            supported: vec![0x5e, 0x71],
+            controlled: vec![],
+        };
+        let u = ApplicationUpdate::NodeInfoReceived {
+            node: 3,
+            info: info.clone(),
+        };
+        assert_eq!(
+            ApplicationUpdate::parse(&u.to_frame().payload, 1).unwrap(),
+            u
+        );
+        let s = ApplicationUpdate::SmartStartHomeIdReceived {
+            nwi_home_id: [0xc1, 2, 3, 4],
+            long_range: false,
+            info,
+        };
+        assert_eq!(
+            ApplicationUpdate::parse(&s.to_frame().payload, 1).unwrap(),
+            s
+        );
     }
 
     #[test]
     fn protocol_info() {
-        let i = NodeProtocolInfo { listening: false, routing: true, flirs_1000: false, flirs_250: false, beaming: true, controller: false, security: true, protocol_version: 3, speeds: 0b111, basic: 4, generic: 0x21, specific: 1 };
+        let i = NodeProtocolInfo {
+            listening: false,
+            routing: true,
+            flirs_1000: false,
+            flirs_250: false,
+            beaming: true,
+            controller: false,
+            security: true,
+            protocol_version: 3,
+            speeds: 0b111,
+            basic: 4,
+            generic: 0x21,
+            specific: 1,
+        };
         assert_eq!(NodeProtocolInfo::parse(&i.encode()).unwrap(), Some(i));
         assert_eq!(NodeProtocolInfo::parse(&[0; 6]).unwrap(), None);
     }
 
     #[test]
     fn nvm_responses() {
-        let r = NvmResponse { status: 0, offset_or_size: 0x1000, data: vec![] };
+        let r = NvmResponse {
+            status: 0,
+            offset_or_size: 0x1000,
+            data: vec![],
+        };
         assert_eq!(NvmResponse::parse(&r.encode(false), false).unwrap(), r);
-        let r = NvmResponse { status: 0xff, offset_or_size: 0x20, data: vec![1, 2, 3] };
+        let r = NvmResponse {
+            status: 0xff,
+            offset_or_size: 0x20,
+            data: vec![1, 2, 3],
+        };
         assert_eq!(NvmResponse::parse(&r.encode(true), true).unwrap(), r);
     }
 }

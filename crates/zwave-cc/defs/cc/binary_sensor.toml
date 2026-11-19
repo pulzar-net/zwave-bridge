@@ -1,0 +1,26 @@
+id = 0x30
+name = "binary_sensor"
+title = "Binary Sensor"
+version = 2
+
+[[command]]
+id = 0x01
+name = "supported_get"
+
+[[command]]
+id = 0x02
+name = "get"
+fields = [{ name = "sensor_type", type = "u8", optional = true }]
+
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "value", type = "u8" },
+  { name = "sensor_type", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x04
+name = "supported_report"
+fields = [{ name = "sensor_types", type = "bitmask", offset = 0 }]

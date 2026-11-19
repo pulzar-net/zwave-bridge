@@ -63,7 +63,10 @@ impl DataFrame {
     /// Serializes the frame. Panics if the payload exceeds [`MAX_PAYLOAD`],
     /// which every builder in this crate rules out.
     pub fn encode(&self) -> Vec<u8> {
-        assert!(self.payload.len() <= MAX_PAYLOAD, "Serial API payload too long");
+        assert!(
+            self.payload.len() <= MAX_PAYLOAD,
+            "Serial API payload too long"
+        );
         let len = (self.payload.len() + 3) as u8;
         let mut v = Vec::with_capacity(self.payload.len() + 5);
         v.push(SOF);
@@ -253,7 +256,10 @@ mod tests {
         let mut buf = BytesMut::from(&good[..4]);
         assert_eq!(codec.decode(&mut buf).unwrap(), None);
         buf.extend_from_slice(&good[4..]);
-        assert!(matches!(codec.decode(&mut buf).unwrap(), Some(Frame::Data(_))));
+        assert!(matches!(
+            codec.decode(&mut buf).unwrap(),
+            Some(Frame::Data(_))
+        ));
     }
 
     #[test]

@@ -113,7 +113,10 @@ mod tests {
     fn aes128_fips197() {
         let key = k("000102030405060708090a0b0c0d0e0f");
         let pt = k("00112233445566778899aabbccddeeff");
-        assert_eq!(aes128_ecb(&key, &pt).to_vec(), h("69c4e0d86a7b0430d8cdb78070b4c55a"));
+        assert_eq!(
+            aes128_ecb(&key, &pt).to_vec(),
+            h("69c4e0d86a7b0430d8cdb78070b4c55a")
+        );
     }
 
     // RFC 4493 section 4, examples 1 to 4.
@@ -121,10 +124,22 @@ mod tests {
     fn cmac_rfc4493() {
         let key = k("2b7e151628aed2a6abf7158809cf4f3c");
         let m = h("6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e5130c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
-        assert_eq!(cmac(&key, &[]).to_vec(), h("bb1d6929e95937287fa37d129b756746"));
-        assert_eq!(cmac(&key, &m[..16]).to_vec(), h("070a16b46b4d4144f79bdd9dd04a287c"));
-        assert_eq!(cmac(&key, &m[..40]).to_vec(), h("dfa66747de9ae63030ca32611497c827"));
-        assert_eq!(cmac(&key, &m).to_vec(), h("51f0bebf7e3b9d92fc49741779363cfe"));
+        assert_eq!(
+            cmac(&key, &[]).to_vec(),
+            h("bb1d6929e95937287fa37d129b756746")
+        );
+        assert_eq!(
+            cmac(&key, &m[..16]).to_vec(),
+            h("070a16b46b4d4144f79bdd9dd04a287c")
+        );
+        assert_eq!(
+            cmac(&key, &m[..40]).to_vec(),
+            h("dfa66747de9ae63030ca32611497c827")
+        );
+        assert_eq!(
+            cmac(&key, &m).to_vec(),
+            h("51f0bebf7e3b9d92fc49741779363cfe")
+        );
     }
 
     // RFC 3610 packet vector #1: AES-128, M = 8 (tag), L = 2 (13-byte nonce),
@@ -136,7 +151,10 @@ mod tests {
         let aad = h("0001020304050607");
         let pt = h("08090a0b0c0d0e0f101112131415161718191a1b1c1d1e");
         let ct = ccm_encrypt(&key, &nonce, &aad, &pt);
-        assert_eq!(ct, h("588c979a61c663d2f066d0c2c0f989806d5f6b61dac38417e8d12cfdf926e0"));
+        assert_eq!(
+            ct,
+            h("588c979a61c663d2f066d0c2c0f989806d5f6b61dac38417e8d12cfdf926e0")
+        );
         assert_eq!(ccm_decrypt(&key, &nonce, &aad, &ct).unwrap(), pt);
         let mut bad = ct.clone();
         bad[0] ^= 1;
@@ -166,7 +184,10 @@ mod tests {
         for (p, i) in pt.iter_mut().zip(iv) {
             *p ^= i;
         }
-        assert_eq!(cbc_mac(&key, &pt).to_vec(), h("5086cb9b507219ee95db113a917678b2"));
+        assert_eq!(
+            cbc_mac(&key, &pt).to_vec(),
+            h("5086cb9b507219ee95db113a917678b2")
+        );
     }
 
     // An S0 MAC from captured Z-Wave traffic (published with Z-Wave JS's tests).

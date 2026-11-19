@@ -1,0 +1,10 @@
+id = 0x56
+name = "crc16_encapsulation"
+title = "CRC-16 Encapsulation"
+version = 1
+
+# The encapsulated command followed by its CRC-16; see crate::crc16.
+[[command]]
+id = 0x01
+name = "encapsulation"
+fields = [{ name = "data", type = "bytes" }]

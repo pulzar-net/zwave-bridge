@@ -1,0 +1,59 @@
+id = 0x98
+name = "security"
+title = "Security 0"
+version = 1
+
+[[command]]
+id = 0x02
+name = "commands_supported_get"
+
+[[command]]
+id = 0x03
+name = "commands_supported_report"
+fields = [
+  { name = "reports_to_follow", type = "u8" },
+  { name = "command_classes", type = "cc_list" },
+]
+
+[[command]]
+id = 0x04
+name = "scheme_get"
+fields = [{ name = "schemes", type = "u8" }]
+
+[[command]]
+id = 0x05
+name = "scheme_report"
+fields = [{ name = "schemes", type = "u8" }]
+
+[[command]]
+id = 0x06
+name = "network_key_set"
+fields = [{ name = "network_key", type = "bytes" }]
+
+[[command]]
+id = 0x07
+name = "network_key_verify"
+
+[[command]]
+id = 0x08
+name = "scheme_inherit"
+fields = [{ name = "schemes", type = "u8" }]
+
+[[command]]
+id = 0x40
+name = "nonce_get"
+
+[[command]]
+id = 0x80
+name = "nonce_report"
+fields = [{ name = "nonce", type = "bytes" }]
+
+[[command]]
+id = 0x81
+name = "message_encapsulation"
+fields = [{ name = "data", type = "bytes" }]
+
+[[command]]
+id = 0xc1
+name = "message_encapsulation_nonce_get"
+fields = [{ name = "data", type = "bytes" }]

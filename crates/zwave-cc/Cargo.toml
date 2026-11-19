@@ -1,6 +1,24 @@
 [package]
 name = "zwave-cc"
+description = "Z-Wave command classes generated from data definitions: typed, bounded parsers and encoders, plus Transport Service and CRC-16"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-publish = false
+repository.workspace = true
+authors.workspace = true
+keywords = ["zwave", "z-wave", "command-class", "iot", "home-automation"]
+categories = ["embedded", "parser-implementations", "encoding"]
+build = "build.rs"
+include = ["src/**", "defs/**", "build.rs", "Cargo.toml", "README.md"]
+
+[dependencies]
+crc = "3"
+thiserror.workspace = true
+
+[build-dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+
+[lints]
+workspace = true

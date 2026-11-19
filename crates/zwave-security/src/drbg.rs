@@ -28,7 +28,10 @@ impl CtrDrbg {
     /// Instantiates from 32 bytes of entropy and an optional personalization
     /// string of at most 32 bytes (shorter strings are zero padded).
     pub fn new(entropy: &[u8; SEED_LEN], personalization: &[u8]) -> Self {
-        assert!(personalization.len() <= SEED_LEN, "personalization too long");
+        assert!(
+            personalization.len() <= SEED_LEN,
+            "personalization too long"
+        );
         let mut seed = *entropy;
         for (s, p) in seed.iter_mut().zip(personalization) {
             *s ^= p;

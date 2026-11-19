@@ -3,10 +3,13 @@
 
 use zwave_security::drbg::CtrDrbg;
 
-fn field<'a>(block: &'a str, name: &str) -> Vec<Vec<u8>> {
+fn field(block: &str, name: &str) -> Vec<Vec<u8>> {
     block
         .lines()
-        .filter_map(|l| l.split_once(" = ").or_else(|| l.strip_suffix(" =").map(|k| (k, ""))))
+        .filter_map(|l| {
+            l.split_once(" = ")
+                .or_else(|| l.strip_suffix(" =").map(|k| (k, "")))
+        })
         .filter(|(k, _)| k.trim() == name)
         .map(|(_, v)| hex::decode(v.trim()).unwrap())
         .collect()
@@ -19,7 +22,10 @@ fn cavp_aes128_no_df() {
     for block in data.split("COUNT = ").skip(1) {
         let entropy: [u8; 32] = field(block, "EntropyInput")[0].clone().try_into().unwrap();
         let ps = &field(block, "PersonalizationString")[0];
-        let reseed: [u8; 32] = field(block, "EntropyInputReseed")[0].clone().try_into().unwrap();
+        let reseed: [u8; 32] = field(block, "EntropyInputReseed")[0]
+            .clone()
+            .try_into()
+            .unwrap();
         let add_reseed = &field(block, "AdditionalInputReseed")[0];
         let adds = field(block, "AdditionalInput");
         let want = &field(block, "ReturnedBits")[0];

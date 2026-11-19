@@ -1,0 +1,17 @@
+id = 0x22
+name = "application_status"
+title = "Application Status"
+version = 1
+
+[[command]]
+id = 0x01
+name = "busy"
+fields = [
+  { name = "status", type = "u8" },
+  { name = "wait_time", type = "u8" },
+]
+
+[[command]]
+id = 0x02
+name = "rejected_request"
+fields = [{ name = "status", type = "u8" }]

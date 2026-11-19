@@ -133,9 +133,14 @@ mod tests {
         let d: Dsk = s.parse().unwrap();
         assert_eq!(d.to_string(), s);
         assert_eq!(d.pin(), 34028);
-        assert_eq!(d.masked(), "xxxxx-23669-20938-46346-33746-07431-56821-14553");
+        assert_eq!(
+            d.masked(),
+            "xxxxx-23669-20938-46346-33746-07431-56821-14553"
+        );
         assert!("34028-23669".parse::<Dsk>().is_err());
-        assert!("70000-23669-20938-46346-33746-07431-56821-14553".parse::<Dsk>().is_err());
+        assert!("70000-23669-20938-46346-33746-07431-56821-14553"
+            .parse::<Dsk>()
+            .is_err());
         assert_eq!(parse_pin(" 00042 ").unwrap(), 42);
         assert!(parse_pin("1234").is_err());
     }

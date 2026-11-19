@@ -1,0 +1,67 @@
+id = 0x86
+name = "version"
+title = "Version"
+version = 3
+
+[[command]]
+id = 0x11
+name = "get"
+
+[[command]]
+id = 0x12
+name = "report"
+fields = [
+  { name = "library_type", type = "u8" },
+  { name = "protocol_version", type = "u8" },
+  { name = "protocol_sub_version", type = "u8" },
+  { name = "firmware_version", type = "u8" },
+  { name = "firmware_sub_version", type = "u8" },
+  { name = "hardware_version", type = "u8", optional = true },
+  { name = "firmware_targets", type = "u8", optional = true },
+  { name = "target_versions", type = "u8_list" },
+]
+
+[[command]]
+id = 0x13
+name = "command_class_get"
+fields = [{ name = "requested_cc", type = "u8" }]
+
+[[command]]
+id = 0x14
+name = "command_class_report"
+fields = [
+  { name = "requested_cc", type = "u8" },
+  { name = "version", type = "u8" },
+]
+
+[[command]]
+id = 0x15
+name = "capabilities_get"
+
+[[command]]
+id = 0x16
+name = "capabilities_report"
+fields = [{ type = "bits", parts = [
+  { name = "zwave_software", shift = 2, width = 1, kind = "bool" },
+  { name = "command_class", shift = 1, width = 1, kind = "bool" },
+  { name = "version", shift = 0, width = 1, kind = "bool" },
+] }]
+
+[[command]]
+id = 0x17
+name = "zwave_software_get"
+
+[[command]]
+id = 0x18
+name = "zwave_software_report"
+fields = [
+  { name = "sdk_version", type = "u24" },
+  { name = "application_framework_api_version", type = "u24" },
+  { name = "application_framework_build", type = "u16" },
+  { name = "host_interface_version", type = "u24" },
+  { name = "host_interface_build", type = "u16" },
+  { name = "zwave_protocol_version", type = "u24" },
+  { name = "zwave_protocol_build", type = "u16" },
+  { name = "application_version", type = "u24" },
+  { name = "application_build", type = "u16" },
+]

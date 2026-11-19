@@ -1,0 +1,29 @@
+id = 0x6c
+name = "supervision"
+title = "Supervision"
+version = 2
+
+[[command]]
+id = 0x01
+name = "get"
+fields = [
+  { type = "bits", parts = [
+    { name = "status_updates", shift = 7, width = 1, kind = "bool" },
+    { name = "session_id", shift = 0, width = 6 },
+  ] },
+  { name = "command_len", type = "u8" },
+  { name = "command", type = "bytes", len = "command_len" },
+]
+
+[[command]]
+id = 0x02
+name = "report"
+fields = [
+  { type = "bits", parts = [
+    { name = "more_status_updates", shift = 7, width = 1, kind = "bool" },
+    { name = "wake_up_request", shift = 6, width = 1, kind = "bool" },
+    { name = "session_id", shift = 0, width = 6 },
+  ] },
+  { name = "status", type = "u8" },
+  { name = "duration", type = "u8", optional = true },
+]

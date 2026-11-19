@@ -1,0 +1,25 @@
+id = 0x25
+name = "binary_switch"
+title = "Binary Switch"
+version = 2
+
+[[command]]
+id = 0x01
+name = "set"
+fields = [
+  { name = "target", type = "u8" },
+  { name = "duration", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x02
+name = "get"
+
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "current", type = "u8" },
+  { name = "target", type = "u8", optional = true },
+  { name = "duration", type = "u8", optional = true },
+]

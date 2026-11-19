@@ -1,0 +1,104 @@
+id = 0x9f
+name = "security_2"
+title = "Security 2"
+version = 1
+
+[[command]]
+id = 0x01
+name = "nonce_get"
+fields = [{ name = "sequence", type = "u8" }]
+
+[[command]]
+id = 0x02
+name = "nonce_report"
+fields = [
+  { name = "sequence", type = "u8" },
+  { type = "bits", parts = [
+    { name = "mos", shift = 1, width = 1, kind = "bool" },
+    { name = "sos", shift = 0, width = 1, kind = "bool" },
+  ] },
+  { name = "receiver_ei", type = "bytes" },
+]
+
+# Sequence, flags, extensions, ciphertext and tag; see zwave_security::s2.
+[[command]]
+id = 0x03
+name = "message_encapsulation"
+fields = [{ name = "data", type = "bytes" }]
+
+[[command]]
+id = 0x04
+name = "kex_get"
+
+[[command]]
+id = 0x05
+name = "kex_report"
+fields = [
+  { type = "bits", parts = [
+    { name = "request_csa", shift = 1, width = 1, kind = "bool" },
+    { name = "echo", shift = 0, width = 1, kind = "bool" },
+  ] },
+  { name = "schemes", type = "u8" },
+  { name = "curves", type = "u8" },
+  { name = "keys", type = "u8" },
+]
+
+[[command]]
+id = 0x06
+name = "kex_set"
+fields = [
+  { type = "bits", parts = [
+    { name = "request_csa", shift = 1, width = 1, kind = "bool" },
+    { name = "echo", shift = 0, width = 1, kind = "bool" },
+  ] },
+  { name = "scheme", type = "u8" },
+  { name = "curve", type = "u8" },
+  { name = "keys", type = "u8" },
+]
+
+[[command]]
+id = 0x07
+name = "kex_fail"
+fields = [{ name = "fail_type", type = "u8" }]
+
+[[command]]
+id = 0x08
+name = "public_key_report"
+fields = [
+  { type = "bits", parts = [{ name = "including_node", shift = 0, width = 1, kind = "bool" }] },
+  { name = "public_key", type = "bytes" },
+]
+
+[[command]]
+id = 0x09
+name = "network_key_get"
+fields = [{ name = "requested_key", type = "u8" }]
+
+[[command]]
+id = 0x0a
+name = "network_key_report"
+fields = [
+  { name = "granted_key", type = "u8" },
+  { name = "network_key", type = "bytes" },
+]
+
+[[command]]
+id = 0x0b
+name = "network_key_verify"
+
+[[command]]
+id = 0x0c
+name = "transfer_end"
+fields = [{ type = "bits", parts = [
+  { name = "key_verified", shift = 1, width = 1, kind = "bool" },
+  { name = "key_request_complete", shift = 0, width = 1, kind = "bool" },
+] }]
+
+[[command]]
+id = 0x0d
+name = "commands_supported_get"
+
+[[command]]
+id = 0x0e
+name = "commands_supported_report"
+fields = [{ name = "command_classes", type = "cc_list" }]

@@ -1,0 +1,82 @@
+id = 0x60
+name = "multi_channel"
+title = "Multi Channel"
+version = 4
+
+[[command]]
+id = 0x07
+name = "end_point_get"
+
+[[command]]
+id = 0x08
+name = "end_point_report"
+fields = [
+  { type = "bits", parts = [
+    { name = "dynamic", shift = 7, width = 1, kind = "bool" },
+    { name = "identical", shift = 6, width = 1, kind = "bool" },
+  ] },
+  { type = "bits", parts = [{ name = "individual_end_points", shift = 0, width = 7 }] },
+  { type = "bits", optional = true, parts = [{ name = "aggregated_end_points", shift = 0, width = 7 }] },
+]
+
+[[command]]
+id = 0x09
+name = "capability_get"
+fields = [{ type = "bits", parts = [{ name = "end_point", shift = 0, width = 7 }] }]
+
+[[command]]
+id = 0x0a
+name = "capability_report"
+fields = [
+  { type = "bits", parts = [
+    { name = "dynamic", shift = 7, width = 1, kind = "bool" },
+    { name = "end_point", shift = 0, width = 7 },
+  ] },
+  { name = "generic", type = "u8" },
+  { name = "specific", type = "u8" },
+  { name = "command_classes", type = "cc_list" },
+]
+
+[[command]]
+id = 0x0b
+name = "end_point_find"
+fields = [
+  { name = "generic", type = "u8" },
+  { name = "specific", type = "u8" },
+]
+
+[[command]]
+id = 0x0c
+name = "end_point_find_report"
+fields = [
+  { name = "reports_to_follow", type = "u8" },
+  { name = "generic", type = "u8" },
+  { name = "specific", type = "u8" },
+  { name = "end_points", type = "u8_list" },
+]
+
+[[command]]
+id = 0x0d
+name = "command_encapsulation"
+fields = [
+  { type = "bits", parts = [{ name = "source_end_point", shift = 0, width = 7 }] },
+  { type = "bits", parts = [
+    { name = "bit_address", shift = 7, width = 1, kind = "bool" },
+    { name = "destination_end_point", shift = 0, width = 7 },
+  ] },
+  { name = "command", type = "bytes" },
+]
+
+[[command]]
+id = 0x0e
+name = "aggregated_members_get"
+fields = [{ type = "bits", parts = [{ name = "end_point", shift = 0, width = 7 }] }]
+
+[[command]]
+id = 0x0f
+name = "aggregated_members_report"
+fields = [
+  { type = "bits", parts = [{ name = "end_point", shift = 0, width = 7 }] },
+  { name = "mask_len", type = "u8" },
+  { name = "members", type = "bitmask", len = "mask_len", offset = 1 },
+]

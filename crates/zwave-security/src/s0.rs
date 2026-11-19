@@ -87,7 +87,9 @@ pub struct S0Manager {
 
 impl std::fmt::Debug for S0Manager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("S0Manager").field("own_node", &self.own_node).finish()
+        f.debug_struct("S0Manager")
+            .field("own_node", &self.own_node)
+            .finish()
     }
 }
 
@@ -121,9 +123,12 @@ impl S0Manager {
     }
 
     fn expire(&mut self, now: Instant) {
-        self.own_nonces.retain(|_, (_, _, t)| now.duration_since(*t) < NONCE_LIFETIME);
-        self.peer_nonces.retain(|_, (_, t)| now.duration_since(*t) < NONCE_LIFETIME);
-        self.halves.retain(|_, (_, t)| now.duration_since(*t) < NONCE_LIFETIME);
+        self.own_nonces
+            .retain(|_, (_, _, t)| now.duration_since(*t) < NONCE_LIFETIME);
+        self.peer_nonces
+            .retain(|_, (_, t)| now.duration_since(*t) < NONCE_LIFETIME);
+        self.halves
+            .retain(|_, (_, t)| now.duration_since(*t) < NONCE_LIFETIME);
     }
 
     /// A Nonce Get command.
@@ -137,7 +142,12 @@ impl S0Manager {
         self.expire(now);
         if self.own_nonces.len() >= MAX_OWN_NONCES {
             // Drop the oldest; a flood of Nonce Gets must not grow memory.
-            if let Some(oldest) = self.own_nonces.iter().min_by_key(|(_, (_, _, t))| *t).map(|(k, _)| *k) {
+            if let Some(oldest) = self
+                .own_nonces
+                .iter()
+                .min_by_key(|(_, (_, _, t))| *t)
+                .map(|(k, _)| *k)
+            {
                 self.own_nonces.remove(&oldest);
             }
         }
@@ -176,11 +186,22 @@ impl S0Manager {
     /// A command longer than [`MAX_PAYLOAD`] needs two frames; this returns
     /// the first and the caller sends it, fetches a new nonce and calls
     /// again with the rest via [`encapsulate_part`](Self::encapsulate_part).
-    pub fn encapsulate(&mut self, peer: u16, command: &[u8], temp_key: bool) -> Result<Vec<u8>, Error> {
+    pub fn encapsulate(
+        &mut self,
+        peer: u16,
+        command: &[u8],
+        temp_key: bool,
+    ) -> Result<Vec<u8>, Error> {
         if command.len() > MAX_PAYLOAD {
             return Err(Error::Malformed("S0 command too long for one frame"));
         }
-        self.encapsulate_part(peer, command, frame_control(false, false, 0), temp_key, false)
+        self.encapsulate_part(
+            peer,
+            command,
+            frame_control(false, false, 0),
+            temp_key,
+            false,
+        )
     }
 
     /// Splits a long command into the two halves S0 sends in sequence.
@@ -218,7 +239,11 @@ impl S0Manager {
         plain.push(control);
         plain.extend_from_slice(part);
         let ct = aes128_ofb(&keys.enc, &iv, &plain);
-        let command = if nonce_get { cmd::MESSAGE_ENCAPSULATION_NONCE_GET } else { cmd::MESSAGE_ENCAPSULATION };
+        let command = if nonce_get {
+            cmd::MESSAGE_ENCAPSULATION_NONCE_GET
+        } else {
+            cmd::MESSAGE_ENCAPSULATION
+        };
         let mac = Self::mac(&keys.auth, &iv, command, self.own_node, peer, &ct);
         let mut out = Vec::with_capacity(2 + 8 + ct.len() + 9);
         out.extend_from_slice(&[CC_SECURITY, command]);
@@ -229,7 +254,14 @@ impl S0Manager {
         Ok(out)
     }
 
-    fn mac(auth: &[u8; 16], iv: &[u8; 16], command: u8, sender: u16, receiver: u16, ct: &[u8]) -> [u8; 8] {
+    fn mac(
+        auth: &[u8; 16],
+        iv: &[u8; 16],
+        command: u8,
+        sender: u16,
+        receiver: u16,
+        ct: &[u8],
+    ) -> [u8; 8] {
         let mut data = Vec::with_capacity(20 + ct.len());
         data.extend_from_slice(iv);
         data.extend_from_slice(&[command, sender as u8, receiver as u8, ct.len() as u8]);
@@ -242,10 +274,18 @@ impl S0Manager {
     ///
     /// The nonce it names must be one we issued to `peer` and still live; it
     /// is consumed either way.
-    pub fn decapsulate(&mut self, peer: u16, frame: &[u8], temp_key: bool) -> Result<S0Payload, Error> {
+    pub fn decapsulate(
+        &mut self,
+        peer: u16,
+        frame: &[u8],
+        temp_key: bool,
+    ) -> Result<S0Payload, Error> {
         if frame.len() < 2 + 8 + 1 + 1 + 8
             || frame[0] != CC_SECURITY
-            || !matches!(frame[1], cmd::MESSAGE_ENCAPSULATION | cmd::MESSAGE_ENCAPSULATION_NONCE_GET)
+            || !matches!(
+                frame[1],
+                cmd::MESSAGE_ENCAPSULATION | cmd::MESSAGE_ENCAPSULATION_NONCE_GET
+            )
         {
             return Err(Error::Malformed("not an S0 encapsulation"));
         }
@@ -255,7 +295,8 @@ impl S0Manager {
         let ct = &frame[10..frame.len() - 9];
         let nonce_id = frame[frame.len() - 9];
         let mac = &frame[frame.len() - 8..];
-        let (receiver_nonce, issued_to, _) = self.own_nonces.remove(&nonce_id).ok_or(Error::NoNonce)?;
+        let (receiver_nonce, issued_to, _) =
+            self.own_nonces.remove(&nonce_id).ok_or(Error::NoNonce)?;
         if issued_to != peer {
             return Err(Error::NoNonce);
         }
@@ -280,7 +321,10 @@ impl S0Manager {
             self.halves.insert((peer, counter), (body, now));
             return Ok(S0Payload::FirstHalf);
         }
-        let (mut first, _) = self.halves.remove(&(peer, counter)).ok_or(Error::Malformed("S0 second half without first"))?;
+        let (mut first, _) = self
+            .halves
+            .remove(&(peer, counter))
+            .ok_or(Error::Malformed("S0 second half without first"))?;
         first.extend_from_slice(&body);
         Ok(S0Payload::Complete(first))
     }
@@ -299,7 +343,10 @@ mod tests {
         let report = n.nonce_report(1).unwrap();
         c.handle_nonce_report(9, &report).unwrap();
         let f = c.encapsulate(9, &[0x25, 0x01, 0xff], false).unwrap();
-        assert_eq!(n.decapsulate(1, &f, false).unwrap(), S0Payload::Complete(vec![0x25, 0x01, 0xff]));
+        assert_eq!(
+            n.decapsulate(1, &f, false).unwrap(),
+            S0Payload::Complete(vec![0x25, 0x01, 0xff])
+        );
         // The nonce was single-use.
         assert_eq!(n.decapsulate(1, &f, false), Err(Error::NoNonce));
     }
@@ -318,7 +365,10 @@ mod tests {
         let mut set = vec![CC_SECURITY, cmd::NETWORK_KEY_SET];
         set.extend_from_slice(&[7; 16]);
         let f = c.encapsulate(9, &set, true).unwrap();
-        assert_eq!(n.decapsulate(1, &f, true).unwrap(), S0Payload::Complete(set));
+        assert_eq!(
+            n.decapsulate(1, &f, true).unwrap(),
+            S0Payload::Complete(set)
+        );
     }
 
     #[test]
@@ -342,7 +392,9 @@ mod tests {
         for (i, (part, control)) in parts.iter().enumerate() {
             let r = n.nonce_report(1).unwrap();
             c.handle_nonce_report(9, &r).unwrap();
-            let f = c.encapsulate_part(9, part, *control, false, i == 0).unwrap();
+            let f = c
+                .encapsulate_part(9, part, *control, false, i == 0)
+                .unwrap();
             let out = n.decapsulate(1, &f, false).unwrap();
             if i == 0 {
                 assert_eq!(out, S0Payload::FirstHalf);

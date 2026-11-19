@@ -121,8 +121,16 @@ mod tests {
     #[test]
     fn match_by_nwi() {
         let mut l = ProvisioningList::default();
-        let dsk: Dsk = "51525-35455-41654-24356-13311-14526-06640-31770".parse().unwrap();
-        assert!(l.upsert(Entry { dsk, granted: vec![SecurityClass::S2Authenticated], status: EntryStatus::Active, node_id: None, name: None }));
+        let dsk: Dsk = "51525-35455-41654-24356-13311-14526-06640-31770"
+            .parse()
+            .unwrap();
+        assert!(l.upsert(Entry {
+            dsk,
+            granted: vec![SecurityClass::S2Authenticated],
+            status: EntryStatus::Active,
+            node_id: None,
+            name: None
+        }));
         assert!(l.has_active());
         assert_eq!(l.match_nwi_home_id(&dsk.nwi_home_id()).unwrap().dsk, dsk);
         assert!(l.match_nwi_home_id(&[0, 0, 0, 0]).is_none());

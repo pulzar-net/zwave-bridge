@@ -1,0 +1,53 @@
+id = 0x85
+name = "association"
+title = "Association"
+version = 3
+
+[[command]]
+id = 0x01
+name = "set"
+fields = [
+  { name = "group", type = "u8" },
+  { name = "nodes", type = "u8_list" },
+]
+
+[[command]]
+id = 0x02
+name = "get"
+fields = [{ name = "group", type = "u8" }]
+
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "group", type = "u8" },
+  { name = "max_nodes", type = "u8" },
+  { name = "reports_to_follow", type = "u8" },
+  { name = "nodes", type = "u8_list" },
+]
+
+[[command]]
+id = 0x04
+name = "remove"
+fields = [
+  { name = "group", type = "u8" },
+  { name = "nodes", type = "u8_list" },
+]
+
+[[command]]
+id = 0x05
+name = "groupings_get"
+
+[[command]]
+id = 0x06
+name = "groupings_report"
+fields = [{ name = "groups", type = "u8" }]
+
+[[command]]
+id = 0x0b
+name = "specific_group_get"
+
+[[command]]
+id = 0x0c
+name = "specific_group_report"
+fields = [{ name = "group", type = "u8" }]

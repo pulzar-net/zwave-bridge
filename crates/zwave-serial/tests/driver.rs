@@ -46,13 +46,18 @@ async fn request_response() {
         let req = data(&mut ctrl).await;
         assert_eq!(req.function, 0x20);
         ctrl.write_all(&[ACK]).await.unwrap();
-        ctrl.write_all(&DataFrame::response(0x20u8, vec![0xc0, 0xff, 0xee, 0x01, 0x01]).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::response(0x20u8, vec![0xc0, 0xff, 0xee, 0x01, 0x01]).encode())
+            .await
+            .unwrap();
         let mut b = [0u8; 1];
         ctrl.read_exact(&mut b).await.unwrap();
         assert_eq!(b[0], ACK, "host acknowledges the response");
     });
     let r = api
-        .request(DataFrame::request(FunctionId::GET_CONTROLLER_ID, vec![]), Duration::from_secs(1))
+        .request(
+            DataFrame::request(FunctionId::GET_CONTROLLER_ID, vec![]),
+            Duration::from_secs(1),
+        )
         .await
         .unwrap();
     assert_eq!(r.payload, vec![0xc0, 0xff, 0xee, 0x01, 0x01]);
@@ -70,13 +75,18 @@ async fn retransmits_after_nak_and_can() {
         ctrl.write_all(&[CAN]).await.unwrap();
         data(&mut ctrl).await;
         ctrl.write_all(&[ACK]).await.unwrap();
-        ctrl.write_all(&DataFrame::response(0x15u8, b"Z-Wave 7.21\0\x07".to_vec()).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::response(0x15u8, b"Z-Wave 7.21\0\x07".to_vec()).encode())
+            .await
+            .unwrap();
         // Keep the pipe open until the host is done.
         let mut b = [0u8; 1];
         let _ = ctrl.read(&mut b).await;
     });
     let r = api
-        .request(DataFrame::request(FunctionId::GET_CONTROLLER_VERSION, vec![]), Duration::from_secs(1))
+        .request(
+            DataFrame::request(FunctionId::GET_CONTROLLER_VERSION, vec![]),
+            Duration::from_secs(1),
+        )
         .await
         .unwrap();
     assert_eq!(r.function, 0x15);
@@ -92,12 +102,17 @@ async fn gives_up_without_ack() {
         let mut n = 0;
         let mut buf = Vec::new();
         let mut chunk = [0u8; 64];
-        while let Ok(Ok(k)) = tokio::time::timeout(Duration::from_millis(2000), ctrl.read(&mut chunk)).await {
+        while let Ok(Ok(k)) =
+            tokio::time::timeout(Duration::from_millis(2000), ctrl.read(&mut chunk)).await
+        {
             if k == 0 {
                 break;
             }
             buf.extend_from_slice(&chunk[..k]);
-            n = decode_all(&buf).iter().filter(|f| matches!(f, Frame::Data(_))).count();
+            n = decode_all(&buf)
+                .iter()
+                .filter(|f| matches!(f, Frame::Data(_)))
+                .count();
             if n == 3 {
                 break;
             }
@@ -105,7 +120,10 @@ async fn gives_up_without_ack() {
         (n, ctrl)
     });
     let e = api
-        .request(DataFrame::request(FunctionId::GET_CONTROLLER_ID, vec![]), Duration::from_secs(1))
+        .request(
+            DataFrame::request(FunctionId::GET_CONTROLLER_ID, vec![]),
+            Duration::from_secs(1),
+        )
         .await
         .unwrap_err();
     assert_eq!(e, SerialError::NoAck(3));
@@ -122,15 +140,21 @@ async fn callback_and_unsolicited() {
         assert_eq!(req.function, 0x13);
         let cb = *req.payload.last().unwrap();
         ctrl.write_all(&[ACK]).await.unwrap();
-        ctrl.write_all(&DataFrame::response(0x13u8, vec![0x01]).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::response(0x13u8, vec![0x01]).encode())
+            .await
+            .unwrap();
         // An unrelated frame from a node arrives before the callback.
-        ctrl.write_all(&DataFrame::request(0x04u8, vec![0, 2, 3, 0x20, 0x03, 0xff]).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::request(0x04u8, vec![0, 2, 3, 0x20, 0x03, 0xff]).encode())
+            .await
+            .unwrap();
         // A frame with a bad checksum must be NAKed.
         let mut bad = DataFrame::request(0x04u8, vec![0, 2, 2, 0x20, 0x02]).encode();
         let l = bad.len() - 1;
         bad[l] ^= 0x55;
         ctrl.write_all(&bad).await.unwrap();
-        ctrl.write_all(&DataFrame::request(0x13u8, vec![cb, 0x00]).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::request(0x13u8, vec![cb, 0x00]).encode())
+            .await
+            .unwrap();
         let mut seen = Vec::new();
         let mut chunk = [0u8; 16];
         while seen.iter().filter(|&&b| b == ACK).count() < 3 {
@@ -161,7 +185,9 @@ async fn refused_request_skips_callback() {
     tokio::spawn(async move {
         data(&mut ctrl).await;
         ctrl.write_all(&[ACK]).await.unwrap();
-        ctrl.write_all(&DataFrame::response(0x13u8, vec![0x00]).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::response(0x13u8, vec![0x00]).encode())
+            .await
+            .unwrap();
         let mut b = [0u8; 8];
         let _ = ctrl.read(&mut b).await;
     });
@@ -193,11 +219,16 @@ async fn probe_identifies_a_controller_and_ignores_silence() {
             product_id: 4,
             functions: [0xff; 32],
         };
-        ctrl.write_all(&DataFrame::response(0x07u8, caps.encode()).encode()).await.unwrap();
+        ctrl.write_all(&DataFrame::response(0x07u8, caps.encode()).encode())
+            .await
+            .unwrap();
         let mut b = [0u8; 8];
         let _ = ctrl.read(&mut b).await;
     });
-    let id = zwave_serial::probe::probe_port(host).await.unwrap().unwrap();
+    let id = zwave_serial::probe::probe_port(host)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(id.firmware, "7.22");
     assert!(id.known_name().unwrap().contains("800"));
 

@@ -1,0 +1,47 @@
+id = 0x84
+name = "wake_up"
+title = "Wake Up"
+version = 3
+
+[[command]]
+id = 0x04
+name = "interval_set"
+fields = [
+  { name = "seconds", type = "u24" },
+  { name = "node_id", type = "u8" },
+]
+
+[[command]]
+id = 0x05
+name = "interval_get"
+
+[[command]]
+id = 0x06
+name = "interval_report"
+fields = [
+  { name = "seconds", type = "u24" },
+  { name = "node_id", type = "u8" },
+]
+
+[[command]]
+id = 0x07
+name = "notification"
+
+[[command]]
+id = 0x08
+name = "no_more_information"
+
+[[command]]
+id = 0x09
+name = "interval_capabilities_get"
+
+[[command]]
+id = 0x0a
+name = "interval_capabilities_report"
+fields = [
+  { name = "minimum", type = "u24" },
+  { name = "maximum", type = "u24" },
+  { name = "default", type = "u24" },
+  { name = "step", type = "u24" },
+  { type = "bits", optional = true, parts = [{ name = "on_demand", shift = 0, width = 1, kind = "bool" }] },
+]

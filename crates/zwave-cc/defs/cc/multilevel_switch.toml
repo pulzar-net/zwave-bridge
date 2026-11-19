@@ -1,0 +1,53 @@
+id = 0x26
+name = "multilevel_switch"
+title = "Multilevel Switch"
+version = 4
+
+[[command]]
+id = 0x01
+name = "set"
+fields = [
+  { name = "value", type = "u8" },
+  { name = "duration", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x02
+name = "get"
+
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "current", type = "u8" },
+  { name = "target", type = "u8", optional = true },
+  { name = "duration", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x04
+name = "start_level_change"
+fields = [
+  { type = "bits", parts = [
+    { name = "direction", shift = 6, width = 2 },
+    { name = "ignore_start_level", shift = 5, width = 1, kind = "bool" },
+  ] },
+  { name = "start_level", type = "u8" },
+  { name = "duration", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x05
+name = "stop_level_change"
+
+[[command]]
+id = 0x06
+name = "supported_get"
+
+[[command]]
+id = 0x07
+name = "supported_report"
+fields = [
+  { type = "bits", parts = [{ name = "primary_switch_type", shift = 0, width = 5 }] },
+  { type = "bits", parts = [{ name = "secondary_switch_type", shift = 0, width = 5 }] },
+]

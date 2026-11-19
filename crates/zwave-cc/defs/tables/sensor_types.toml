@@ -1,0 +1,763 @@
+# Generated from the Z-Wave Alliance's assigned values as tabulated by
+# Z-Wave JS (MIT, see NOTICE). Edit freely; build.rs reads this file.
+
+[[sensor]]
+id = 1
+name = "air_temperature"
+label = "Air temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 2
+name = "general_purpose"
+label = "General purpose"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+  { id = 1, label = "Dimensionless value", unit = "" },
+]
+
+[[sensor]]
+id = 3
+name = "illuminance"
+label = "Illuminance"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+  { id = 1, label = "Lux", unit = "Lux" },
+]
+
+[[sensor]]
+id = 4
+name = "power"
+label = "Power"
+scales = [
+  { id = 0, label = "Watt", unit = "W" },
+  { id = 1, label = "Btu/h", unit = "Btu/h" },
+]
+
+[[sensor]]
+id = 5
+name = "humidity"
+label = "Humidity"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+  { id = 1, label = "Absolute humidity", unit = "g/m³" },
+]
+
+[[sensor]]
+id = 6
+name = "velocity"
+label = "Velocity"
+scales = [
+  { id = 0, label = "m/s", unit = "m/s" },
+  { id = 1, label = "Mph", unit = "Mph" },
+]
+
+[[sensor]]
+id = 7
+name = "direction"
+label = "Direction"
+scales = [
+  { id = 0, label = "Degrees", unit = "°" },
+]
+
+[[sensor]]
+id = 8
+name = "atmospheric_pressure"
+label = "Atmospheric pressure"
+scales = [
+  { id = 0, label = "Kilopascal", unit = "kPa" },
+  { id = 1, label = "Inches of Mercury", unit = "inHg" },
+]
+
+[[sensor]]
+id = 9
+name = "barometric_pressure"
+label = "Barometric pressure"
+scales = [
+  { id = 0, label = "Kilopascal", unit = "kPa" },
+  { id = 1, label = "Inches of Mercury", unit = "inHg" },
+]
+
+[[sensor]]
+id = 10
+name = "solar_radiation"
+label = "Solar radiation"
+scales = [
+  { id = 0, label = "Watt per square meter", unit = "W/m²" },
+]
+
+[[sensor]]
+id = 11
+name = "dew_point"
+label = "Dew point"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 12
+name = "rain_rate"
+label = "Rain rate"
+scales = [
+  { id = 0, label = "Millimeter/hour", unit = "mm/h" },
+  { id = 1, label = "Inches per hour", unit = "in/h" },
+]
+
+[[sensor]]
+id = 13
+name = "tide_level"
+label = "Tide level"
+scales = [
+  { id = 0, label = "Meter", unit = "m" },
+  { id = 1, label = "Feet", unit = "ft" },
+]
+
+[[sensor]]
+id = 14
+name = "weight"
+label = "Weight"
+scales = [
+  { id = 0, label = "Kilogram", unit = "kg" },
+  { id = 1, label = "Pounds", unit = "lb" },
+]
+
+[[sensor]]
+id = 15
+name = "voltage"
+label = "Voltage"
+scales = [
+  { id = 0, label = "Volt", unit = "V" },
+  { id = 1, label = "Millivolt", unit = "mV" },
+]
+
+[[sensor]]
+id = 16
+name = "current"
+label = "Current"
+scales = [
+  { id = 0, label = "Ampere", unit = "A" },
+  { id = 1, label = "Milliampere", unit = "mA" },
+]
+
+[[sensor]]
+id = 17
+name = "carbon_dioxide_level"
+label = "Carbon dioxide (CO₂) level"
+scales = [
+  { id = 0, label = "Parts/million", unit = "ppm" },
+]
+
+[[sensor]]
+id = 18
+name = "air_flow"
+label = "Air flow"
+scales = [
+  { id = 0, label = "Cubic meter per hour", unit = "m³/h" },
+  { id = 1, label = "Cubic feet per minute", unit = "cfm" },
+]
+
+[[sensor]]
+id = 19
+name = "tank_capacity"
+label = "Tank capacity"
+scales = [
+  { id = 0, label = "Liter", unit = "l" },
+  { id = 1, label = "Cubic meter", unit = "m³" },
+  { id = 2, label = "Gallons", unit = "gallon" },
+]
+
+[[sensor]]
+id = 20
+name = "distance"
+label = "Distance"
+scales = [
+  { id = 0, label = "Meter", unit = "m" },
+  { id = 1, label = "Centimeter", unit = "cm" },
+  { id = 2, label = "Feet", unit = "ft" },
+]
+
+[[sensor]]
+id = 21
+name = "angle_position"
+label = "Angle position"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+  { id = 1, label = "Degrees relative to north pole of standing eye view", unit = "°N" },
+  { id = 2, label = "Degrees relative to south pole of standing eye view", unit = "°S" },
+]
+
+[[sensor]]
+id = 22
+name = "rotation"
+label = "Rotation"
+scales = [
+  { id = 0, label = "Revolutions per minute", unit = "rpm" },
+  { id = 1, label = "Hertz", unit = "Hz" },
+]
+
+[[sensor]]
+id = 23
+name = "water_temperature"
+label = "Water temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 24
+name = "soil_temperature"
+label = "Soil temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 25
+name = "seismic_intensity"
+label = "Seismic Intensity"
+scales = [
+  { id = 0, label = "Mercalli", unit = "" },
+  { id = 1, label = "European Macroseismic", unit = "" },
+  { id = 2, label = "Liedu", unit = "" },
+  { id = 3, label = "Shindo", unit = "" },
+]
+
+[[sensor]]
+id = 26
+name = "seismic_magnitude"
+label = "Seismic magnitude"
+scales = [
+  { id = 0, label = "Local", unit = "" },
+  { id = 1, label = "Moment", unit = "" },
+  { id = 2, label = "Surface wave", unit = "" },
+  { id = 3, label = "Body wave", unit = "" },
+]
+
+[[sensor]]
+id = 27
+name = "ultraviolet"
+label = "Ultraviolet"
+scales = [
+  { id = 0, label = "UV index", unit = "" },
+]
+
+[[sensor]]
+id = 28
+name = "electrical_resistivity"
+label = "Electrical resistivity"
+scales = [
+  { id = 0, label = "Ohm meter", unit = "Ωm" },
+]
+
+[[sensor]]
+id = 29
+name = "electrical_conductivity"
+label = "Electrical conductivity"
+scales = [
+  { id = 0, label = "Siemens per meter", unit = "S/m" },
+]
+
+[[sensor]]
+id = 30
+name = "loudness"
+label = "Loudness"
+scales = [
+  { id = 0, label = "Decibel", unit = "dB" },
+  { id = 1, label = "A-weighted decibels", unit = "dBA" },
+]
+
+[[sensor]]
+id = 31
+name = "moisture"
+label = "Moisture"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+  { id = 1, label = "Volume water content", unit = "m³/m³" },
+  { id = 2, label = "Impedance", unit = "kΩ" },
+  { id = 3, label = "Water activity", unit = "aw" },
+]
+
+[[sensor]]
+id = 32
+name = "frequency"
+label = "Frequency"
+scales = [
+  { id = 0, label = "Hertz", unit = "Hz" },
+  { id = 1, label = "Kilohertz", unit = "kHz" },
+]
+
+[[sensor]]
+id = 33
+name = "time"
+label = "Time"
+scales = [
+  { id = 0, label = "Second", unit = "s" },
+]
+
+[[sensor]]
+id = 34
+name = "target_temperature"
+label = "Target temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 35
+name = "particulate_matter_2_5"
+label = "Particulate Matter 2.5"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+  { id = 1, label = "Microgram per cubic meter", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 36
+name = "formaldehyde_level"
+label = "Formaldehyde (CH₂O) level"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+]
+
+[[sensor]]
+id = 37
+name = "radon_concentration"
+label = "Radon concentration"
+scales = [
+  { id = 0, label = "Becquerel per cubic meter", unit = "bq/m³" },
+  { id = 1, label = "Picocuries per liter", unit = "pCi/l" },
+]
+
+[[sensor]]
+id = 38
+name = "methane_density"
+label = "Methane (CH₄) density"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+]
+
+[[sensor]]
+id = 39
+name = "volatile_organic_compound_level"
+label = "Volatile Organic Compound level"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+  { id = 1, label = "Parts/million", unit = "ppm" },
+]
+
+[[sensor]]
+id = 40
+name = "carbon_monoxide_level"
+label = "Carbon monoxide (CO) level"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+  { id = 1, label = "Parts/million", unit = "ppm" },
+]
+
+[[sensor]]
+id = 41
+name = "soil_humidity"
+label = "Soil humidity"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+]
+
+[[sensor]]
+id = 42
+name = "soil_reactivity"
+label = "Soil reactivity"
+scales = [
+  { id = 0, label = "Acidity", unit = "pH" },
+]
+
+[[sensor]]
+id = 43
+name = "soil_salinity"
+label = "Soil salinity"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+]
+
+[[sensor]]
+id = 44
+name = "heart_rate"
+label = "Heart rate"
+scales = [
+  { id = 0, label = "Beats per minute", unit = "bpm" },
+]
+
+[[sensor]]
+id = 45
+name = "blood_pressure"
+label = "Blood pressure"
+scales = [
+  { id = 0, label = "Systolic", unit = "mmHg" },
+  { id = 1, label = "Diastolic", unit = "mmHg" },
+]
+
+[[sensor]]
+id = 46
+name = "muscle_mass"
+label = "Muscle mass"
+scales = [
+  { id = 0, label = "Kilogram", unit = "kg" },
+]
+
+[[sensor]]
+id = 47
+name = "fat_mass"
+label = "Fat mass"
+scales = [
+  { id = 0, label = "Kilogram", unit = "kg" },
+]
+
+[[sensor]]
+id = 48
+name = "bone_mass"
+label = "Bone mass"
+scales = [
+  { id = 0, label = "Kilogram", unit = "kg" },
+]
+
+[[sensor]]
+id = 49
+name = "total_body_water"
+label = "Total body water (TBW)"
+scales = [
+  { id = 0, label = "Kilogram", unit = "kg" },
+]
+
+[[sensor]]
+id = 50
+name = "basis_metabolic_rate"
+label = "Basis metabolic rate (BMR)"
+scales = [
+  { id = 0, label = "Joule", unit = "J" },
+]
+
+[[sensor]]
+id = 51
+name = "body_mass_index"
+label = "Body Mass Index (BMI)"
+scales = [
+  { id = 0, label = "Body Mass Index", unit = "" },
+]
+
+[[sensor]]
+id = 52
+name = "acceleration_x_axis"
+label = "Acceleration X-axis"
+scales = [
+  { id = 0, label = "Meter per square second", unit = "m/s²" },
+]
+
+[[sensor]]
+id = 53
+name = "acceleration_y_axis"
+label = "Acceleration Y-axis"
+scales = [
+  { id = 0, label = "Meter per square second", unit = "m/s²" },
+]
+
+[[sensor]]
+id = 54
+name = "acceleration_z_axis"
+label = "Acceleration Z-axis"
+scales = [
+  { id = 0, label = "Meter per square second", unit = "m/s²" },
+]
+
+[[sensor]]
+id = 55
+name = "smoke_density"
+label = "Smoke density"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+]
+
+[[sensor]]
+id = 56
+name = "water_flow"
+label = "Water flow"
+scales = [
+  { id = 0, label = "Liter per hour", unit = "l/h" },
+]
+
+[[sensor]]
+id = 57
+name = "water_pressure"
+label = "Water pressure"
+scales = [
+  { id = 0, label = "Kilopascal", unit = "kPa" },
+]
+
+[[sensor]]
+id = 58
+name = "rf_signal_strength"
+label = "RF signal strength"
+scales = [
+  { id = 0, label = "RSSI", unit = "%" },
+  { id = 1, label = "Power Level", unit = "dBm" },
+]
+
+[[sensor]]
+id = 59
+name = "particulate_matter_10"
+label = "Particulate Matter 10"
+scales = [
+  { id = 0, label = "Mole per cubic meter", unit = "mol/m³" },
+  { id = 1, label = "Microgram per cubic meter", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 60
+name = "respiratory_rate"
+label = "Respiratory rate"
+scales = [
+  { id = 0, label = "Breaths per minute", unit = "bpm" },
+]
+
+[[sensor]]
+id = 61
+name = "relative_modulation_level"
+label = "Relative Modulation level"
+scales = [
+  { id = 0, label = "Percentage value", unit = "%" },
+]
+
+[[sensor]]
+id = 62
+name = "boiler_water_temperature"
+label = "Boiler water temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 63
+name = "domestic_hot_water_temperature"
+label = "Domestic Hot Water (DHW) temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 64
+name = "outside_temperature"
+label = "Outside temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 65
+name = "exhaust_temperature"
+label = "Exhaust temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 66
+name = "water_chlorine_level"
+label = "Water Chlorine level"
+scales = [
+  { id = 0, label = "Milligram per liter", unit = "mg/l" },
+]
+
+[[sensor]]
+id = 67
+name = "water_acidity"
+label = "Water acidity"
+scales = [
+  { id = 0, label = "Acidity", unit = "pH" },
+]
+
+[[sensor]]
+id = 68
+name = "water_oxidation_reduction_potential"
+label = "Water Oxidation reduction potential"
+scales = [
+  { id = 0, label = "Millivolt", unit = "mV" },
+]
+
+[[sensor]]
+id = 69
+name = "heart_rate_lf_hf_ratio"
+label = "Heart Rate LF/HF ratio"
+scales = [
+  { id = 0, label = "Unitless", unit = "" },
+]
+
+[[sensor]]
+id = 70
+name = "motion_direction"
+label = "Motion Direction"
+scales = [
+  { id = 0, label = "Degrees", unit = "°" },
+]
+
+[[sensor]]
+id = 71
+name = "applied_force_on_the_sensor"
+label = "Applied force on the sensor"
+scales = [
+  { id = 0, label = "Newton", unit = "N" },
+]
+
+[[sensor]]
+id = 72
+name = "return_air_temperature"
+label = "Return Air temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 73
+name = "supply_air_temperature"
+label = "Supply Air temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 74
+name = "condenser_coil_temperature"
+label = "Condenser Coil temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 75
+name = "evaporator_coil_temperature"
+label = "Evaporator Coil temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 76
+name = "liquid_line_temperature"
+label = "Liquid Line temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 77
+name = "discharge_line_temperature"
+label = "Discharge Line temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 78
+name = "suction_pressure"
+label = "Suction Pressure"
+scales = [
+  { id = 0, label = "Kilopascal", unit = "kPa" },
+  { id = 1, label = "Pound per square inch", unit = "psi" },
+]
+
+[[sensor]]
+id = 79
+name = "discharge_pressure"
+label = "Discharge Pressure"
+scales = [
+  { id = 0, label = "Kilopascal", unit = "kPa" },
+  { id = 1, label = "Pound per square inch", unit = "psi" },
+]
+
+[[sensor]]
+id = 80
+name = "defrost_temperature"
+label = "Defrost temperature"
+scales = [
+  { id = 0, label = "Celsius", unit = "°C" },
+  { id = 1, label = "Fahrenheit", unit = "°F" },
+]
+
+[[sensor]]
+id = 81
+name = "ozone"
+label = "Ozone"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 82
+name = "sulfur_dioxide"
+label = "Sulfur dioxide"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 83
+name = "nitrogen_dioxide"
+label = "Nitrogen dioxide"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 84
+name = "ammonia"
+label = "Ammonia"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 85
+name = "lead"
+label = "Lead"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 86
+name = "particulate_matter_1"
+label = "Particulate Matter 1"
+scales = [
+  { id = 0, label = "Density", unit = "µg/m³" },
+]
+
+[[sensor]]
+id = 87
+name = "person_counter_entering"
+label = "Person counter (entering)"
+scales = [
+  { id = 0, label = "Unitless", unit = "" },
+]
+
+[[sensor]]
+id = 88
+name = "person_counter_exiting"
+label = "Person counter (exiting)"
+scales = [
+  { id = 0, label = "Unitless", unit = "" },
+]
+

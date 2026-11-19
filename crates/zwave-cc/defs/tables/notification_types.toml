@@ -1,0 +1,379 @@
+# Generated from the Z-Wave Alliance's assigned values as tabulated by
+# Z-Wave JS (MIT, see NOTICE). Edit freely; build.rs reads this file.
+
+[[notification]]
+id = 1
+name = "smoke_alarm"
+label = "Smoke Alarm"
+events = [
+  { id = 1, label = "Smoke detected (location provided)", variable = "Sensor status", idle = true },
+  { id = 2, label = "Smoke detected", variable = "Sensor status", idle = true },
+  { id = 3, label = "Smoke alarm test", variable = "Alarm status", idle = true },
+  { id = 4, label = "Replacement required", variable = "Maintenance status", idle = true },
+  { id = 5, label = "Replacement required, End-of-life", variable = "Maintenance status", idle = true },
+  { id = 6, label = "Alarm silenced", variable = "Alarm status", idle = true },
+  { id = 7, label = "Maintenance required, planned periodic inspection", variable = "Periodic inspection status", idle = true },
+  { id = 8, label = "Maintenance required, dust in device", variable = "Dust in device status", idle = true },
+]
+
+[[notification]]
+id = 2
+name = "co_alarm"
+label = "CO Alarm"
+events = [
+  { id = 1, label = "Carbon monoxide detected (location provided)", variable = "Sensor status", idle = true },
+  { id = 2, label = "Carbon monoxide detected", variable = "Sensor status", idle = true },
+  { id = 3, label = "Carbon monoxide test", variable = "Test status", idle = false },
+  { id = 4, label = "Replacement required", variable = "Maintenance status", idle = true },
+  { id = 5, label = "Replacement required, End-of-life", variable = "Maintenance status", idle = true },
+  { id = 6, label = "Alarm silenced", variable = "Alarm status", idle = true },
+  { id = 7, label = "Maintenance required, planned periodic inspection", variable = "Periodic inspection status", idle = true },
+]
+
+[[notification]]
+id = 3
+name = "co2_alarm"
+label = "CO2 Alarm"
+events = [
+  { id = 1, label = "Carbon dioxide detected (location provided)", variable = "Sensor status", idle = true },
+  { id = 2, label = "Carbon dioxide detected", variable = "Sensor status", idle = true },
+  { id = 3, label = "Carbon dioxide test", variable = "Test status", idle = false },
+  { id = 4, label = "Replacement required", variable = "Maintenance status", idle = true },
+  { id = 5, label = "Replacement required, End-of-life", variable = "Maintenance status", idle = true },
+  { id = 6, label = "Alarm silenced", variable = "Alarm status", idle = true },
+  { id = 7, label = "Maintenance required, planned periodic inspection", variable = "Periodic inspection status", idle = true },
+]
+
+[[notification]]
+id = 4
+name = "heat_alarm"
+label = "Heat Alarm"
+events = [
+  { id = 1, label = "Overheat detected (location provided)", variable = "Heat sensor status", idle = true },
+  { id = 2, label = "Overheat detected", variable = "Heat sensor status", idle = true },
+  { id = 3, label = "Rapid temperature rise (location provided)", variable = "", idle = false },
+  { id = 4, label = "Rapid temperature rise", variable = "", idle = false },
+  { id = 5, label = "Underheat detected (location provided)", variable = "Heat sensor status", idle = true },
+  { id = 6, label = "Underheat detected", variable = "Heat sensor status", idle = true },
+  { id = 7, label = "Heat alarm test", variable = "Alarm status", idle = true },
+  { id = 8, label = "Replacement required, End-of-life", variable = "Maintenance status", idle = true },
+  { id = 9, label = "Alarm silenced", variable = "Alarm status", idle = true },
+  { id = 10, label = "Maintenance required, dust in device", variable = "Dust in device status", idle = true },
+  { id = 11, label = "Maintenance required, planned periodic inspection", variable = "Periodic inspection status", idle = true },
+  { id = 12, label = "Rapid temperature fall (location provided)", variable = "", idle = false },
+  { id = 13, label = "Rapid temperature fall", variable = "", idle = false },
+]
+
+[[notification]]
+id = 5
+name = "water_alarm"
+label = "Water Alarm"
+events = [
+  { id = 1, label = "Water leak detected (location provided)", variable = "Sensor status", idle = true },
+  { id = 2, label = "Water leak detected", variable = "Sensor status", idle = true },
+  { id = 3, label = "Water level dropped (location provided)", variable = "", idle = false },
+  { id = 4, label = "Water level dropped", variable = "", idle = false },
+  { id = 5, label = "Replace water filter", variable = "Maintenance status", idle = true },
+  { id = 6, label = "Water flow alarm", variable = "Water flow alarm status", idle = true },
+  { id = 7, label = "Water pressure alarm", variable = "Water pressure alarm status", idle = true },
+  { id = 8, label = "Water temperature alarm", variable = "Water temperature alarm status", idle = true },
+  { id = 9, label = "Water level alarm", variable = "Water level alarm status", idle = true },
+  { id = 10, label = "Sump pump active", variable = "Pump status", idle = true },
+  { id = 11, label = "Sump pump failure", variable = "Pump status", idle = true },
+]
+
+[[notification]]
+id = 6
+name = "access_control"
+label = "Access Control"
+events = [
+  { id = 1, label = "Manual lock operation", variable = "", idle = false },
+  { id = 2, label = "Manual unlock operation", variable = "", idle = false },
+  { id = 3, label = "RF lock operation", variable = "", idle = false },
+  { id = 4, label = "RF unlock operation", variable = "", idle = false },
+  { id = 5, label = "Keypad lock operation", variable = "", idle = false },
+  { id = 6, label = "Keypad unlock operation", variable = "", idle = false },
+  { id = 7, label = "Manual not fully locked operation", variable = "", idle = false },
+  { id = 8, label = "RF not fully locked operation", variable = "", idle = false },
+  { id = 9, label = "Auto lock locked operation", variable = "", idle = false },
+  { id = 10, label = "Auto lock not fully locked operation", variable = "", idle = false },
+  { id = 11, label = "Lock jammed", variable = "Lock state", idle = true },
+  { id = 12, label = "All user codes deleted", variable = "", idle = false },
+  { id = 13, label = "Single user code deleted", variable = "", idle = false },
+  { id = 14, label = "New user code added", variable = "", idle = false },
+  { id = 15, label = "New user code not added due to duplicate code", variable = "", idle = false },
+  { id = 16, label = "Keypad temporary disabled", variable = "Keypad state", idle = true },
+  { id = 17, label = "Keypad busy", variable = "Keypad state", idle = true },
+  { id = 18, label = "New program code entered: unique code for lock configuration", variable = "", idle = false },
+  { id = 19, label = "Manually enter user access code exceeds code limit", variable = "", idle = false },
+  { id = 20, label = "Unlock by RF with invalid user code", variable = "", idle = false },
+  { id = 21, label = "Locked by RF with invalid user code", variable = "", idle = false },
+  { id = 22, label = "Window/door is open", variable = "Door state", idle = false },
+  { id = 23, label = "Window/door is closed", variable = "Door state", idle = false },
+  { id = 24, label = "Window/door handle is open", variable = "Door handle state", idle = false },
+  { id = 25, label = "Window/door handle is closed", variable = "Door handle state", idle = false },
+  { id = 32, label = "Messaging User Code entered via keypad", variable = "", idle = false },
+  { id = 33, label = "Lock operation with User Code", variable = "", idle = false },
+  { id = 34, label = "Unlock operation with User Code", variable = "", idle = false },
+  { id = 35, label = "Credential lock/open operation", variable = "", idle = false },
+  { id = 36, label = "Credential unlock/close operation", variable = "", idle = false },
+  { id = 47, label = "Valid credential access denied: User Active State set to Occupied Disabled", variable = "", idle = false },
+  { id = 48, label = "Valid credential access denied: Schedule inactive", variable = "", idle = false },
+  { id = 49, label = "Valid credential access denied: Not enough credentials entered", variable = "", idle = false },
+  { id = 50, label = "Invalid credential used", variable = "", idle = false },
+  { id = 51, label = "Non-Access credential entered via local interface", variable = "", idle = false },
+  { id = 64, label = "Barrier performing initialization process", variable = "Barrier performing initialization process status", idle = false },
+  { id = 65, label = "Barrier operation (open/close) force has been exceeded", variable = "", idle = false },
+  { id = 66, label = "Barrier motor has exceeded manufacturer's operational time limit", variable = "", idle = false },
+  { id = 67, label = "Barrier operation has exceeded physical mechanical limits", variable = "", idle = false },
+  { id = 68, label = "Barrier unable to perform requested operation due to UL requirements", variable = "", idle = false },
+  { id = 69, label = "Barrier unattended operation has been disabled per UL requirements", variable = "Barrier UL disabling status", idle = true },
+  { id = 70, label = "Barrier failed to perform requested operation, device malfunction", variable = "", idle = false },
+  { id = 71, label = "Barrier vacation mode", variable = "Barrier vacation mode status", idle = false },
+  { id = 72, label = "Barrier safety beam obstacle", variable = "Barrier safety beam obstacle status", idle = false },
+  { id = 73, label = "Barrier sensor not detected / supervisory error", variable = "Barrier sensor status", idle = true },
+  { id = 74, label = "Barrier sensor low battery warning", variable = "Barrier battery status", idle = true },
+  { id = 75, label = "Barrier detected short in wall station wires", variable = "Barrier short-circuit status", idle = true },
+  { id = 76, label = "Barrier associated with non Z-Wave remote control", variable = "Barrier control status", idle = true },
+]
+
+[[notification]]
+id = 7
+name = "home_security"
+label = "Home Security"
+events = [
+  { id = 1, label = "Intrusion (location provided)", variable = "Sensor status", idle = true },
+  { id = 2, label = "Intrusion", variable = "Sensor status", idle = true },
+  { id = 3, label = "Tampering, product cover removed", variable = "Cover status", idle = true },
+  { id = 4, label = "Tampering, invalid code", variable = "", idle = false },
+  { id = 5, label = "Glass breakage (location provided)", variable = "", idle = false },
+  { id = 6, label = "Glass breakage", variable = "", idle = false },
+  { id = 7, label = "Motion detection (location provided)", variable = "Motion sensor status", idle = true },
+  { id = 8, label = "Motion detection", variable = "Motion sensor status", idle = true },
+  { id = 9, label = "Tampering, product moved", variable = "", idle = false },
+  { id = 10, label = "Impact detected", variable = "", idle = false },
+  { id = 11, label = "Magnetic field interference detected", variable = "Magnetic interference status", idle = true },
+  { id = 12, label = "RF Jamming detected", variable = "", idle = false },
+]
+
+[[notification]]
+id = 8
+name = "power_management"
+label = "Power Management"
+events = [
+  { id = 1, label = "Power has been applied", variable = "Power status", idle = true },
+  { id = 2, label = "AC mains disconnected", variable = "Mains status", idle = false },
+  { id = 3, label = "AC mains re-connected", variable = "Mains status", idle = false },
+  { id = 4, label = "Surge detected", variable = "", idle = false },
+  { id = 5, label = "Voltage drop/drift", variable = "", idle = false },
+  { id = 6, label = "Over-current detected", variable = "Over-current status", idle = true },
+  { id = 7, label = "Over-voltage detected", variable = "Over-voltage status", idle = true },
+  { id = 8, label = "Over-load detected", variable = "Over-load status", idle = true },
+  { id = 9, label = "Load error", variable = "Load error status", idle = true },
+  { id = 10, label = "Replace battery soon", variable = "Battery maintenance status", idle = true },
+  { id = 11, label = "Replace battery now", variable = "Battery maintenance status", idle = true },
+  { id = 12, label = "Battery is charging", variable = "Battery load status", idle = true },
+  { id = 13, label = "Battery is fully charged", variable = "Battery level status", idle = true },
+  { id = 14, label = "Charge battery soon", variable = "Battery level status", idle = true },
+  { id = 15, label = "Charge battery now", variable = "Battery level status", idle = true },
+  { id = 16, label = "Back-up battery is low", variable = "Backup battery level status", idle = true },
+  { id = 17, label = "Battery fluid is low", variable = "Battery maintenance status", idle = true },
+  { id = 18, label = "Back-up battery disconnected", variable = "Backup battery level status", idle = true },
+]
+
+[[notification]]
+id = 9
+name = "system"
+label = "System"
+events = [
+  { id = 1, label = "System hardware failure", variable = "Hardware status", idle = true },
+  { id = 2, label = "System software failure", variable = "Software status", idle = true },
+  { id = 3, label = "System hardware failure (with failure code)", variable = "Hardware status", idle = true },
+  { id = 4, label = "System software failure (with failure code)", variable = "Software status", idle = true },
+  { id = 5, label = "Heartbeat", variable = "", idle = false },
+  { id = 6, label = "Tampering, product cover removed", variable = "Cover status", idle = true },
+  { id = 7, label = "Emergency shutoff", variable = "Emergency shutoff status", idle = true },
+]
+
+[[notification]]
+id = 10
+name = "emergency_alarm"
+label = "Emergency Alarm"
+events = [
+  { id = 1, label = "Contact police", variable = "", idle = false },
+  { id = 2, label = "Contact fire service", variable = "", idle = false },
+  { id = 3, label = "Contact medical service", variable = "", idle = false },
+  { id = 4, label = "Panic alert", variable = "", idle = false },
+]
+
+[[notification]]
+id = 11
+name = "clock"
+label = "Clock"
+events = [
+  { id = 1, label = "Wake up alert", variable = "", idle = false },
+  { id = 2, label = "Timer ended", variable = "", idle = false },
+  { id = 3, label = "Time remaining", variable = "", idle = false },
+]
+
+[[notification]]
+id = 12
+name = "appliance"
+label = "Appliance"
+events = [
+  { id = 1, label = "Program started", variable = "Program status", idle = true },
+  { id = 2, label = "Program in progress", variable = "Program status", idle = true },
+  { id = 3, label = "Program completed", variable = "Program status", idle = true },
+  { id = 4, label = "Replace main filter", variable = "Maintenance status", idle = true },
+  { id = 5, label = "Failure to set target temperature", variable = "Target temperature failure status", idle = true },
+  { id = 6, label = "Supplying water", variable = "Appliance status", idle = true },
+  { id = 7, label = "Water supply failure", variable = "Water supply failure status", idle = true },
+  { id = 8, label = "Boiling", variable = "Appliance status", idle = true },
+  { id = 9, label = "Boiling failure", variable = "Boiling failure status", idle = true },
+  { id = 10, label = "Washing", variable = "Appliance status", idle = true },
+  { id = 11, label = "Washing failure", variable = "Washing failure status", idle = true },
+  { id = 12, label = "Rinsing", variable = "Appliance status", idle = true },
+  { id = 13, label = "Rinsing failure", variable = "Rinsing failure status", idle = true },
+  { id = 14, label = "Draining", variable = "Appliance status", idle = true },
+  { id = 15, label = "Draining failure", variable = "Draining failure status", idle = true },
+  { id = 16, label = "Spinning", variable = "Appliance status", idle = true },
+  { id = 17, label = "Spinning failure", variable = "Spinning failure status", idle = true },
+  { id = 18, label = "Drying", variable = "Appliance status", idle = true },
+  { id = 19, label = "Drying failure", variable = "Drying failure status", idle = true },
+  { id = 20, label = "Fan failure", variable = "Fan failure status", idle = true },
+  { id = 21, label = "Compressor failure", variable = "Compressor failure status", idle = true },
+]
+
+[[notification]]
+id = 13
+name = "home_health"
+label = "Home Health"
+events = [
+  { id = 1, label = "Leaving bed", variable = "Position status", idle = true },
+  { id = 2, label = "Sitting on bed", variable = "Position status", idle = true },
+  { id = 3, label = "Lying on bed", variable = "Position status", idle = true },
+  { id = 4, label = "Posture changed", variable = "", idle = false },
+  { id = 5, label = "Sitting on bed edge", variable = "Position status", idle = true },
+  { id = 6, label = "Volatile Organic Compound level", variable = "VOC level status", idle = false },
+  { id = 7, label = "Sleep apnea detected", variable = "Sleep apnea status", idle = true },
+  { id = 8, label = "Sleep stage 0 detected (Dreaming/REM)", variable = "Sleep stage status", idle = true },
+  { id = 9, label = "Sleep stage 1 detected (Light sleep, non-REM 1)", variable = "Sleep stage status", idle = true },
+  { id = 10, label = "Sleep stage 2 detected (Medium sleep, non-REM 2)", variable = "Sleep stage status", idle = true },
+  { id = 11, label = "Sleep stage 3 detected (Deep sleep, non-REM 3)", variable = "Sleep stage status", idle = true },
+  { id = 12, label = "Fall detected", variable = "", idle = false },
+]
+
+[[notification]]
+id = 14
+name = "siren"
+label = "Siren"
+events = [
+  { id = 1, label = "Siren active", variable = "Siren status", idle = true },
+]
+
+[[notification]]
+id = 15
+name = "water_valve"
+label = "Water Valve"
+events = [
+  { id = 1, label = "Valve operation", variable = "Valve operation status", idle = false },
+  { id = 2, label = "Master valve operation", variable = "Master valve operation status", idle = false },
+  { id = 3, label = "Valve short circuit", variable = "Valve short circuit status", idle = true },
+  { id = 4, label = "Master valve short circuit", variable = "Master valve short circuit status", idle = true },
+  { id = 5, label = "Valve current alarm", variable = "Valve current alarm status", idle = true },
+  { id = 6, label = "Master valve current alarm", variable = "Master valve current alarm status", idle = true },
+  { id = 7, label = "Valve jammed", variable = "Valve jammed status", idle = true },
+]
+
+[[notification]]
+id = 16
+name = "weather_alarm"
+label = "Weather Alarm"
+events = [
+  { id = 1, label = "Rain alarm", variable = "Rain alarm status", idle = true },
+  { id = 2, label = "Moisture alarm", variable = "Moisture alarm status", idle = true },
+  { id = 3, label = "Freeze alarm", variable = "Freeze alarm status", idle = true },
+]
+
+[[notification]]
+id = 17
+name = "irrigation"
+label = "Irrigation"
+events = [
+  { id = 1, label = "Schedule started", variable = "Schedule (id) status", idle = false },
+  { id = 2, label = "Schedule finished", variable = "Schedule (id) status", idle = false },
+  { id = 3, label = "Valve table run started", variable = "Valve (id) run status", idle = false },
+  { id = 4, label = "Valve table run finished", variable = "Valve (id) run status", idle = false },
+  { id = 5, label = "Device is not configured", variable = "Device configuration status", idle = true },
+]
+
+[[notification]]
+id = 18
+name = "gas_alarm"
+label = "Gas alarm"
+events = [
+  { id = 1, label = "Combustible gas detected (location provided)", variable = "Combustible gas status", idle = true },
+  { id = 2, label = "Combustible gas detected", variable = "Combustible gas status", idle = true },
+  { id = 3, label = "Toxic gas detected (location provided)", variable = "Toxic gas status", idle = true },
+  { id = 4, label = "Toxic gas detected", variable = "Toxic gas status", idle = true },
+  { id = 5, label = "Gas alarm test", variable = "Alarm status", idle = true },
+  { id = 6, label = "Replacement required", variable = "Maintenance status", idle = true },
+]
+
+[[notification]]
+id = 19
+name = "pest_control"
+label = "Pest Control"
+events = [
+  { id = 1, label = "Trap armed (location provided)", variable = "Trap status", idle = true },
+  { id = 2, label = "Trap armed", variable = "Trap status", idle = true },
+  { id = 3, label = "Trap re-arm required (location provided)", variable = "Trap status", idle = true },
+  { id = 4, label = "Trap re-arm required", variable = "Trap status", idle = true },
+  { id = 5, label = "Pest detected (location provided)", variable = "", idle = false },
+  { id = 6, label = "Pest detected", variable = "", idle = false },
+  { id = 7, label = "Pest exterminated (location provided)", variable = "", idle = false },
+  { id = 8, label = "Pest exterminated", variable = "", idle = false },
+]
+
+[[notification]]
+id = 20
+name = "light_sensor"
+label = "Light sensor"
+events = [
+  { id = 1, label = "Light detected", variable = "Light detection status", idle = true },
+  { id = 2, label = "Light color transition detected", variable = "", idle = false },
+]
+
+[[notification]]
+id = 21
+name = "water_quality_monitoring"
+label = "Water Quality Monitoring"
+events = [
+  { id = 1, label = "Chlorine alarm", variable = "Chlorine alarm status", idle = true },
+  { id = 2, label = "Acidity (pH) alarm", variable = "Acidity (pH) status", idle = true },
+  { id = 3, label = "Water Oxidation alarm", variable = "Water Oxidation alarm status", idle = true },
+  { id = 4, label = "Chlorine empty", variable = "Chlorine Sensor status", idle = true },
+  { id = 5, label = "Acidity (pH) empty", variable = "Acidity (pH) Sensor status", idle = true },
+  { id = 6, label = "Waterflow measuring station shortage detected", variable = "Waterflow measuring station sensor", idle = true },
+  { id = 7, label = "Waterflow clear water shortage detected", variable = "Waterflow clear water sensor", idle = true },
+  { id = 8, label = "Disinfection system error detected", variable = "Disinfection system status", idle = true },
+  { id = 9, label = "Filter cleaning ongoing", variable = "Filter cleaning status", idle = true },
+  { id = 10, label = "Heating operation ongoing", variable = "Heating status", idle = true },
+  { id = 11, label = "Filter pump operation ongoing", variable = "Filter pump status", idle = true },
+  { id = 12, label = "Freshwater operation ongoing", variable = "Freshwater flow status", idle = true },
+  { id = 13, label = "Dry protection operation active", variable = "Dry protection status", idle = true },
+  { id = 14, label = "Water tank is empty", variable = "Water tank status", idle = false },
+  { id = 15, label = "Water tank level is unknown", variable = "Water tank status", idle = false },
+  { id = 16, label = "Water tank is full", variable = "Water tank status", idle = false },
+  { id = 17, label = "Collective disorder", variable = "Collective disorder status", idle = true },
+]
+
+[[notification]]
+id = 22
+name = "home_monitoring"
+label = "Home monitoring"
+events = [
+  { id = 1, label = "Home occupied (location provided)", variable = "Home occupancy status", idle = true },
+  { id = 2, label = "Home occupied", variable = "Home occupancy status", idle = true },
+]
+

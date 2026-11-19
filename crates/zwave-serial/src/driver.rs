@@ -92,7 +92,12 @@ impl Request {
     }
 
     /// A request that expects a response and then a callback.
-    pub fn with_callback(frame: DataFrame, response: Duration, callback_id: u8, callback: Duration) -> Self {
+    pub fn with_callback(
+        frame: DataFrame,
+        response: Duration,
+        callback_id: u8,
+        callback: Duration,
+    ) -> Self {
         Request {
             frame,
             response: Some(response),
@@ -155,7 +160,9 @@ impl Current {
     fn deadline(&self) -> Instant {
         match self.phase {
             Phase::Backoff { until } => until,
-            Phase::AwaitAck { deadline } | Phase::AwaitResponse { deadline } | Phase::AwaitCallback { deadline } => deadline,
+            Phase::AwaitAck { deadline }
+            | Phase::AwaitResponse { deadline }
+            | Phase::AwaitCallback { deadline } => deadline,
         }
     }
 }
@@ -189,7 +196,10 @@ impl SerialApi {
     /// The next callback id, 1 to 255 (0 means "no callback" on the wire).
     pub fn next_callback_id(&self) -> u8 {
         loop {
-            let id = self.callback_id.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+            let id = self
+                .callback_id
+                .fetch_add(1, Ordering::Relaxed)
+                .wrapping_add(1);
             if id != 0 {
                 return id;
             }
@@ -203,11 +213,16 @@ impl SerialApi {
             .send(Job { req, reply: tx })
             .await
             .map_err(|_| SerialError::Closed("link task stopped".into()))?;
-        rx.await.map_err(|_| SerialError::Closed("link task stopped".into()))?
+        rx.await
+            .map_err(|_| SerialError::Closed("link task stopped".into()))?
     }
 
     /// Sends a request and returns its response frame.
-    pub async fn request(&self, frame: DataFrame, timeout: Duration) -> Result<DataFrame, SerialError> {
+    pub async fn request(
+        &self,
+        frame: DataFrame,
+        timeout: Duration,
+    ) -> Result<DataFrame, SerialError> {
         self.execute(Request::with_response(frame, timeout))
             .await?
             .response
@@ -220,8 +235,12 @@ impl SerialApi {
     }
 }
 
-async fn run<T>(io: T, config: Config, mut jobs: mpsc::Receiver<Job>, unsolicited: mpsc::Sender<DataFrame>)
-where
+async fn run<T>(
+    io: T,
+    config: Config,
+    mut jobs: mpsc::Receiver<Job>,
+    unsolicited: mpsc::Sender<DataFrame>,
+) where
     T: AsyncRead + AsyncWrite + Send + Unpin + 'static,
 {
     let mut framed = Framed::new(io, FrameCodec::default());
@@ -399,7 +418,9 @@ fn offer(c: &mut Current, df: &DataFrame) -> bool {
     let callback = c.job.req.callback;
     let callback_follows = c.job.req.callback_follows;
     match df.kind {
-        FrameType::Response if df.function == func && response.is_some() && c.exchange.response.is_none() => {
+        FrameType::Response
+            if df.function == func && response.is_some() && c.exchange.response.is_none() =>
+        {
             // A response implies the ACK was sent even if we missed it.
             if matches!(c.phase, Phase::AwaitAck { .. } | Phase::Backoff { .. }) {
                 after_ack(c);
@@ -407,7 +428,9 @@ fn offer(c: &mut Current, df: &DataFrame) -> bool {
             c.exchange.response = Some(df.clone());
             if let Some((_, t)) = callback {
                 if callback_follows(df) {
-                    c.phase = Phase::AwaitCallback { deadline: Instant::now() + t };
+                    c.phase = Phase::AwaitCallback {
+                        deadline: Instant::now() + t,
+                    };
                 }
             }
             true

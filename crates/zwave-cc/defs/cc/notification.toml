@@ -1,0 +1,68 @@
+id = 0x71
+name = "notification"
+title = "Notification"
+version = 8
+
+[[command]]
+id = 0x01
+name = "event_supported_get"
+fields = [{ name = "notification_type", type = "u8" }]
+
+[[command]]
+id = 0x02
+name = "event_supported_report"
+fields = [
+  { name = "notification_type", type = "u8" },
+  { type = "bits", parts = [{ name = "mask_len", shift = 0, width = 5 }] },
+  { name = "events", type = "bitmask", len = "mask_len", offset = 0 },
+]
+
+[[command]]
+id = 0x04
+name = "get"
+fields = [
+  { name = "v1_alarm_type", type = "u8" },
+  { name = "notification_type", type = "u8", optional = true },
+  { name = "event", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x05
+name = "report"
+fields = [
+  { name = "v1_alarm_type", type = "u8" },
+  { name = "v1_alarm_level", type = "u8" },
+  { name = "zensor_net_source", type = "u8", optional = true },
+  { name = "status", type = "u8", optional = true },
+  { name = "notification_type", type = "u8", optional = true },
+  { name = "event", type = "u8", optional = true },
+  { type = "bits", optional = true, parts = [
+    { name = "sequence", shift = 7, width = 1, kind = "bool" },
+    { name = "params_len", shift = 0, width = 5 },
+  ] },
+  { name = "params", type = "bytes", len = "params_len" },
+  { name = "sequence_number", type = "u8", optional = true, when = "sequence" },
+]
+
+[[command]]
+id = 0x06
+name = "set"
+fields = [
+  { name = "notification_type", type = "u8" },
+  { name = "status", type = "u8" },
+]
+
+[[command]]
+id = 0x07
+name = "supported_get"
+
+[[command]]
+id = 0x08
+name = "supported_report"
+fields = [
+  { type = "bits", parts = [
+    { name = "v1_alarm", shift = 7, width = 1, kind = "bool" },
+    { name = "mask_len", shift = 0, width = 5 },
+  ] },
+  { name = "types", type = "bitmask", len = "mask_len", offset = 0 },
+]

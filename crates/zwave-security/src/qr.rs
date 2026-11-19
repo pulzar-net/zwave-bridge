@@ -111,7 +111,9 @@ pub fn parse(code: &str) -> Result<QrCode, Error> {
     while at + 4 <= s.len() {
         let type_critical = num(s, at, 2, 99)? as u8;
         let len = num(s, at + 2, 2, 99)? as usize;
-        let data = s.get(at + 4..at + 4 + len).ok_or(Error::Invalid("QR code TLV"))?;
+        let data = s
+            .get(at + 4..at + 4 + len)
+            .ok_or(Error::Invalid("QR code TLV"))?;
         at += 4 + len;
         let critical = type_critical & 1 == 1;
         match type_critical >> 1 {
@@ -181,10 +183,24 @@ mod tests {
     fn roundtrip_and_checksum() {
         let qr = QrCode {
             version: 1,
-            requested_classes: vec![SecurityClass::S2Authenticated, SecurityClass::S2Unauthenticated],
-            dsk: "51525-35455-41654-24356-13311-14526-06640-31770".parse().unwrap(),
-            product_type: Some(ProductType { generic: 0x10, specific: 0x01, icon: 0x0700 }),
-            product_id: Some(ProductId { manufacturer: 0x0000, product_type: 0x0004, product: 0x0003, version: (1, 2) }),
+            requested_classes: vec![
+                SecurityClass::S2Authenticated,
+                SecurityClass::S2Unauthenticated,
+            ],
+            dsk: "51525-35455-41654-24356-13311-14526-06640-31770"
+                .parse()
+                .unwrap(),
+            product_type: Some(ProductType {
+                generic: 0x10,
+                specific: 0x01,
+                icon: 0x0700,
+            }),
+            product_id: Some(ProductId {
+                manufacturer: 0x0000,
+                product_type: 0x0004,
+                product: 0x0003,
+                version: (1, 2),
+            }),
             supported_protocols: None,
             max_inclusion_request_interval: None,
         };

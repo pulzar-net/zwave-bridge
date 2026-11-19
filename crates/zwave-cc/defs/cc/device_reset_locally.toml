@@ -1,0 +1,8 @@
+id = 0x5a
+name = "device_reset_locally"
+title = "Device Reset Locally"
+version = 1
+
+[[command]]
+id = 0x01
+name = "notification"

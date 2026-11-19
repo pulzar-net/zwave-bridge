@@ -1,0 +1,22 @@
+id = 0x20
+name = "basic"
+title = "Basic"
+version = 2
+
+[[command]]
+id = 0x01
+name = "set"
+fields = [{ name = "value", type = "u8" }]
+
+[[command]]
+id = 0x02
+name = "get"
+
+[[command]]
+id = 0x03
+name = "report"
+fields = [
+  { name = "current", type = "u8" },
+  { name = "target", type = "u8", optional = true },
+  { name = "duration", type = "u8", optional = true },
+]

@@ -1,0 +1,19 @@
+id = 0x5e
+name = "zwave_plus_info"
+title = "Z-Wave Plus Info"
+version = 2
+
+[[command]]
+id = 0x01
+name = "get"
+
+[[command]]
+id = 0x02
+name = "report"
+fields = [
+  { name = "zwave_plus_version", type = "u8" },
+  { name = "role_type", type = "u8" },
+  { name = "node_type", type = "u8" },
+  { name = "installer_icon", type = "u16" },
+  { name = "user_icon", type = "u16" },
+]

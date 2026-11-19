@@ -1,0 +1,56 @@
+# Generated from the Z-Wave Alliance's assigned values as tabulated by
+# Z-Wave JS (MIT, see NOTICE). Edit freely; build.rs reads this file.
+
+[[meter]]
+id = 1
+name = "electric"
+label = "Electric"
+scales = [
+  { id = 0, label = "kWh", unit = "kWh" },
+  { id = 1, label = "kVAh", unit = "kVAh" },
+  { id = 2, label = "W", unit = "W" },
+  { id = 3, label = "Pulse count", unit = "" },
+  { id = 4, label = "V", unit = "V" },
+  { id = 5, label = "A", unit = "A" },
+  { id = 6, label = "Power Factor", unit = "" },
+  { id = 7, label = "kVar", unit = "kVar" },
+  { id = 8, label = "kVarh", unit = "kVarh" },
+]
+
+[[meter]]
+id = 2
+name = "gas"
+label = "Gas"
+scales = [
+  { id = 0, label = "Cubic meters", unit = "m³" },
+  { id = 1, label = "Cubic feet", unit = "ft³" },
+  { id = 3, label = "Pulse count", unit = "" },
+]
+
+[[meter]]
+id = 3
+name = "water"
+label = "Water"
+scales = [
+  { id = 0, label = "Cubic meters", unit = "m³" },
+  { id = 1, label = "Cubic feet", unit = "ft³" },
+  { id = 2, label = "US gallons", unit = "gal" },
+  { id = 3, label = "Pulse count", unit = "" },
+]
+
+[[meter]]
+id = 4
+name = "heating"
+label = "Heating"
+scales = [
+  { id = 0, label = "kWh", unit = "kWh" },
+]
+
+[[meter]]
+id = 5
+name = "cooling"
+label = "Cooling"
+scales = [
+  { id = 0, label = "kWh", unit = "kWh" },
+]
+

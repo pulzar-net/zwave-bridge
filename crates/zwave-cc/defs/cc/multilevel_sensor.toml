@@ -1,0 +1,42 @@
+id = 0x31
+name = "multilevel_sensor"
+title = "Multilevel Sensor"
+version = 11
+
+[[command]]
+id = 0x01
+name = "supported_sensor_get"
+
+[[command]]
+id = 0x02
+name = "supported_sensor_report"
+fields = [{ name = "sensor_types", type = "bitmask", offset = 1 }]
+
+[[command]]
+id = 0x03
+name = "supported_scale_get"
+fields = [{ name = "sensor_type", type = "u8" }]
+
+[[command]]
+id = 0x04
+name = "get"
+fields = [
+  { name = "sensor_type", type = "u8", optional = true },
+  { type = "bits", optional = true, parts = [{ name = "scale", shift = 3, width = 2 }] },
+]
+
+[[command]]
+id = 0x05
+name = "report"
+fields = [
+  { name = "sensor_type", type = "u8" },
+  { name = "value", type = "value" },
+]
+
+[[command]]
+id = 0x06
+name = "supported_scale_report"
+fields = [
+  { name = "sensor_type", type = "u8" },
+  { type = "bits", parts = [{ name = "scales", shift = 0, width = 4 }] },
+]
