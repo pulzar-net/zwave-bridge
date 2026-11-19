@@ -12,7 +12,9 @@
 use crate::driver::{Config, SerialApi, SerialError};
 use crate::frame::DataFrame;
 use crate::function::FunctionId as F;
-use crate::message::{setup, ControllerId, ControllerVersion, InitData, RfRegion, SerialApiCapabilities};
+use crate::message::{
+    setup, ControllerId, ControllerVersion, InitData, RfRegion, SerialApiCapabilities,
+};
 use crate::port::Port;
 use crate::NodeId;
 use std::time::Duration;
@@ -88,7 +90,9 @@ impl ControllerIdentity {
 /// Names of a few common sticks, by (manufacturer, product type, product id).
 pub fn known_name(manufacturer: u16, product_type: u16, product_id: u16) -> Option<&'static str> {
     Some(match (manufacturer, product_type, product_id) {
-        (0x0000, 0x0004, 0x0004) => "Silicon Labs 800 series controller (e.g. Zooz ZST39 LR, HomeSeer SmartStick G8)",
+        (0x0000, 0x0004, 0x0004) => {
+            "Silicon Labs 800 series controller (e.g. Zooz ZST39 LR, HomeSeer SmartStick G8)"
+        }
         (0x0000, 0x0004, 0x0001) | (0x0000, 0x0004, 0x0002) => "Silicon Labs 700 series controller",
         (0x0086, 0x0001, 0x005a) => "Aeotec Z-Stick Gen5",
         (0x0086, 0x0001, 0x005d) => "Aeotec Z-Stick 7",
@@ -102,12 +106,18 @@ const STEP: Duration = Duration::from_millis(400);
 async fn details(api: &SerialApi, id: &mut ControllerIdentity) {
     let c = &id.capabilities;
     if c.supports(F::GET_CONTROLLER_VERSION) {
-        if let Ok(r) = api.request(DataFrame::request(F::GET_CONTROLLER_VERSION, vec![]), STEP).await {
+        if let Ok(r) = api
+            .request(DataFrame::request(F::GET_CONTROLLER_VERSION, vec![]), STEP)
+            .await
+        {
             id.library_version = ControllerVersion::parse(&r.payload).ok().map(|v| v.version);
         }
     }
     if c.supports(F::GET_CONTROLLER_ID) {
-        if let Ok(r) = api.request(DataFrame::request(F::GET_CONTROLLER_ID, vec![]), STEP).await {
+        if let Ok(r) = api
+            .request(DataFrame::request(F::GET_CONTROLLER_ID, vec![]), STEP)
+            .await
+        {
             if let Ok(cid) = ControllerId::parse(&r.payload, 1) {
                 id.home_id = Some(cid.home_id);
                 id.node_id = Some(cid.node_id);
@@ -115,7 +125,10 @@ async fn details(api: &SerialApi, id: &mut ControllerIdentity) {
         }
     }
     if c.supports(F::GET_INIT_DATA) {
-        if let Ok(r) = api.request(DataFrame::request(F::GET_INIT_DATA, vec![]), STEP).await {
+        if let Ok(r) = api
+            .request(DataFrame::request(F::GET_INIT_DATA, vec![]), STEP)
+            .await
+        {
             if let Ok(init) = InitData::parse(&r.payload) {
                 id.api_version = Some(init.api_version);
                 id.chip = init.chip_type.zip(init.chip_version);
@@ -127,14 +140,30 @@ async fn details(api: &SerialApi, id: &mut ControllerIdentity) {
         }
     }
     if c.supports(F::GET_CONTROLLER_CAPABILITIES) {
-        if let Ok(r) = api.request(DataFrame::request(F::GET_CONTROLLER_CAPABILITIES, vec![]), STEP).await {
+        if let Ok(r) = api
+            .request(
+                DataFrame::request(F::GET_CONTROLLER_CAPABILITIES, vec![]),
+                STEP,
+            )
+            .await
+        {
             id.primary = r.payload.first().map(|b| b & 0x01 == 0);
         }
     }
     if c.supports(F::SERIAL_API_SETUP) {
-        if let Ok(r) = api.request(DataFrame::request(F::SERIAL_API_SETUP, vec![setup::GET_RF_REGION]), STEP).await {
+        if let Ok(r) = api
+            .request(
+                DataFrame::request(F::SERIAL_API_SETUP, vec![setup::GET_RF_REGION]),
+                STEP,
+            )
+            .await
+        {
             if r.payload.first() == Some(&setup::GET_RF_REGION) {
-                id.region = r.payload.get(1).map(|&b| RfRegion::from_u8(b)).filter(|r| !matches!(r, RfRegion::Other(_)));
+                id.region = r
+                    .payload
+                    .get(1)
+                    .map(|&b| RfRegion::from_u8(b))
+                    .filter(|r| !matches!(r, RfRegion::Other(_)));
             }
         }
     }
@@ -153,10 +182,14 @@ pub async fn probe_port<P: Port>(port: P) -> Result<Option<ControllerIdentity>, 
         let frame = DataFrame::request(F::GET_SERIAL_API_CAPABILITIES, vec![]);
         let resp = match api.request(frame, Duration::from_millis(800)).await {
             Ok(r) => r,
-            Err(SerialError::NoAck(_) | SerialError::Rejected(_) | SerialError::ResponseTimeout) => return Ok(None),
+            Err(
+                SerialError::NoAck(_) | SerialError::Rejected(_) | SerialError::ResponseTimeout,
+            ) => return Ok(None),
             Err(e) => return Err(e),
         };
-        let Ok(c) = SerialApiCapabilities::parse(&resp.payload) else { return Ok(None) };
+        let Ok(c) = SerialApiCapabilities::parse(&resp.payload) else {
+            return Ok(None);
+        };
         let mut id = ControllerIdentity {
             firmware: format!("{}.{}", c.firmware_major, c.firmware_minor),
             manufacturer_id: c.manufacturer_id,
@@ -175,10 +208,16 @@ pub async fn probe_port<P: Port>(port: P) -> Result<Option<ControllerIdentity>, 
             region: None,
         };
         // Best effort: whatever the time bound leaves room for.
-        let _ = tokio::time::timeout(PROBE_TIMEOUT.saturating_sub(Duration::from_millis(1400)), details(&api, &mut id)).await;
+        let _ = tokio::time::timeout(
+            PROBE_TIMEOUT.saturating_sub(Duration::from_millis(1400)),
+            details(&api, &mut id),
+        )
+        .await;
         Ok(Some(id))
     };
-    let r = tokio::time::timeout(PROBE_TIMEOUT, run).await.unwrap_or(Ok(None));
+    let r = tokio::time::timeout(PROBE_TIMEOUT, run)
+        .await
+        .unwrap_or(Ok(None));
     // Dropping the last handle stops the link task, which closes the port.
     drop(api);
     tokio::task::yield_now().await;
@@ -187,7 +226,9 @@ pub async fn probe_port<P: Port>(port: P) -> Result<Option<ControllerIdentity>, 
 
 /// Opens `path` (a device or `tcp://host:port`) and probes it.
 pub async fn probe(path: &str) -> Result<Option<ControllerIdentity>, SerialError> {
-    let port = crate::port::open(path).await.map_err(|e| SerialError::Closed(e.to_string()))?;
+    let port = crate::port::open(path)
+        .await
+        .map_err(|e| SerialError::Closed(e.to_string()))?;
     probe_port(port).await
 }
 

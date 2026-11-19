@@ -238,26 +238,51 @@ async fn probe_identifies_a_controller_and_ignores_silence() {
                 .encode(),
                 0x15 => b"Z-Wave 7.22\0\x07".to_vec(),
                 0x20 => vec![0xc0, 0xff, 0xee, 0x01, 0x01],
-                0x02 => zwave_serial::message::InitData { api_version: 9, capabilities: 0x08, nodes: vec![1, 2, 3], chip_type: Some(8), chip_version: Some(0) }.encode(),
+                0x02 => zwave_serial::message::InitData {
+                    api_version: 9,
+                    capabilities: 0x08,
+                    nodes: vec![1, 2, 3],
+                    chip_type: Some(8),
+                    chip_version: Some(0),
+                }
+                .encode(),
                 0x05 => vec![0x1c],
                 0x0b => vec![0x20, 0x01],
                 _ => vec![],
             };
             ctrl.write_all(&[ACK]).await.unwrap();
-            ctrl.write_all(&DataFrame::response(req.function, payload).encode()).await.unwrap();
+            ctrl.write_all(&DataFrame::response(req.function, payload).encode())
+                .await
+                .unwrap();
         }
     });
-    let id = zwave_serial::probe::probe_port(host).await.unwrap().unwrap();
+    let id = zwave_serial::probe::probe_port(host)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(id.firmware, "7.22");
     assert!(id.known_name().unwrap().contains("800"));
     assert_eq!(id.series, Some(zwave_serial::Series::S800));
-    assert_eq!((id.home_id, id.node_id, id.node_count), (Some(0xc0ffee01), Some(1), Some(2)));
-    assert_eq!((id.primary, id.sis, id.api_version), (Some(true), Some(true), Some(9)));
+    assert_eq!(
+        (id.home_id, id.node_id, id.node_count),
+        (Some(0xc0ffee01), Some(1), Some(2))
+    );
+    assert_eq!(
+        (id.primary, id.sis, id.api_version),
+        (Some(true), Some(true), Some(9))
+    );
     assert_eq!(id.region, Some(zwave_serial::message::RfRegion::Usa));
     assert_eq!(id.library_version.as_deref(), Some("Z-Wave 7.22"));
     // Only read-only functions were asked, and the port was closed afterwards.
-    let seen = tokio::time::timeout(Duration::from_secs(2), responder).await.expect("port closed").unwrap();
-    assert!(seen.iter().all(|f| [0x07, 0x15, 0x20, 0x02, 0x05, 0x0b].contains(f)), "{seen:02x?}");
+    let seen = tokio::time::timeout(Duration::from_secs(2), responder)
+        .await
+        .expect("port closed")
+        .unwrap();
+    assert!(
+        seen.iter()
+            .all(|f| [0x07, 0x15, 0x20, 0x02, 0x05, 0x0b].contains(f)),
+        "{seen:02x?}"
+    );
 
     let (host, _silent) = tokio::io::duplex(1024);
     let t = std::time::Instant::now();

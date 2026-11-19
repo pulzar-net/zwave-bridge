@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   NIGHTLY: nightly-2026-11-14
@@ -22,7 +22,9 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
