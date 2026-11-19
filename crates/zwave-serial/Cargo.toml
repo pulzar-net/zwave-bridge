@@ -1,0 +1,31 @@
+[package]
+name = "zwave-serial"
+description = "Z-Wave Serial API host side: frames, ACK/NAK/CAN, retransmits, callbacks, typed controller messages and a controller probe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["zwave", "z-wave", "serial", "iot", "home-automation"]
+categories = ["embedded", "hardware-support", "network-programming"]
+
+[features]
+default = ["serialport"]
+# Open local serial devices (USB sticks, UARTs) through tokio-serial.
+serialport = ["dep:tokio-serial"]
+
+[dependencies]
+bytes.workspace = true
+futures-util.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "io-util", "net", "time", "sync", "macros"] }
+tokio-serial = { version = "5.4", optional = true }
+tokio-util.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "time", "io-util", "test-util"] }
+
+[lints]
+workspace = true
