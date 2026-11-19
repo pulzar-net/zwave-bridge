@@ -250,7 +250,6 @@ async fn run<T>(
         return;
     }
     let mut current: Option<Current> = None;
-    let mut jobs_open = true;
     let mut partial_since: Option<Instant> = None;
     let fail_all = |current: &mut Option<Current>, e: SerialError| {
         if let Some(c) = current.take() {
@@ -358,8 +357,9 @@ async fn run<T>(
                     Phase::AwaitCallback { .. } => fail_all(&mut current, SerialError::CallbackTimeout),
                 }
             }
-            job = jobs.recv(), if current.is_none() && jobs_open => {
-                let Some(job) = job else { jobs_open = false; continue; };
+            job = jobs.recv(), if current.is_none() => {
+                // Every handle is gone: stop, closing the port.
+                let Some(job) = job else { return; };
                 trace!(function = job.req.frame.function, len = job.req.frame.payload.len(), "tx");
                 if let Err(e) = framed.send(Frame::Data(job.req.frame.clone())).await {
                     let _ = job.reply.send(Err(SerialError::Closed(e.to_string())));

@@ -207,31 +207,60 @@ async fn refused_request_skips_callback() {
 #[tokio::test]
 async fn probe_identifies_a_controller_and_ignores_silence() {
     let (host, mut ctrl) = tokio::io::duplex(1024);
-    tokio::spawn(async move {
-        let req = data(&mut ctrl).await;
-        assert_eq!(req.function, 0x07);
-        ctrl.write_all(&[ACK]).await.unwrap();
-        let caps = zwave_serial::message::SerialApiCapabilities {
-            firmware_major: 7,
-            firmware_minor: 22,
-            manufacturer_id: 0,
-            product_type: 4,
-            product_id: 4,
-            functions: [0xff; 32],
-        };
-        ctrl.write_all(&DataFrame::response(0x07u8, caps.encode()).encode())
-            .await
-            .unwrap();
-        let mut b = [0u8; 8];
-        let _ = ctrl.read(&mut b).await;
+    let responder = tokio::spawn(async move {
+        let mut seen = Vec::new();
+        loop {
+            let mut buf = Vec::new();
+            let req = loop {
+                let mut chunk = [0u8; 256];
+                let n = ctrl.read(&mut chunk).await.unwrap_or(0);
+                if n == 0 {
+                    return seen;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+                if let Some(d) = decode_all(&buf).into_iter().find_map(|f| match f {
+                    Frame::Data(d) => Some(d),
+                    _ => None,
+                }) {
+                    break d;
+                }
+            };
+            seen.push(req.function);
+            let payload = match req.function {
+                0x07 => zwave_serial::message::SerialApiCapabilities {
+                    firmware_major: 7,
+                    firmware_minor: 22,
+                    manufacturer_id: 0,
+                    product_type: 4,
+                    product_id: 4,
+                    functions: [0xff; 32],
+                }
+                .encode(),
+                0x15 => b"Z-Wave 7.22\0\x07".to_vec(),
+                0x20 => vec![0xc0, 0xff, 0xee, 0x01, 0x01],
+                0x02 => zwave_serial::message::InitData { api_version: 9, capabilities: 0x08, nodes: vec![1, 2, 3], chip_type: Some(8), chip_version: Some(0) }.encode(),
+                0x05 => vec![0x1c],
+                0x0b => vec![0x20, 0x01],
+                _ => vec![],
+            };
+            ctrl.write_all(&[ACK]).await.unwrap();
+            ctrl.write_all(&DataFrame::response(req.function, payload).encode()).await.unwrap();
+        }
     });
-    let id = zwave_serial::probe::probe_port(host)
-        .await
-        .unwrap()
-        .unwrap();
+    let id = zwave_serial::probe::probe_port(host).await.unwrap().unwrap();
     assert_eq!(id.firmware, "7.22");
     assert!(id.known_name().unwrap().contains("800"));
+    assert_eq!(id.series, Some(zwave_serial::Series::S800));
+    assert_eq!((id.home_id, id.node_id, id.node_count), (Some(0xc0ffee01), Some(1), Some(2)));
+    assert_eq!((id.primary, id.sis, id.api_version), (Some(true), Some(true), Some(9)));
+    assert_eq!(id.region, Some(zwave_serial::message::RfRegion::Usa));
+    assert_eq!(id.library_version.as_deref(), Some("Z-Wave 7.22"));
+    // Only read-only functions were asked, and the port was closed afterwards.
+    let seen = tokio::time::timeout(Duration::from_secs(2), responder).await.expect("port closed").unwrap();
+    assert!(seen.iter().all(|f| [0x07, 0x15, 0x20, 0x02, 0x05, 0x0b].contains(f)), "{seen:02x?}");
 
     let (host, _silent) = tokio::io::duplex(1024);
+    let t = std::time::Instant::now();
     assert_eq!(zwave_serial::probe::probe_port(host).await.unwrap(), None);
+    assert!(t.elapsed() < zwave_serial::probe::PROBE_TIMEOUT + Duration::from_millis(200));
 }
