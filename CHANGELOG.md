@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 
 - `zwave-host`: `nvm3::convert` turns a backup into an image for another
@@ -14,11 +16,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   application version and RF configuration, as Z-Wave JS's `migrateNVM` does.
   It refuses a protocol format newer than the target's SDK reads and images
   whose format cannot be told. `Controller::restore_nvm` converts as needed.
-
-## [0.2.0] - 2026-11-20
-
-### Added
-
 - `zwave-host`: a node included with S2 Authenticated or Access Control
   keeps its full DSK in its record (`NodeRecord::dsk`), as SmartStart nodes
   already did.
