@@ -1261,6 +1261,23 @@ pub fn nvm_request(extended: bool, op: u8, length: u8, offset: u32) -> DataFrame
     DataFrame::request(f, v)
 }
 
+/// Builds an NVM write of `data` at `offset`.
+pub fn nvm_write(extended: bool, offset: u32, data: &[u8]) -> DataFrame {
+    let f = if extended {
+        F::EXTENDED_NVM_OPERATIONS
+    } else {
+        F::NVM_OPERATIONS
+    };
+    let mut v = vec![nvm::WRITE, data.len() as u8];
+    if extended {
+        v.extend_from_slice(&offset.to_be_bytes());
+    } else {
+        v.extend_from_slice(&(offset as u16).to_be_bytes());
+    }
+    v.extend_from_slice(data);
+    DataFrame::request(f, v)
+}
+
 /// Whether a frame is the response to `function`.
 pub fn is_response(f: &DataFrame, function: crate::FunctionId) -> bool {
     f.kind == FrameType::Response && f.function == function.0

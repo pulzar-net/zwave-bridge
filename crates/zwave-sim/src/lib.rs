@@ -48,6 +48,8 @@ pub struct SimConfig {
     pub frame_gap: Duration,
     /// Accept 16-bit node ids (and so Long Range), as 700 and 800 series sticks with Long Range do.
     pub long_range: bool,
+    /// The NVM image to start with (by default `nvm_size` bytes of a pattern).
+    pub nvm: Option<Vec<u8>>,
 }
 
 impl Default for SimConfig {
@@ -57,6 +59,7 @@ impl Default for SimConfig {
             nvm_size: 4096,
             frame_gap: Duration::from_millis(2),
             long_range: true,
+            nvm: None,
         }
     }
 }
@@ -117,7 +120,10 @@ pub struct SimHandle {
 impl Simulator {
     /// A controller with no nodes in its network.
     pub fn new(cfg: SimConfig) -> Self {
-        let nvm = (0..cfg.nvm_size).map(|i| (i * 7 + 3) as u8).collect();
+        let nvm = cfg
+            .nvm
+            .clone()
+            .unwrap_or_else(|| (0..cfg.nvm_size).map(|i| (i * 7 + 3) as u8).collect());
         Simulator {
             cfg,
             nodes: vec![],
@@ -604,6 +610,28 @@ impl Simulator {
                             status: if end >= self.nvm.len() { 0xff } else { 0 },
                             offset_or_size: off as u32,
                             data,
+                        }
+                    }
+                    0x02 => {
+                        let len = usize::from(p.get(1).copied().unwrap_or(0));
+                        let off = p
+                            .get(2..6)
+                            .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
+                            .unwrap_or(0) as usize;
+                        match p.get(6..6 + len) {
+                            Some(data) if off + len <= self.nvm.len() => {
+                                self.nvm[off..off + len].copy_from_slice(data);
+                                NvmResponse {
+                                    status: 0,
+                                    offset_or_size: off as u32,
+                                    data: vec![],
+                                }
+                            }
+                            _ => NvmResponse {
+                                status: 0x01,
+                                offset_or_size: off as u32,
+                                data: vec![],
+                            },
                         }
                     }
                     0x03 => NvmResponse {

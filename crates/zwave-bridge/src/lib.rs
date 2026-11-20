@@ -127,6 +127,7 @@ enum FromMqtt {
 
 struct Bridge {
     cfg: Config,
+    restart: std::sync::Arc<tokio::sync::Notify>,
     library: Option<std::sync::Arc<zwave_host::device_config::Library>>,
     devices: HashMap<u16, std::sync::Arc<zwave_host::device_config::DeviceConfig>>,
     c: Controller,
@@ -209,7 +210,9 @@ pub async fn run<P: Port>(
             zwave_host::device_config::DirSource::new(d),
         ))
     });
+    let restart = std::sync::Arc::new(tokio::sync::Notify::new());
     let mut b = Bridge {
+        restart: restart.clone(),
         cfg,
         library,
         devices: HashMap::new(),
@@ -238,6 +241,13 @@ pub async fn run<P: Port>(
                 b.publish(&format!("{}/bridge/response/{action}", b.base), &body, false).await;
             },
             _ = &mut shutdown => break,
+            _ = restart.notified() => {
+                // The controller restarted with a restored memory: start over with a fresh host.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                b.publish_raw(&format!("{}/bridge/state", b.base), b"offline".to_vec(), true).await;
+                let _ = b.mqtt.disconnect().await;
+                return Err(anyhow::anyhow!("controller memory restored; restart zwave-bridge"));
+            }
         }
     }
     b.publish_raw(
@@ -669,6 +679,32 @@ impl Bridge {
                     false,
                 )
                 .await;
+            }
+            "restore" => {
+                // A backup the bridge wrote (or the operator put) in the store directory.
+                let file = args.get("file").and_then(Json::as_str).map(String::from);
+                let dir = self.cfg.store.dir.clone();
+                let restarted = self.restart.clone();
+                self.respond_later(action, async move {
+                    let Some(file) = file
+                        .filter(|f| !f.contains('/') && !f.contains('\\') && !f.starts_with('.'))
+                    else {
+                        return reply(Err(
+                            "\"file\" is a backup's name in the store directory".into()
+                        ));
+                    };
+                    let image = match std::fs::read(dir.join(&file)) {
+                        Ok(b) => b,
+                        Err(e) => return reply(Err(format!("{file}: {e}"))),
+                    };
+                    match c.restore_nvm(&image).await {
+                        Ok(()) => {
+                            restarted.notify_one();
+                            reply(Ok(json!({"file": file, "restart": true})))
+                        }
+                        Err(e) => reply(Err(e.to_string())),
+                    }
+                });
             }
             "firmware_update" => {
                 // Only files the operator put in <store>/firmware, never a path from the network.

@@ -15,6 +15,10 @@ All notable changes are listed here. The project follows
   separate Long Range S2 keys (Authenticated and Access Control only), no
   routing information for Long Range nodes. `zwave-serial` builders and
   frame encoders take the node id width (a breaking change).
+- `zwave-host`: `nvm3` reads and writes NVM3 images (700 and 800 series,
+  checked against real backups in CI); `Controller::restore_nvm` writes a
+  backup back after checking it matches the controller's series and SDK.
+  `zwave-bridge`: `restore` request.
 - `zwave-cc`: Firmware Update Meta Data (version 8).
 - `zwave-host`: `Controller::update_firmware`: CRC-checked fragments sized for
   the node's security, activation, Intel HEX images; progress events.

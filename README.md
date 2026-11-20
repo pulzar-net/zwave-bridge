@@ -13,9 +13,10 @@ information and NVM backups.
 
 **Status: 0.1.0, pre-release.** The stack is tested end to end against a
 Serial API simulator in CI; it has not yet been run against a real stick.
-Z-Wave Long Range (SmartStart, 16-bit node ids, its own S2 keys) and
-firmware updates are in; NVM restore and conversion between controller
-series are in progress. Not certified by the Z-Wave Alliance (see below).
+Z-Wave Long Range (SmartStart, 16-bit node ids, its own S2 keys), firmware
+updates and NVM restore onto the same series are in; converting a backup
+between 700 and 800 series is the next step. Not certified by the Z-Wave
+Alliance (see below).
 
 ## Crates
 
@@ -110,7 +111,10 @@ devices must be re-included.
 
 Requests: `include`, `exclude`, `stop`, `grant`, `validate_dsk`,
 `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`,
-`remove_failed`, `rename`, `topology`, `configure`, `firmware_update`
+`remove_failed`, `rename`, `topology`, `configure`, `restore`
+(`{"file": "nvm-1763580000.bin"}`: writes a `backup` back onto a stick of the
+same series and SDK, then the bridge exits for its service manager to
+restart it), `firmware_update`
 (`{"node": 5, "file": "zse40_v2.gbl"}`, a file you placed in
 `<store dir>/firmware`; `.hex` images are converted, others sent as they are).
 

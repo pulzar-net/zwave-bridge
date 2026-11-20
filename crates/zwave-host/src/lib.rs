@@ -30,6 +30,7 @@ mod inclusion;
 mod interview;
 pub mod node;
 mod nvm;
+pub mod nvm3;
 pub mod store;
 pub mod values;
 

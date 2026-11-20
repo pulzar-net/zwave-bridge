@@ -5,7 +5,7 @@ use crate::controller::Controller;
 use crate::Error;
 use std::time::Duration;
 use tracing::info;
-use zwave_serial::message::{nvm, nvm_request, NvmResponse};
+use zwave_serial::message::{nvm, nvm_request, nvm_write, NvmResponse};
 use zwave_serial::{DataFrame, FunctionId as F};
 
 /// Largest image accepted (the biggest current controller NVM is well under this).
@@ -147,5 +147,74 @@ impl Controller {
             image.extend_from_slice(&r.payload[..take]);
         }
         Ok(image)
+    }
+}
+
+impl Controller {
+    /// Writes a backup image back to the controller and restarts it.
+    ///
+    /// The image must be from the same series and SDK as the controller's
+    /// current one (checked by reading both); a backup from another series
+    /// needs conversion. The controller restarts afterwards, so this
+    /// `Controller` must be dropped and a new one started.
+    pub async fn restore_nvm(&self, image: &[u8]) -> Result<(), Error> {
+        let caps = &self.inner.caps;
+        let extended = if caps.supports(F::EXTENDED_NVM_OPERATIONS) {
+            true
+        } else if caps.supports(F::NVM_OPERATIONS) {
+            false
+        } else {
+            return Err(Error::Controller(
+                "this controller offers no NVM restore (700 or 800 series only)".into(),
+            ));
+        };
+        let current = self.backup_nvm().await?;
+        let from = crate::nvm3::NvmInfo::read(image)
+            .map_err(|e| Error::Controller(format!("backup: {e}")))?;
+        let to = crate::nvm3::NvmInfo::read(&current)
+            .map_err(|e| Error::Controller(format!("controller: {e}")))?;
+        from.restorable_onto(&to).map_err(Error::Controller)?;
+        let open = self.nvm_op(extended, nvm::OPEN, 0, 0).await?;
+        if open.status != nvm::STATUS_OK {
+            return Err(Error::Controller(format!(
+                "NVM open failed: {:#04x}",
+                open.status
+            )));
+        }
+        let result = async {
+            for (i, chunk) in image.chunks(usize::from(CHUNK)).enumerate() {
+                let offset = (i * usize::from(CHUNK)) as u32;
+                let r = self
+                    .inner
+                    .api
+                    .request(nvm_write(extended, offset, chunk), Duration::from_secs(5))
+                    .await?;
+                let r = NvmResponse::parse(&r.payload, extended)
+                    .map_err(|e| Error::Controller(e.to_string()))?;
+                if r.status != nvm::STATUS_OK && r.status != nvm::STATUS_EOF {
+                    return Err(Error::Controller(format!(
+                        "NVM write at {offset:#x} failed: {:#04x}",
+                        r.status
+                    )));
+                }
+            }
+            Ok(())
+        }
+        .await;
+        let close = self.nvm_op(extended, nvm::CLOSE, 0, 0).await;
+        result?;
+        close?;
+        self.inner
+            .api
+            .execute(zwave_serial::Request::ack_only(DataFrame::request(
+                F::SOFT_RESET,
+                vec![],
+            )))
+            .await?;
+        info!(
+            bytes = image.len(),
+            "NVM restored; the controller is restarting"
+        );
+        Ok(())
     }
 }

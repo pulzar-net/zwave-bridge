@@ -14,6 +14,7 @@ tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 zwave-serial = { path = "../crates/zwave-serial", default-features = false }
 zwave-security = { path = "../crates/zwave-security" }
 zwave-cc = { path = "../crates/zwave-cc" }
+zwave-host = { path = "../crates/zwave-host" }
 
 # Its own workspace, as cargo-fuzz expects.
 [workspace]
@@ -67,6 +68,20 @@ bench = false
 [[bin]]
 name = "qr_and_dsk"
 path = "fuzz_targets/qr_and_dsk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nvm3"
+path = "fuzz_targets/nvm3.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "device_config"
+path = "fuzz_targets/device_config.rs"
 test = false
 doc = false
 bench = false

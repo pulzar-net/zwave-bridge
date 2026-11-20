@@ -551,3 +551,67 @@ async fn long_range_smartstart_and_restart() {
     })
     .await;
 }
+
+fn nvm_700(home: [u8; 4], extra: &[u8]) -> Vec<u8> {
+    use zwave_host::nvm3::*;
+    let mut ci = home.to_vec();
+    ci.push(1);
+    ci.resize(13, 0);
+    let app = write_volume(
+        APPLICATION_SIZE_700,
+        2048,
+        &[(APPLICATION_VERSION_FILE_700, vec![1, 18, 7, 0])],
+    )
+    .unwrap();
+    let proto = write_volume(
+        IMAGE_SIZE_700 - APPLICATION_SIZE_700,
+        2048,
+        &[
+            (PROTOCOL_VERSION_FILE, vec![0, 17, 7, 3]),
+            (CONTROLLER_INFO_FILE, ci),
+            (0x50005, extra.to_vec()),
+        ],
+    )
+    .unwrap();
+    [app, proto].concat()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn nvm_restore_checks_compatibility() {
+    let dir = tempfile::tempdir().unwrap();
+    let original = nvm_700([0xc0, 0xff, 0xee, 0x01], &[1, 2, 3]);
+    let (host, dev) = tokio::io::duplex(16 * 1024);
+    let h = Simulator::new(SimConfig {
+        nvm: Some(original.clone()),
+        frame_gap: Duration::ZERO,
+        ..SimConfig::default()
+    })
+    .spawn(dev);
+    let (c, _ev) = Controller::start(host, config(NetworkKeys::generate().unwrap(), dir.path()))
+        .await
+        .unwrap();
+    assert_eq!(c.backup_nvm().await.unwrap(), original);
+    let info = zwave_host::nvm3::NvmInfo::read(&original).unwrap();
+    assert_eq!(info.home_id, Some(0xc0ffee01));
+
+    // A backup of the same series and SDK is written back as it is.
+    let other = nvm_700([0xc0, 0xff, 0xee, 0x02], &[9, 9, 9, 9, 9]);
+    c.restore_nvm(&other).await.unwrap();
+    assert_eq!(h.nvm().await, other);
+
+    // An 800 series image needs conversion and is refused before anything is written.
+    let shared = zwave_host::nvm3::write_volume(
+        zwave_host::nvm3::IMAGE_SIZE_800,
+        8192,
+        &[(
+            zwave_host::nvm3::APPLICATION_VERSION_FILE_800,
+            vec![0, 1, 0, 0],
+        )],
+    )
+    .unwrap();
+    let e = c.restore_nvm(&shared).await.unwrap_err().to_string();
+    assert!(e.contains("conversion"), "{e}");
+    assert_eq!(h.nvm().await, other);
+    // Something that is not an NVM image at all.
+    assert!(c.restore_nvm(&[0u8; 100]).await.is_err());
+}
