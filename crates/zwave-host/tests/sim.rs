@@ -28,6 +28,7 @@ fn sim() -> Simulator {
         ))
         .with_node(NodeSpec::smartstart_sensor("smartstart"))
         .with_node(NodeSpec::long_range_sensor("lr"))
+        .with_node(NodeSpec::switch("spare"))
 }
 
 fn config(keys: NetworkKeys, dir: &std::path::Path) -> HostConfig {
@@ -637,4 +638,35 @@ async fn store_writes_do_not_race() {
     c.flush().unwrap();
     let stored = zwave_host::store::load(&dir.path().join("nodes.json")).unwrap();
     assert_eq!(stored.nodes[&r.node].name.as_deref(), Some("switch 199"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn replace_a_failed_node() {
+    let dir = tempfile::tempdir().unwrap();
+    let (c, mut ev, h) = start(NetworkKeys::generate().unwrap(), dir.path()).await;
+    let r = include(&c, &mut ev, &h, "switch", InclusionOptions::default()).await;
+    interviewed(&mut ev, r.node).await;
+    // A node that answers cannot be replaced.
+    assert!(c
+        .replace_failed_node(r.node, InclusionOptions::default())
+        .await
+        .is_err());
+    assert!(h.power_off("switch").await);
+    assert!(!c.ping(r.node).await);
+    let c2 = c.clone();
+    let node = r.node;
+    let task = tokio::spawn(async move {
+        c2.replace_failed_node(node, InclusionOptions::default())
+            .await
+    });
+    expect(&mut ev, "replacement ready", |e| {
+        matches!(e, Event::InclusionStarted).then_some(())
+    })
+    .await;
+    assert_eq!(h.press("spare").await, Some(r.node));
+    let res = task.await.unwrap().unwrap();
+    assert_eq!(res.node, r.node);
+    interviewed(&mut ev, r.node).await;
+    assert_eq!(h.node_id("spare").await, Some(r.node));
+    assert!(c.ping(r.node).await);
 }

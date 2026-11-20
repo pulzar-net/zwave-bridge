@@ -863,6 +863,7 @@ impl Controller {
                 },
                 F::ADD_NODE_TO_NETWORK => self.on_add_node_status(&f.payload),
                 F::REMOVE_NODE_FROM_NETWORK => self.on_remove_node_status(&f.payload),
+                F::REPLACE_FAILED_NODE => self.on_replace_status(&f.payload),
                 F::SERIAL_API_STARTED => warn!("the controller restarted"),
                 other => debug!("unsolicited {other} ignored"),
             }

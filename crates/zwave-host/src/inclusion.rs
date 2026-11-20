@@ -56,6 +56,7 @@ pub(crate) struct InclusionState {
     busy: bool,
     add_tx: Option<mpsc::Sender<AddNodeStatus>>,
     remove_tx: Option<mpsc::Sender<RemoveNodeStatus>>,
+    replace_tx: Option<mpsc::Sender<u8>>,
     cancel: Option<oneshot::Sender<()>>,
     grant: Option<oneshot::Sender<Vec<SecurityClass>>>,
     pin: Option<oneshot::Sender<Option<u16>>>,
@@ -70,6 +71,7 @@ impl Drop for Busy<'_> {
         st.busy = false;
         st.add_tx = None;
         st.remove_tx = None;
+        st.replace_tx = None;
         st.cancel = None;
         st.grant = None;
         st.pin = None;
@@ -108,6 +110,109 @@ impl Controller {
             }
             Err(e) => debug!("{e}"),
         }
+    }
+
+    pub(crate) fn on_replace_status(&self, payload: &[u8]) {
+        let Some(&status) = payload.get(1) else {
+            return;
+        };
+        let tx = self
+            .inner
+            .inclusion
+            .lock()
+            .expect("lock")
+            .replace_tx
+            .clone();
+        if let Some(tx) = tx {
+            let _ = tx.try_send(status);
+        }
+    }
+
+    /// Replaces a failed node: the controller gives its node id to the next
+    /// node that joins (press its button), which then gets security and an
+    /// interview as a new node would. The node must be one the controller
+    /// considers failed.
+    pub async fn replace_failed_node(
+        &self,
+        node: NodeId,
+        opts: InclusionOptions,
+    ) -> Result<InclusionResult, Error> {
+        let busy = self.take_busy()?;
+        let (tx, mut rx) = mpsc::channel(8);
+        let (ctx, mut crx) = oneshot::channel();
+        {
+            let mut st = self.inner.inclusion.lock().expect("lock");
+            st.replace_tx = Some(tx);
+            st.cancel = Some(ctx);
+        }
+        let cb = self.inner.api.next_callback_id();
+        let mut p = self.node_payload(node);
+        p.push(cb);
+        let r = self
+            .inner
+            .api
+            .request(
+                DataFrame::request(F::REPLACE_FAILED_NODE, p),
+                Duration::from_secs(2),
+            )
+            .await?;
+        if r.payload.first() != Some(&0) {
+            return Err(Error::Inclusion(format!(
+                "the controller refused to replace node {node} ({:#04x})",
+                r.payload.first().copied().unwrap_or(0)
+            )));
+        }
+        let deadline =
+            tokio::time::Instant::now() + opts.timeout.unwrap_or(self.inner.cfg.inclusion_timeout);
+        let outcome = loop {
+            tokio::select! {
+                s = rx.recv() => match s {
+                    Some(0x03) => self.emit(Event::InclusionStarted),
+                    Some(0x04) => break Ok(()),
+                    Some(0x05) => break Err(Error::Inclusion(format!("replacing node {node} failed"))),
+                    Some(0x00) => break Err(Error::Inclusion(format!("node {node} answers; it is not failed"))),
+                    Some(other) => debug!("replace status {other:#x}"),
+                    None => break Err(Error::Stopped),
+                },
+                _ = tokio::time::sleep_until(deadline) => break Err(Error::Inclusion("no node joined".into())),
+                _ = &mut crx => break Err(Error::Inclusion("replacement stopped".into())),
+            }
+        };
+        self.emit(Event::InclusionStopped);
+        drop(busy);
+        outcome?;
+        // A new node in the old id: forget everything about the old one.
+        self.s2(node).lock().expect("lock").forget_peer(node);
+        self.inner.runtime.lock().expect("lock").remove(&node);
+        self.inner
+            .store
+            .lock()
+            .expect("store lock")
+            .nodes
+            .insert(node, NodeRecord::new(node));
+        self.mark_dirty();
+        self.assume_awake(node);
+        let (_g, nif) = self.wait_for(node, false, |i| {
+            matches!(
+                i,
+                crate::controller::Inbound::NodeInfo(_)
+                    | crate::controller::Inbound::NodeInfoFailed
+            )
+        });
+        self.inner
+            .api
+            .request(
+                DataFrame::request(F::REQUEST_NODE_INFO, self.node_payload(node)),
+                Duration::from_secs(2),
+            )
+            .await?;
+        let info = match tokio::time::timeout(self.inner.cfg.request_timeout * 2, nif).await {
+            Ok(Ok(crate::controller::Inbound::NodeInfo(i))) => i,
+            _ => NodeInfo::default(),
+        };
+        let res = self.on_node_added(node, info, &opts, None).await;
+        self.update_smartstart().await;
+        Ok(res)
     }
 
     fn take_busy(&self) -> Result<Busy<'_>, Error> {
@@ -263,7 +368,12 @@ impl Controller {
             }
             s.nodes.insert(node, r);
         }
-        self.inner.info.lock().expect("lock").nodes.push(node);
+        {
+            let mut info = self.inner.info.lock().expect("lock");
+            if !info.nodes.contains(&node) {
+                info.nodes.push(node);
+            }
+        }
         self.mark_dirty();
         self.emit(Event::NodeAdded { node });
         if let Err(e) = self.fetch_protocol_info(node).await {

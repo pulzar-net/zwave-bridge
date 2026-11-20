@@ -5,6 +5,9 @@ All notable changes are listed here. The project follows
 
 ## 0.2.0 (2026-11-20)
 
+- `zwave-host`: `Controller::replace_failed_node` gives a failed node's id to
+  a new node, with security and an interview; `zwave-sim` can power a node off
+  and replace it.
 - `zwave-host`: `ValueUpdate.rssi` (the carrying frame's RSSI), `Controller::queued`
   (requests waiting for a sleeping node) and `Controller::last_route`.
 - `zwave-host`: store writes are serialized; `flush` racing the background

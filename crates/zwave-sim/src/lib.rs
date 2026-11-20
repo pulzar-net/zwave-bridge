@@ -78,6 +78,10 @@ enum Mode {
     Removing {
         cb: u8,
     },
+    Replacing {
+        cb: u8,
+        node: u16,
+    },
 }
 
 type Inspector = Box<dyn FnOnce(Option<&SimNode>) + Send>;
@@ -90,6 +94,7 @@ enum Cmd {
     Motion(String, oneshot::Sender<bool>),
     Inspect(String, Inspector),
     Nvm(oneshot::Sender<Vec<u8>>),
+    PowerOff(String, oneshot::Sender<bool>),
     Attach(Box<dyn PortBox>),
 }
 
@@ -322,6 +327,11 @@ impl Simulator {
                 f(self.nodes.iter().find(|n| n.spec.name == name));
                 vec![]
             }
+            Cmd::PowerOff(name, reply) => {
+                let found = self.by_name(&name).map(|n| n.powered = false).is_some();
+                let _ = reply.send(found);
+                vec![]
+            }
             Cmd::Nvm(reply) => {
                 let _ = reply.send(self.nvm.clone());
                 vec![]
@@ -353,6 +363,20 @@ impl Simulator {
                         AddNodeStatus::ProtocolDone.to_frame(cb, self.nid),
                     ],
                     Some(next),
+                )
+            }
+            Mode::Replacing { cb, node } => {
+                let Some(n) = self.by_name(name) else {
+                    return (vec![], None);
+                };
+                if n.id.is_some() {
+                    return (vec![], None);
+                }
+                n.join(node, home);
+                self.mode = Mode::Idle;
+                (
+                    vec![DataFrame::request(F::REPLACE_FAILED_NODE, vec![cb, 0x04])],
+                    Some(node),
                 )
             }
             Mode::Removing { cb } => {
@@ -404,6 +428,7 @@ impl Simulator {
                     F::GET_SUC_NODE_ID,
                     F::REQUEST_NODE_INFO,
                     F::REMOVE_FAILED_NODE,
+                    F::REPLACE_FAILED_NODE,
                     F::GET_ROUTING_INFO,
                     F::EXTENDED_NVM_OPERATIONS,
                     F::GET_LONG_RANGE_NODES,
@@ -572,6 +597,27 @@ impl Simulator {
                     _ => {
                         self.mode = Mode::Idle;
                         vec![]
+                    }
+                }
+            }
+            F::REPLACE_FAILED_NODE => {
+                let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
+                let cb = p.get(self.nid).copied().unwrap_or(0);
+                match self.node_mut(id).map(|n| n.reachable()) {
+                    None => vec![Self::response(F::REPLACE_FAILED_NODE, vec![0x01])],
+                    Some(true) => vec![
+                        Self::response(F::REPLACE_FAILED_NODE, vec![0x00]),
+                        DataFrame::request(F::REPLACE_FAILED_NODE, vec![cb, 0x00]),
+                    ],
+                    Some(false) => {
+                        if let Some(n) = self.node_mut(id) {
+                            n.leave();
+                        }
+                        self.mode = Mode::Replacing { cb, node: id };
+                        vec![
+                            Self::response(F::REPLACE_FAILED_NODE, vec![0x00]),
+                            DataFrame::request(F::REPLACE_FAILED_NODE, vec![cb, 0x03]),
+                        ]
                     }
                 }
             }
@@ -805,6 +851,13 @@ impl SimHandle {
         self.inspect(name, |n| n.granted.clone())
             .await
             .unwrap_or_default()
+    }
+
+    /// Cuts a node's power: it stops answering, so the controller sees it fail.
+    pub async fn power_off(&self, name: &str) -> bool {
+        self.ask(|tx| Cmd::PowerOff(name.into(), tx))
+            .await
+            .unwrap_or(false)
     }
 
     /// The simulated NVM image.

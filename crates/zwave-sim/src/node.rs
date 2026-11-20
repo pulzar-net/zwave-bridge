@@ -225,6 +225,8 @@ pub struct SimNode {
     pub id: Option<u16>,
     /// Awake (sleeping nodes).
     pub awake: bool,
+    /// Powered; a node without power answers nothing.
+    pub powered: bool,
     /// Classes it holds keys for after inclusion.
     pub granted: Vec<SecurityClass>,
     /// Sensor readings by type.
@@ -267,6 +269,7 @@ impl SimNode {
             spec,
             id: None,
             awake: true,
+            powered: true,
             granted: vec![],
             sensors,
             switch_on: false,
@@ -307,7 +310,7 @@ impl SimNode {
 
     /// Whether frames reach it now.
     pub fn reachable(&self) -> bool {
-        self.id.is_some() && (self.spec.listening || self.awake)
+        self.powered && self.id.is_some() && (self.spec.listening || self.awake)
     }
 
     fn highest(&self) -> Sec {
