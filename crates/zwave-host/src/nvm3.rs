@@ -6,9 +6,9 @@
 //! series image holds two volumes (application, then protocol); an 800
 //! series image one shared volume.
 //!
-//! This module reads images (to identify a backup before restoring it) and
-//! writes them (for tests and simulators, and later for conversion between
-//! series).
+//! This module reads images (to identify a backup before restoring it),
+//! writes them, and converts a backup to another controller's layout and SDK
+//! ([`convert`]), following Z-Wave JS's `migrateNVM` for the 700/800 path.
 
 use std::collections::HashMap;
 
@@ -448,6 +448,110 @@ fn object(key: u32, data: &[u8]) -> Vec<u8> {
     v.extend_from_slice(data);
     v.resize(v.len().div_ceil(4) * 4, 0xff);
     v
+}
+
+/// The RF configuration file (region, TX power): the target's is kept.
+pub const RF_CONFIG_FILE: u32 = 104;
+
+/// The highest protocol file format a controller of this SDK reads and
+/// migrates from (Z-Wave JS `jsonToNVM`'s table).
+fn protocol_format_for_sdk(v: Version) -> u8 {
+    let v = (v.major, v.minor, v.patch);
+    match v {
+        _ if v >= (7, 19, 0) => 5,
+        _ if v >= (7, 17, 0) => 4,
+        _ if v >= (7, 15, 3) => 3,
+        _ if v >= (7, 12, 0) => 2,
+        _ if v >= (7, 11, 0) => 1,
+        _ => 0,
+    }
+}
+
+/// Whether a file lives in a 700 series image's application volume.
+fn application_file(key: u32) -> bool {
+    key < PROTOCOL_VERSION_FILE || key == APPLICATION_VERSION_FILE_700
+}
+
+/// Converts `backup` so it can be written onto the controller whose current
+/// image is `target`: the same series and SDK give the backup back as it is;
+/// otherwise every file of the backup is repacked in the target's layout
+/// (one shared volume on the 800 series, application and protocol volumes on
+/// the 700 series) with the target's application version and RF
+/// configuration, and the protocol files as the backup has them, which the
+/// target's firmware migrates to its own format on start. Refused when the
+/// backup's protocol format is newer than the target's SDK reads, or when
+/// either image's format cannot be told.
+pub fn convert(backup: &[u8], target: &[u8]) -> Result<Vec<u8>, String> {
+    let from = NvmInfo::read(backup).map_err(|e| format!("backup: {e}"))?;
+    let to = NvmInfo::read(target).map_err(|e| format!("controller: {e}"))?;
+    if from.restorable_onto(&to).is_ok() {
+        return Ok(backup.to_vec());
+    }
+    let src = Nvm3::parse(backup).map_err(|e| format!("backup: {e}"))?;
+    let tgt = Nvm3::parse(target).map_err(|e| format!("controller: {e}"))?;
+    let format = from
+        .protocol
+        .ok_or("the backup has no protocol version file, so its format cannot be told")?
+        .format;
+    let reads = match (to.protocol, to.application) {
+        (Some(p), _) => p.format.max(protocol_format_for_sdk(p)),
+        (None, Some(a)) => protocol_format_for_sdk(a),
+        (None, None) => {
+            return Err(
+                "the controller's image has no version files, so its SDK cannot be told".into(),
+            )
+        }
+    };
+    if format > reads {
+        return Err(format!(
+            "the backup's protocol format {format} is newer than this controller's SDK reads ({reads}); update the controller's firmware first"
+        ));
+    }
+    let app_key = if tgt.shared {
+        APPLICATION_VERSION_FILE_800
+    } else {
+        APPLICATION_VERSION_FILE_700
+    };
+    let app_version = tgt
+        .file(app_key)
+        .ok_or("the controller's image has no application version file")?;
+    let mut files: Vec<(u32, Vec<u8>)> = src
+        .keys()
+        .into_iter()
+        .filter(|k| {
+            ![
+                APPLICATION_VERSION_FILE_700,
+                APPLICATION_VERSION_FILE_800,
+                RF_CONFIG_FILE,
+            ]
+            .contains(k)
+        })
+        .filter_map(|k| src.file(k).map(|d| (k, d.to_vec())))
+        .collect();
+    files.push((app_key, app_version.to_vec()));
+    if let Some(rf) = tgt.file(RF_CONFIG_FILE).or(src.file(RF_CONFIG_FILE)) {
+        files.push((RF_CONFIG_FILE, rf.to_vec()));
+    }
+    files.sort_by_key(|f| f.0);
+    let page = tgt.page_size;
+    let image = if tgt.shared {
+        write_volume(target.len(), page, &files)?
+    } else {
+        if target.len() <= APPLICATION_SIZE_700 {
+            return Err("the controller's 700 series image is too small".into());
+        }
+        let (app, proto): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| application_file(f.0));
+        [
+            write_volume(APPLICATION_SIZE_700, page, &app)?,
+            write_volume(target.len() - APPLICATION_SIZE_700, page, &proto)?,
+        ]
+        .concat()
+    };
+    let check = NvmInfo::read(&image).map_err(|e| format!("converted image: {e}"))?;
+    if check.home_id != from.home_id || check.shared != tgt.shared {
+        return Err("the converted image does not read back".into());
+    }
+    Ok(image)
 }
 
 /// Writes a volume of `size` bytes holding `files`, packed from the first

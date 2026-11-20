@@ -602,19 +602,50 @@ async fn nvm_restore_checks_compatibility() {
     c.restore_nvm(&other).await.unwrap();
     assert_eq!(h.nvm().await, other);
 
-    // An 800 series image needs conversion and is refused before anything is written.
-    let shared = zwave_host::nvm3::write_volume(
-        zwave_host::nvm3::IMAGE_SIZE_800,
+    // An 800 series image whose format cannot be told is refused before
+    // anything is written.
+    use zwave_host::nvm3::*;
+    let shared = write_volume(
+        IMAGE_SIZE_800,
         8192,
-        &[(
-            zwave_host::nvm3::APPLICATION_VERSION_FILE_800,
-            vec![0, 1, 0, 0],
-        )],
+        &[(APPLICATION_VERSION_FILE_800, vec![0, 1, 0, 0])],
     )
     .unwrap();
     let e = c.restore_nvm(&shared).await.unwrap_err().to_string();
-    assert!(e.contains("conversion"), "{e}");
+    assert!(e.contains("cannot be told"), "{e}");
     assert_eq!(h.nvm().await, other);
+
+    // An 800 series backup is converted to this 700 series controller: its
+    // files in the two volumes, the controller's own application version.
+    let mut ci = vec![0xc0, 0xff, 0xee, 0x03, 1];
+    ci.resize(13, 0);
+    let backup_800 = |format: u8| {
+        write_volume(
+            IMAGE_SIZE_800,
+            8192,
+            &[
+                (APPLICATION_VERSION_FILE_800, vec![0, 23, 7, 0]),
+                (PROTOCOL_VERSION_FILE, vec![0, 15, 7, format]),
+                (CONTROLLER_INFO_FILE, ci.clone()),
+                (0x50005, vec![7; 29]),
+            ],
+        )
+        .unwrap()
+    };
+    c.restore_nvm(&backup_800(3)).await.unwrap();
+    let now = h.nvm().await;
+    assert_eq!(now.len(), other.len());
+    let n = Nvm3::parse(&now).unwrap();
+    assert!(!n.shared);
+    assert_eq!(n.file(0x50005), Some(&[7u8; 29][..]));
+    assert_eq!(
+        n.file(APPLICATION_VERSION_FILE_700),
+        Some(&[1, 18, 7, 0][..])
+    );
+    assert_eq!(NvmInfo::read(&now).unwrap().home_id, Some(0xc0ffee03));
+    // A protocol format newer than this controller's SDK reads is refused.
+    let e = c.restore_nvm(&backup_800(5)).await.unwrap_err().to_string();
+    assert!(e.contains("update the controller"), "{e}");
     // Something that is not an NVM image at all.
     assert!(c.restore_nvm(&[0u8; 100]).await.is_err());
 }

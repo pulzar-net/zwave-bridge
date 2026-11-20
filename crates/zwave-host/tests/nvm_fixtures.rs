@@ -64,3 +64,71 @@ fn real_backups_parse() {
     eprintln!("{checked} images read, {compared} compared with their JSON");
     assert!(checked >= 10 && compared >= 3);
 }
+
+/// Every real 700 series backup converts to the 800 series layout and back
+/// with its protocol files intact; the published 800 image, which has no
+/// protocol version file, is refused both ways.
+#[test]
+fn real_backups_convert_between_series() {
+    use zwave_host::nvm3::*;
+    let Ok(dir) = std::env::var("ZWAVE_JS_NVM_DIR") else {
+        assert!(std::env::var("ZWAVE_JS_NVM_REQUIRED").as_deref() != Ok("1"));
+        return;
+    };
+    let bin = std::path::Path::new(&dir).join("nvm_700_binary");
+    let read = |n: &str| std::fs::read(bin.join(format!("{n}.bin"))).unwrap();
+    let target_800 = write_volume(
+        IMAGE_SIZE_800,
+        8192,
+        &[
+            (APPLICATION_VERSION_FILE_800, vec![0, 23, 7, 0]),
+            (RF_CONFIG_FILE, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        ],
+    )
+    .unwrap();
+    let target_700 = read("ctrlr_backup_700_7.19.1");
+    let protocol = |n: &Nvm3| -> Vec<(u32, Vec<u8>)> {
+        n.keys()
+            .into_iter()
+            .filter(|k| (0x50000..0x60000).contains(k) && *k != APPLICATION_VERSION_FILE_700)
+            .map(|k| (k, n.file(k).unwrap().to_vec()))
+            .collect()
+    };
+    let mut seen = 0;
+    for e in std::fs::read_dir(&bin).unwrap() {
+        let name = e.unwrap().file_name().into_string().unwrap();
+        if !name.starts_with("ctrlr_backup_700_") {
+            continue;
+        }
+        seen += 1;
+        let image = std::fs::read(bin.join(&name)).unwrap();
+        let src = Nvm3::parse(&image).unwrap();
+        let to800 = convert(&image, &target_800).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(to800.len(), IMAGE_SIZE_800, "{name}");
+        let n8 = Nvm3::parse(&to800).unwrap();
+        assert!(n8.shared, "{name}");
+        assert_eq!(protocol(&n8), protocol(&src), "{name}: protocol files");
+        assert_eq!(
+            n8.file(RF_CONFIG_FILE),
+            Some(&[1, 2, 3, 4, 5, 6, 7, 8, 9][..]),
+            "{name}: the target's RF config"
+        );
+        assert_eq!(n8.file(APPLICATION_VERSION_FILE_700), None, "{name}");
+        let back = convert(&to800, &target_700).unwrap_or_else(|e| panic!("{name} back: {e}"));
+        assert_eq!(back.len(), target_700.len(), "{name}");
+        let n7 = Nvm3::parse(&back).unwrap();
+        assert!(!n7.shared, "{name}");
+        assert_eq!(protocol(&n7), protocol(&src), "{name}: protocol files back");
+        assert_eq!(
+            NvmInfo::read(&back).unwrap().home_id,
+            NvmInfo::read(&image).unwrap().home_id,
+            "{name}"
+        );
+    }
+    assert!(seen >= 10, "fixtures missing");
+    let real_800 = read("ctrlr_backup_800_7.23.0");
+    assert!(convert(&real_800, &target_700)
+        .unwrap_err()
+        .contains("cannot be told"));
+    assert!(convert(&read("ctrlr_backup_700_7.19.1"), &real_800).is_err());
+}

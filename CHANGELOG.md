@@ -6,6 +6,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `zwave-host`: `nvm3::convert` turns a backup into an image for another
+  controller: 700 to 800 series and back, or another SDK of the same series,
+  repacking the backup's files in the target's layout with the target's
+  application version and RF configuration, as Z-Wave JS's `migrateNVM` does.
+  It refuses a protocol format newer than the target's SDK reads and images
+  whose format cannot be told. `Controller::restore_nvm` converts as needed.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

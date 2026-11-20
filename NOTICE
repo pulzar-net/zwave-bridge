@@ -33,6 +33,10 @@ The code is written for this project. Two data files come from elsewhere:
 - crates/zwave-security/tests/data/ctr_drbg_aes128_nodf.rsp: NIST CAVP
   CTR_DRBG test vectors (public domain).
 
+crates/zwave-host/src/nvm3.rs follows the NVM3 file IDs, volume layouts and
+migration rules that Z-Wave JS's nvmedit package (same author and license as
+above) documents in code; its tests read nvmedit's published backups.
+
 Z-Wave is a registered trademark of Silicon Labs and its subsidiaries. This
 project is not affiliated with or certified by the Z-Wave Alliance or
 Silicon Labs.

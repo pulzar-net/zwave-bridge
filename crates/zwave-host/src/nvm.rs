@@ -153,9 +153,9 @@ impl Controller {
 impl Controller {
     /// Writes a backup image back to the controller and restarts it.
     ///
-    /// The image must be from the same series and SDK as the controller's
-    /// current one (checked by reading both); a backup from another series
-    /// needs conversion. The controller restarts afterwards, so this
+    /// A backup from another series (700 or 800) or SDK is converted first
+    /// ([`crate::nvm3::convert`]); one whose protocol format is newer than
+    /// the controller reads is refused. The controller restarts afterwards, so this
     /// `Controller` must be dropped and a new one started.
     pub async fn restore_nvm(&self, image: &[u8]) -> Result<(), Error> {
         let caps = &self.inner.caps;
@@ -169,11 +169,9 @@ impl Controller {
             ));
         };
         let current = self.backup_nvm().await?;
-        let from = crate::nvm3::NvmInfo::read(image)
-            .map_err(|e| Error::Controller(format!("backup: {e}")))?;
-        let to = crate::nvm3::NvmInfo::read(&current)
-            .map_err(|e| Error::Controller(format!("controller: {e}")))?;
-        from.restorable_onto(&to).map_err(Error::Controller)?;
+        // Converted to this controller's series and SDK where they differ.
+        let image = crate::nvm3::convert(image, &current).map_err(Error::Controller)?;
+        let image = &image[..];
         let open = self.nvm_op(extended, nvm::OPEN, 0, 0).await?;
         if open.status != nvm::STATUS_OK {
             return Err(Error::Controller(format!(
