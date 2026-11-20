@@ -10,6 +10,11 @@ All notable changes are listed here. The project follows
   from a directory or an in-memory map; `Controller::configure` writes
   settings by parameter key, merging partial parameters. CI loads every file
   of the latest `@zwave-js/config` release.
+- Long Range: 16-bit node ids on the Serial API when the controller offers
+  them, the Long Range node list, SmartStart inclusion over Long Range,
+  separate Long Range S2 keys (Authenticated and Access Control only), no
+  routing information for Long Range nodes. `zwave-serial` builders and
+  frame encoders take the node id width (a breaking change).
 - `zwave-cc`: Firmware Update Meta Data (version 8).
 - `zwave-host`: `Controller::update_firmware`: CRC-checked fragments sized for
   the node's security, activation, Intel HEX images; progress events.

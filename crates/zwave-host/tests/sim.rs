@@ -27,6 +27,7 @@ fn sim() -> Simulator {
             ],
         ))
         .with_node(NodeSpec::smartstart_sensor("smartstart"))
+        .with_node(NodeSpec::long_range_sensor("lr"))
 }
 
 fn config(keys: NetworkKeys, dir: &std::path::Path) -> HostConfig {
@@ -485,4 +486,68 @@ async fn firmware_update_over_s2() {
         .await
         .unwrap();
     assert_eq!(fragments, 1000usize.div_ceil(28));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn long_range_smartstart_and_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let keys = NetworkKeys::generate().unwrap();
+    let (host, dev) = tokio::io::duplex(16 * 1024);
+    let h = sim().spawn(dev);
+    let (c, mut ev) = Controller::start(host, config(keys.clone(), dir.path()))
+        .await
+        .unwrap();
+    let spec = NodeSpec::long_range_sensor("x");
+    c.provision(Entry {
+        dsk: spec.dsk(),
+        granted: vec![
+            SecurityClass::S2Authenticated,
+            SecurityClass::S2Unauthenticated,
+        ],
+        status: Default::default(),
+        node_id: None,
+        name: None,
+    })
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(h.power_on("lr").await);
+    let (node, classes) = expect(&mut ev, "bootstrapped", |e| match e {
+        Event::SecurityBootstrapped { node, classes } => Some((*node, classes.clone())),
+        _ => None,
+    })
+    .await;
+    assert!(
+        zwave_host::is_long_range(node),
+        "node {node} has a Long Range id"
+    );
+    // Unauthenticated does not exist on Long Range, even if granted.
+    assert_eq!(classes, vec![SecurityClass::S2Authenticated]);
+    interviewed(&mut ev, node).await;
+    assert!(c.node(node).unwrap().neighbors.is_empty());
+    assert!(h.set_sensor("lr", 1, 19.5).await);
+    expect(&mut ev, "LR temperature", |e| {
+        matches!(e, Event::Value(u) if u.id.node == node && u.value == ValueKind::Number(19.5))
+            .then_some(())
+    })
+    .await;
+    c.flush().unwrap();
+    drop(c);
+    drop(ev);
+
+    let (host2, dev2) = tokio::io::duplex(16 * 1024);
+    h.attach(dev2).await;
+    let (c2, mut ev2) = Controller::start(host2, config(keys, dir.path()))
+        .await
+        .unwrap();
+    assert!(
+        c2.info().nodes.contains(&node),
+        "the Long Range node list is read at start"
+    );
+    assert!(h.set_sensor("lr", 1, 20.0).await);
+    expect(&mut ev2, "LR temperature after restart", |e| {
+        matches!(e, Event::Value(u) if u.id.node == node && u.value == ValueKind::Number(20.0))
+            .then_some(())
+    })
+    .await;
 }

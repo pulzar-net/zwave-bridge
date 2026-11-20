@@ -13,8 +13,9 @@ information and NVM backups.
 
 **Status: 0.1.0, pre-release.** The stack is tested end to end against a
 Serial API simulator in CI; it has not yet been run against a real stick.
-Long Range, NVM restore and conversion, and the Firmware Update command class
-are the next milestone. Not certified by the Z-Wave Alliance (see below).
+Z-Wave Long Range (SmartStart, 16-bit node ids, its own S2 keys) and
+firmware updates are in; NVM restore and conversion between controller
+series are in progress. Not certified by the Z-Wave Alliance (see below).
 
 ## Crates
 
@@ -31,7 +32,8 @@ Command classes in this release: Basic, Application Status, Binary Switch,
 Multilevel Switch, Binary Sensor, Multilevel Sensor, Meter, Z-Wave Plus Info,
 Device Reset Locally, CRC-16 Encapsulation, Transport Service, Multi Channel,
 Supervision, Configuration, Notification, Manufacturer Specific, Battery,
-Wake Up, Association, Version, Security 0 and Security 2.
+Wake Up, Association, Version, Firmware Update Meta Data, Security 0 and
+Security 2.
 
 ## Running the bridge
 

@@ -240,6 +240,10 @@ pub(crate) struct Inner {
     pub(crate) store: Mutex<StoreData>,
     pub(crate) runtime: Mutex<HashMap<NodeId, Runtime>>,
     pub(crate) s2: Mutex<S2Manager>,
+    /// S2 for Long Range nodes: its own keys, as Long Range requires.
+    pub(crate) s2_lr: Mutex<S2Manager>,
+    /// Bytes per node id on the Serial API: 1, or 2 once 16-bit ids are on.
+    pub(crate) nid: usize,
     pub(crate) s0: Mutex<S0Manager>,
     pub(crate) keypair: KeyPair,
     waiters: Mutex<Vec<Waiter>>,
@@ -311,11 +315,34 @@ impl Controller {
                 .payload,
         )
         .map_err(|e| Error::Controller(e.to_string()))?;
+        // 16-bit node ids where the controller offers them (needed for Long Range).
+        let mut nid = 1;
+        if caps.supports(F::SERIAL_API_SETUP) {
+            if let Ok(r) = api
+                .request(
+                    DataFrame::request(
+                        F::SERIAL_API_SETUP,
+                        vec![
+                            message::setup::SET_NODE_ID_TYPE,
+                            message::setup::NODE_ID_LONG,
+                        ],
+                    ),
+                    t,
+                )
+                .await
+            {
+                if r.payload.first() == Some(&message::setup::SET_NODE_ID_TYPE)
+                    && r.payload.get(1).is_some_and(|&b| b != 0)
+                {
+                    nid = 2;
+                }
+            }
+        }
         let id = ControllerId::parse(
             &api.request(DataFrame::request(F::GET_CONTROLLER_ID, vec![]), t)
                 .await?
                 .payload,
-            1,
+            nid,
         )
         .map_err(|e| Error::Controller(e.to_string()))?;
         let init = InitData::parse(
@@ -367,17 +394,19 @@ impl Controller {
                 // No SUC in the network: make the controller the SIS, as hosts do.
                 let r = api
                     .request(
-                        DataFrame::request(
-                            F::SET_SUC_NODE_ID,
-                            vec![id.node_id as u8, 0x01, 0x00, 0x01, 0x00],
-                        ),
+                        DataFrame::request(F::SET_SUC_NODE_ID, {
+                            let mut v = Vec::new();
+                            message::node_bytes(id.node_id, nid, &mut v);
+                            v.extend_from_slice(&[0x01, 0x00, 0x01, 0x00]);
+                            v
+                        }),
                         t,
                     )
                     .await?;
                 sis = r.payload.first() == Some(&1);
                 info!("controller made SIS: {sis}");
             } else {
-                sis = suc.payload.first() == Some(&(id.node_id as u8));
+                sis = message::parse_node_id(&suc.payload, nid) == Some(id.node_id);
             }
         }
 
@@ -399,12 +428,28 @@ impl Controller {
             }
         }
         data.home_id = Some(id.home_id);
-        let nodes: Vec<NodeId> = init
+        let mut nodes: Vec<NodeId> = init
             .nodes
             .iter()
             .copied()
             .filter(|&n| n != id.node_id)
             .collect();
+        if nid == 2 && caps.supports(F::GET_LONG_RANGE_NODES) {
+            for segment in 0..4u8 {
+                let r = api
+                    .request(
+                        DataFrame::request(F::GET_LONG_RANGE_NODES, vec![segment]),
+                        t,
+                    )
+                    .await?;
+                let (more, _, lr) = message::parse_long_range_nodes(&r.payload)
+                    .map_err(|e| Error::Controller(e.to_string()))?;
+                nodes.extend(lr);
+                if !more {
+                    break;
+                }
+            }
+        }
         data.nodes.retain(|n, _| nodes.contains(n));
         for &n in &nodes {
             data.nodes.entry(n).or_insert_with(|| NodeRecord::new(n));
@@ -414,9 +459,22 @@ impl Controller {
         for class in SecurityClass::HIGHEST_FIRST {
             s2.set_network_key(class, cfg.keys.key(class));
         }
+        let mut s2_lr = S2Manager::new(id.node_id, id.home_id);
+        for class in [
+            SecurityClass::S2AccessControl,
+            SecurityClass::S2Authenticated,
+        ] {
+            if let Some(k) = cfg.keys.long_range_key(class) {
+                s2_lr.set_network_key(class, k);
+            }
+        }
         for (n, r) in &data.nodes {
             if !r.security.is_empty() {
-                s2.set_peer_classes(*n, &r.security);
+                if crate::is_long_range(*n) {
+                    s2_lr.set_peer_classes(*n, &r.security);
+                } else {
+                    s2.set_peer_classes(*n, &r.security);
+                }
             }
         }
         let s0 = S0Manager::new(id.node_id, &cfg.keys.s0);
@@ -450,6 +508,8 @@ impl Controller {
             store: Mutex::new(data),
             runtime: Mutex::new(HashMap::new()),
             s2: Mutex::new(s2),
+            s2_lr: Mutex::new(s2_lr),
+            nid,
             s0: Mutex::new(s0),
             keypair,
             waiters: Mutex::new(Vec::new()),
@@ -773,17 +833,20 @@ impl Controller {
     async fn dispatch(self, mut rx: mpsc::Receiver<DataFrame>) {
         while let Some(f) = rx.recv().await {
             match F(f.function) {
-                F::APPLICATION_COMMAND_HANDLER => match ApplicationCommand::parse(&f.payload, 1) {
-                    Ok(ac) => self.on_application_command(ac).await,
-                    Err(e) => debug!("{e}"),
-                },
-                F::BRIDGE_APPLICATION_COMMAND_HANDLER => {
-                    match ApplicationCommand::parse_bridge(&f.payload, 1) {
+                F::APPLICATION_COMMAND_HANDLER => {
+                    match ApplicationCommand::parse(&f.payload, self.inner.nid) {
                         Ok(ac) => self.on_application_command(ac).await,
                         Err(e) => debug!("{e}"),
                     }
                 }
-                F::APPLICATION_UPDATE => match ApplicationUpdate::parse(&f.payload, 1) {
+                F::BRIDGE_APPLICATION_COMMAND_HANDLER => {
+                    match ApplicationCommand::parse_bridge(&f.payload, self.inner.nid) {
+                        Ok(ac) => self.on_application_command(ac).await,
+                        Err(e) => debug!("{e}"),
+                    }
+                }
+                F::APPLICATION_UPDATE => match ApplicationUpdate::parse(&f.payload, self.inner.nid)
+                {
                     Ok(u) => self.on_application_update(u).await,
                     Err(e) => debug!("{e}"),
                 },
@@ -821,9 +884,11 @@ impl Controller {
                     self.deliver(n, Inbound::NodeInfoFailed);
                 }
             }
-            ApplicationUpdate::SmartStartHomeIdReceived { nwi_home_id, .. } => {
-                self.on_smartstart_request(nwi_home_id)
-            }
+            ApplicationUpdate::SmartStartHomeIdReceived {
+                nwi_home_id,
+                long_range,
+                ..
+            } => self.on_smartstart_request(nwi_home_id, long_range),
             ApplicationUpdate::NodeRemoved { node } => self.forget_node(node),
             other => debug!("application update {other:?}"),
         }
@@ -839,7 +904,7 @@ impl Controller {
             .remove(&node)
             .is_some();
         self.inner.runtime.lock().expect("lock").remove(&node);
-        self.inner.s2.lock().expect("lock").forget_peer(node);
+        self.s2(node).lock().expect("lock").forget_peer(node);
         {
             let mut s = self.inner.store.lock().expect("store lock");
             for e in s.provisioning.entries().to_vec() {
@@ -927,8 +992,7 @@ impl Controller {
                 (0x9f, Some(0x01)) => {
                     // The node wants to send us something encrypted.
                     let report = self
-                        .inner
-                        .s2
+                        .s2(node)
                         .lock()
                         .expect("lock")
                         .nonce_report(node, false);
@@ -939,8 +1003,7 @@ impl Controller {
                 }
                 (0x9f, Some(0x02)) => {
                     let r = self
-                        .inner
-                        .s2
+                        .s2(node)
                         .lock()
                         .expect("lock")
                         .handle_nonce_report(node, &frame);
@@ -967,13 +1030,12 @@ impl Controller {
                 }
                 (0x9f, Some(0x03)) => {
                     let r = if ac.rx_status.multicast() {
-                        self.inner
-                            .s2
+                        self.s2(node)
                             .lock()
                             .expect("lock")
                             .decrypt_multicast(node, &frame)
                     } else {
-                        self.inner.s2.lock().expect("lock").decrypt(node, &frame)
+                        self.s2(node).lock().expect("lock").decrypt(node, &frame)
                     };
                     match r {
                         Ok(d) => {
@@ -985,7 +1047,7 @@ impl Controller {
                             debug!(node, "S2 decryption failed: {e}; asking for a resync");
                             let mos = ac.rx_status.multicast();
                             let report =
-                                self.inner.s2.lock().expect("lock").nonce_report(node, mos);
+                                self.s2(node).lock().expect("lock").nonce_report(node, mos);
                             if let Ok(r) = report {
                                 self.transmit_logged(node, r).await;
                             }
@@ -1253,7 +1315,17 @@ impl Controller {
         let api = &self.inner.api;
         let cb = api.next_callback_id();
         let req = Request::with_callback(
-            message::send_data(node, &frame, tx_options::DEFAULT, cb),
+            message::send_data(
+                node,
+                self.inner.nid,
+                &frame,
+                if crate::is_long_range(node) {
+                    tx_options::ACK
+                } else {
+                    tx_options::DEFAULT
+                },
+                cb,
+            ),
             Duration::from_secs(10),
             cb,
             Duration::from_secs(65),
@@ -1362,7 +1434,7 @@ impl Controller {
 
     async fn s2_encrypt(&self, node: NodeId, bytes: &[u8], key: KeyId) -> Result<Vec<u8>, Error> {
         for attempt in 0..3 {
-            let r = self.inner.s2.lock().expect("lock").encrypt(
+            let r = self.s2(node).lock().expect("lock").encrypt(
                 node,
                 bytes,
                 &EncryptOptions {
@@ -1375,8 +1447,7 @@ impl Controller {
                 Err(zwave_security::Error::NoSpan) if attempt < 2 => {
                     let (_g, rx) = self.wait_for(node, true, |i| matches!(i, Inbound::S2Nonce));
                     let get = self
-                        .inner
-                        .s2
+                        .s2(node)
                         .lock()
                         .expect("lock")
                         .nonce_get(node)
@@ -1729,7 +1800,7 @@ impl Controller {
             .inner
             .api
             .request(
-                DataFrame::request(F::GET_NODE_PROTOCOL_INFO, vec![node as u8]),
+                DataFrame::request(F::GET_NODE_PROTOCOL_INFO, self.node_payload(node)),
                 Duration::from_secs(2),
             )
             .await?;
@@ -1754,12 +1825,35 @@ impl Controller {
         })
     }
 
+    /// The S2 state for a node: Long Range nodes have their own keys.
+    pub(crate) fn s2(&self, node: NodeId) -> &Mutex<S2Manager> {
+        if crate::is_long_range(node) {
+            &self.inner.s2_lr
+        } else {
+            &self.inner.s2
+        }
+    }
+
+    /// A node id as the Serial API's payload expects it.
+    pub(crate) fn node_payload(&self, node: NodeId) -> Vec<u8> {
+        let mut v = Vec::with_capacity(2);
+        message::node_bytes(node, self.inner.nid, &mut v);
+        v
+    }
+
     /// Reads a node's neighbor table from the controller (no radio traffic).
+    /// Long Range nodes talk to the controller directly and have none.
     pub async fn refresh_neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, Error> {
+        if crate::is_long_range(node) {
+            return Ok(vec![]);
+        }
         let r = self
             .inner
             .api
-            .request(message::get_routing_info(node), Duration::from_secs(2))
+            .request(
+                message::get_routing_info(node, self.inner.nid),
+                Duration::from_secs(2),
+            )
             .await?;
         let n = message::parse_routing_info(&r.payload)
             .map_err(|e| Error::Controller(e.to_string()))?;

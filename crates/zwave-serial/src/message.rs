@@ -24,6 +24,20 @@ fn need(p: &[u8], n: usize, what: &'static str) -> Result<()> {
     }
 }
 
+/// Appends a node id as `len` bytes (1 classic, 2 when the Serial API uses 16-bit node ids).
+pub fn node_bytes(node: NodeId, len: usize, out: &mut Vec<u8>) {
+    if len == 2 {
+        out.extend_from_slice(&node.to_be_bytes());
+    } else {
+        out.push(node as u8);
+    }
+}
+
+/// The node id at the start of a payload, `len` bytes wide.
+pub fn parse_node_id(p: &[u8], len: usize) -> Option<NodeId> {
+    node_id(p, 0, len, "node id").ok()
+}
+
 /// Reads a node id of `len` bytes (1 classic, 2 Long Range) at `at`.
 fn node_id(p: &[u8], at: usize, len: usize, what: &'static str) -> Result<NodeId> {
     need(p, at + len, what)?;
@@ -283,10 +297,10 @@ impl ControllerId {
         })
     }
 
-    /// Encodes the payload (simulators, classic node ids).
-    pub fn encode(&self) -> Vec<u8> {
+    /// Encodes the payload (simulators).
+    pub fn encode(&self, node_id_len: usize) -> Vec<u8> {
         let mut v = self.home_id.to_be_bytes().to_vec();
-        v.push(self.node_id as u8);
+        node_bytes(self.node_id, node_id_len, &mut v);
         v
     }
 }
@@ -515,13 +529,11 @@ impl ApplicationCommand {
         })
     }
 
-    /// Encodes as an `APPLICATION_COMMAND_HANDLER` request frame (simulators, classic ids).
-    pub fn to_frame(&self) -> DataFrame {
-        let mut v = vec![
-            self.rx_status.0,
-            self.source as u8,
-            self.command.len() as u8,
-        ];
+    /// Encodes as an `APPLICATION_COMMAND_HANDLER` request frame (simulators).
+    pub fn to_frame(&self, node_id_len: usize) -> DataFrame {
+        let mut v = vec![self.rx_status.0];
+        node_bytes(self.source, node_id_len, &mut v);
+        v.push(self.command.len() as u8);
         v.extend_from_slice(&self.command);
         if let Some(r) = self.rssi {
             v.push(r as u8);
@@ -626,37 +638,66 @@ impl ApplicationUpdate {
         })
     }
 
-    /// Encodes as a request frame (simulators, classic ids).
-    pub fn to_frame(&self) -> DataFrame {
+    /// Encodes as a request frame (simulators).
+    pub fn to_frame(&self, node_id_len: usize) -> DataFrame {
+        let zero = |kind: u8| {
+            let mut v = vec![kind];
+            node_bytes(0, node_id_len, &mut v);
+            v
+        };
         let p = match self {
             ApplicationUpdate::NodeInfoReceived { node, info } => {
                 let body = info.encode();
-                let mut v = vec![0x84, *node as u8, body.len() as u8];
+                let mut v = vec![0x84];
+                node_bytes(*node, node_id_len, &mut v);
+                v.push(body.len() as u8);
                 v.extend_from_slice(&body);
                 v
             }
-            ApplicationUpdate::NodeInfoRequestFailed => vec![0x81, 0, 0],
+            ApplicationUpdate::NodeInfoRequestFailed => {
+                let mut v = zero(0x81);
+                v.push(0);
+                v
+            }
             ApplicationUpdate::SmartStartHomeIdReceived {
                 nwi_home_id,
                 long_range,
                 info,
             } => {
                 let body = info.encode();
-                let mut v = vec![if *long_range { 0x87 } else { 0x85 }, 0, 0];
+                let mut v = zero(if *long_range { 0x87 } else { 0x85 });
+                v.push(0);
                 v.extend_from_slice(nwi_home_id);
                 v.push(body.len().saturating_sub(3) as u8);
                 v.extend_from_slice(&body);
                 v
             }
             ApplicationUpdate::SmartStartIncludedNodeInfo { nwi_home_id } => {
-                let mut v = vec![0x86, 0, 0];
+                let mut v = zero(0x86);
+                v.push(0);
                 v.extend_from_slice(nwi_home_id);
                 v
             }
-            ApplicationUpdate::NodeAdded { node } => vec![0x40, *node as u8, 0],
-            ApplicationUpdate::NodeRemoved { node } => vec![0x20, *node as u8, 0],
-            ApplicationUpdate::SucIdChanged => vec![0x10, 0, 0],
-            ApplicationUpdate::Other { kind } => vec![*kind, 0, 0],
+            ApplicationUpdate::NodeAdded { node } | ApplicationUpdate::NodeRemoved { node } => {
+                let mut v = vec![if matches!(self, ApplicationUpdate::NodeAdded { .. }) {
+                    0x40
+                } else {
+                    0x20
+                }];
+                node_bytes(*node, node_id_len, &mut v);
+                v.push(0);
+                v
+            }
+            ApplicationUpdate::SucIdChanged => {
+                let mut v = zero(0x10);
+                v.push(0);
+                v
+            }
+            ApplicationUpdate::Other { kind } => {
+                let mut v = zero(*kind);
+                v.push(0);
+                v
+            }
         };
         DataFrame::request(F::APPLICATION_UPDATE, p)
     }
@@ -820,10 +861,16 @@ pub mod tx_options {
     pub const DEFAULT: u8 = ACK | AUTO_ROUTE | EXPLORE;
 }
 
-/// Builds a SendData request (classic node ids).
-pub fn send_data(node: NodeId, command: &[u8], options: u8, callback_id: u8) -> DataFrame {
-    let mut v = Vec::with_capacity(command.len() + 4);
-    v.push(node as u8);
+/// Builds a SendData request with node ids of `node_id_len` bytes.
+pub fn send_data(
+    node: NodeId,
+    node_id_len: usize,
+    command: &[u8],
+    options: u8,
+    callback_id: u8,
+) -> DataFrame {
+    let mut v = Vec::with_capacity(command.len() + 5);
+    node_bytes(node, node_id_len, &mut v);
     v.push(command.len() as u8);
     v.extend_from_slice(command);
     v.push(options);
@@ -843,6 +890,8 @@ pub mod add_mode {
     pub const SMART_START_LISTEN: u8 = 0x09;
     /// Transmit at full power.
     pub const HIGH_POWER: u8 = 0x80;
+    /// Include over Z-Wave Long Range (SmartStart).
+    pub const PROTOCOL_LONG_RANGE: u8 = 0x20;
     /// Network-wide inclusion (explorer frames).
     pub const NETWORK_WIDE: u8 = 0x40;
 }
@@ -912,23 +961,25 @@ impl AddNodeStatus {
         })
     }
 
-    /// Encodes as a callback frame (simulators, classic ids).
-    pub fn to_frame(&self, callback_id: u8) -> DataFrame {
-        let with_info = |status: u8, node: NodeId, info: &NodeInfo| {
-            let body = info.encode();
-            let mut v = vec![callback_id, status, node as u8, body.len() as u8];
+    /// Encodes as a callback frame (simulators).
+    pub fn to_frame(&self, callback_id: u8, node_id_len: usize) -> DataFrame {
+        let with_info = |status: u8, node: NodeId, info: Option<&NodeInfo>| {
+            let body = info.map(NodeInfo::encode).unwrap_or_default();
+            let mut v = vec![callback_id, status];
+            node_bytes(node, node_id_len, &mut v);
+            v.push(body.len() as u8);
             v.extend_from_slice(&body);
             v
         };
         let p = match self {
-            AddNodeStatus::Ready => vec![callback_id, 0x01, 0, 0],
-            AddNodeStatus::NodeFound => vec![callback_id, 0x02, 0, 0],
-            AddNodeStatus::AddingEndNode { node, info } => with_info(0x03, *node, info),
-            AddNodeStatus::AddingController { node, info } => with_info(0x04, *node, info),
-            AddNodeStatus::ProtocolDone => vec![callback_id, 0x05, 0, 0],
-            AddNodeStatus::Done { node } => vec![callback_id, 0x06, *node as u8, 0],
-            AddNodeStatus::Failed => vec![callback_id, 0x07, 0, 0],
-            AddNodeStatus::Other(o) => vec![callback_id, *o, 0, 0],
+            AddNodeStatus::Ready => with_info(0x01, 0, None),
+            AddNodeStatus::NodeFound => with_info(0x02, 0, None),
+            AddNodeStatus::AddingEndNode { node, info } => with_info(0x03, *node, Some(info)),
+            AddNodeStatus::AddingController { node, info } => with_info(0x04, *node, Some(info)),
+            AddNodeStatus::ProtocolDone => with_info(0x05, 0, None),
+            AddNodeStatus::Done { node } => with_info(0x06, *node, None),
+            AddNodeStatus::Failed => with_info(0x07, 0, None),
+            AddNodeStatus::Other(o) => with_info(*o, 0, None),
         };
         DataFrame::request(F::ADD_NODE_TO_NETWORK, p)
     }
@@ -979,7 +1030,7 @@ impl RemoveNodeStatus {
     }
 
     /// Encodes as a callback frame (simulators).
-    pub fn to_frame(&self, callback_id: u8) -> DataFrame {
+    pub fn to_frame(&self, callback_id: u8, node_id_len: usize) -> DataFrame {
         let (s, n) = match *self {
             RemoveNodeStatus::Ready => (0x01, 0),
             RemoveNodeStatus::NodeFound => (0x02, 0),
@@ -989,10 +1040,10 @@ impl RemoveNodeStatus {
             RemoveNodeStatus::Failed => (0x07, 0),
             RemoveNodeStatus::Other(o) => (o, 0),
         };
-        DataFrame::request(
-            F::REMOVE_NODE_FROM_NETWORK,
-            vec![callback_id, s, n as u8, 0],
-        )
+        let mut v = vec![callback_id, s];
+        node_bytes(n, node_id_len, &mut v);
+        v.push(0);
+        DataFrame::request(F::REMOVE_NODE_FROM_NETWORK, v)
     }
 }
 
@@ -1008,6 +1059,10 @@ pub mod setup {
     pub const SET_RF_REGION: u8 = 0x40;
     /// Set 8- or 16-bit node ids on the Serial API.
     pub const SET_NODE_ID_TYPE: u8 = 0x80;
+    /// Node ids are one byte.
+    pub const NODE_ID_SHORT: u8 = 0x01;
+    /// Node ids are two bytes (needed for Long Range).
+    pub const NODE_ID_LONG: u8 = 0x02;
 }
 
 /// An RF region.
@@ -1088,8 +1143,38 @@ pub fn parse_routing_info(p: &[u8]) -> Result<Vec<NodeId>> {
 }
 
 /// Builds a `GET_ROUTING_INFO` request.
-pub fn get_routing_info(node: NodeId) -> DataFrame {
-    DataFrame::request(F::GET_ROUTING_INFO, vec![node as u8, 0, 0, 0])
+pub fn get_routing_info(node: NodeId, node_id_len: usize) -> DataFrame {
+    let mut v = Vec::with_capacity(5);
+    node_bytes(node, node_id_len, &mut v);
+    v.extend_from_slice(&[0, 0, 0]);
+    DataFrame::request(F::GET_ROUTING_INFO, v)
+}
+
+/// Long Range nodes per `GET_LONG_RANGE_NODES` segment (128 bytes of mask).
+pub const LONG_RANGE_NODES_PER_SEGMENT: u16 = 1024;
+
+/// A `GET_LONG_RANGE_NODES` response: more segments follow, the segment, and its nodes.
+pub fn parse_long_range_nodes(p: &[u8]) -> Result<(bool, u8, Vec<NodeId>)> {
+    need(p, 3, "long range nodes")?;
+    let segment = p[1];
+    let len = usize::from(p[2]).min(p.len() - 3).min(128);
+    let first = 256 + LONG_RANGE_NODES_PER_SEGMENT * NodeId::from(segment);
+    Ok((p[0] != 0, segment, parse_node_mask(&p[3..3 + len], first)))
+}
+
+/// Encodes a `GET_LONG_RANGE_NODES` response (simulators).
+pub fn encode_long_range_nodes(more: bool, segment: u8, nodes: &[NodeId]) -> Vec<u8> {
+    let first = 256 + LONG_RANGE_NODES_PER_SEGMENT * NodeId::from(segment);
+    let mut mask = vec![0u8; 128];
+    for &n in nodes {
+        if n >= first && n < first + LONG_RANGE_NODES_PER_SEGMENT {
+            let i = usize::from(n - first);
+            mask[i / 8] |= 1 << (i % 8);
+        }
+    }
+    let mut v = vec![u8::from(more), segment, 128];
+    v.extend_from_slice(&mask);
+    v
 }
 
 /// NVM backup subcommands (`NVM_OPERATIONS`, `EXTENDED_NVM_OPERATIONS`).
@@ -1239,7 +1324,7 @@ mod tests {
             command: vec![0x31, 0x05, 0x01, 0x22, 0x00, 0xe1],
             rssi: Some(-60),
         };
-        let f = a.to_frame();
+        let f = a.to_frame(1);
         assert_eq!(ApplicationCommand::parse(&f.payload, 1).unwrap(), a);
         // Length byte beyond the payload.
         assert!(ApplicationCommand::parse(&[0, 4, 9, 0x20], 1).is_err());
@@ -1284,7 +1369,10 @@ mod tests {
             controlled: vec![],
         };
         let s = AddNodeStatus::AddingEndNode { node: 7, info };
-        assert_eq!(AddNodeStatus::parse(&s.to_frame(3).payload, 1).unwrap(), s);
+        assert_eq!(
+            AddNodeStatus::parse(&s.to_frame(3, 1).payload, 1).unwrap(),
+            s
+        );
         assert_eq!(
             AddNodeStatus::parse(&[3, 6, 7, 0], 1).unwrap(),
             AddNodeStatus::Done { node: 7 }
@@ -1305,7 +1393,7 @@ mod tests {
             info: info.clone(),
         };
         assert_eq!(
-            ApplicationUpdate::parse(&u.to_frame().payload, 1).unwrap(),
+            ApplicationUpdate::parse(&u.to_frame(1).payload, 1).unwrap(),
             u
         );
         let s = ApplicationUpdate::SmartStartHomeIdReceived {
@@ -1314,7 +1402,7 @@ mod tests {
             info,
         };
         assert_eq!(
-            ApplicationUpdate::parse(&s.to_frame().payload, 1).unwrap(),
+            ApplicationUpdate::parse(&s.to_frame(1).payload, 1).unwrap(),
             s
         );
     }

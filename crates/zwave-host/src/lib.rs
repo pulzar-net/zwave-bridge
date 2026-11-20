@@ -44,6 +44,11 @@ pub use zwave_serial::NodeId;
 
 use zwave_security::provisioning::Entry as ProvisioningEntry;
 
+/// Whether a node id is a Long Range node (256 and up).
+pub fn is_long_range(node: NodeId) -> bool {
+    node > 255
+}
+
 /// The network keys and the controller's long-term S2 key pair.
 ///
 /// Generate them once per network with [`NetworkKeys::generate`] and keep
@@ -65,6 +70,12 @@ pub struct NetworkKeys {
     /// The controller's Curve25519 private key for S2 key exchange.
     #[serde(with = "hex_key")]
     pub ecdh_private: [u8; 32],
+    /// Long Range S2 Authenticated (Long Range nodes use their own keys).
+    #[serde(default, with = "hex_key_opt", skip_serializing_if = "Option::is_none")]
+    pub lr_s2_authenticated: Option<[u8; 16]>,
+    /// Long Range S2 Access Control.
+    #[serde(default, with = "hex_key_opt", skip_serializing_if = "Option::is_none")]
+    pub lr_s2_access_control: Option<[u8; 16]>,
 }
 
 impl std::fmt::Debug for NetworkKeys {
@@ -83,7 +94,32 @@ impl NetworkKeys {
             s2_authenticated: random_bytes()?,
             s2_access_control: random_bytes()?,
             ecdh_private: random_bytes()?,
+            lr_s2_authenticated: Some(random_bytes()?),
+            lr_s2_access_control: Some(random_bytes()?),
         })
+    }
+
+    /// Adds the Long Range keys to keys made before they existed; true if any was added.
+    pub fn fill_long_range(&mut self) -> Result<bool, zwave_security::Error> {
+        let mut added = false;
+        if self.lr_s2_authenticated.is_none() {
+            self.lr_s2_authenticated = Some(zwave_security::random_bytes()?);
+            added = true;
+        }
+        if self.lr_s2_access_control.is_none() {
+            self.lr_s2_access_control = Some(zwave_security::random_bytes()?);
+            added = true;
+        }
+        Ok(added)
+    }
+
+    /// The Long Range key for a class (only the two authenticated S2 classes exist on Long Range).
+    pub fn long_range_key(&self, class: SecurityClass) -> Option<&[u8; 16]> {
+        match class {
+            SecurityClass::S2Authenticated => self.lr_s2_authenticated.as_ref(),
+            SecurityClass::S2AccessControl => self.lr_s2_access_control.as_ref(),
+            _ => None,
+        }
     }
 
     /// The key for a class.
@@ -100,6 +136,30 @@ impl NetworkKeys {
     pub fn controller_dsk(&self) -> zwave_security::dsk::Dsk {
         let kp = zwave_security::kex::KeyPair::from_private(self.ecdh_private);
         zwave_security::dsk::Dsk::from_public_key(kp.public())
+    }
+}
+
+mod hex_key_opt {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(k: &Option<[u8; 16]>, s: S) -> Result<S::Ok, S::Error> {
+        match k {
+            Some(k) => s.serialize_str(&hex::encode(k)),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<[u8; 16]>, D::Error> {
+        let s: Option<String> = Option::deserialize(d)?;
+        match s {
+            None => Ok(None),
+            Some(s) => {
+                let v = hex::decode(s.trim()).map_err(serde::de::Error::custom)?;
+                v.try_into()
+                    .map(Some)
+                    .map_err(|_| serde::de::Error::custom("expected 16 bytes"))
+            }
+        }
     }
 }
 

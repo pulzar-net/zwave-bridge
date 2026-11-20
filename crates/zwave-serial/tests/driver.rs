@@ -165,7 +165,7 @@ async fn callback_and_unsolicited() {
     });
     let ex = api
         .execute(Request::with_callback(
-            zwave_serial::message::send_data(2, &[0x20, 0x02], 0x25, cb),
+            zwave_serial::message::send_data(2, 1, &[0x20, 0x02], 0x25, cb),
             Duration::from_secs(1),
             cb,
             Duration::from_secs(2),
@@ -193,7 +193,7 @@ async fn refused_request_skips_callback() {
     });
     let ex = api
         .execute(Request::with_callback(
-            zwave_serial::message::send_data(2, &[0x20, 0x02], 0x25, 9),
+            zwave_serial::message::send_data(2, 1, &[0x20, 0x02], 0x25, 9),
             Duration::from_secs(1),
             9,
             Duration::from_secs(5),

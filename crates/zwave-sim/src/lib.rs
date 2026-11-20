@@ -46,6 +46,8 @@ pub struct SimConfig {
     pub nvm_size: usize,
     /// Pause between frames the simulator sends, so a host reads them one by one.
     pub frame_gap: Duration,
+    /// Accept 16-bit node ids (and so Long Range), as 700 and 800 series sticks with Long Range do.
+    pub long_range: bool,
 }
 
 impl Default for SimConfig {
@@ -54,16 +56,25 @@ impl Default for SimConfig {
             home_id: 0xc0ff_ee01,
             nvm_size: 4096,
             frame_gap: Duration::from_millis(2),
+            long_range: true,
         }
     }
 }
 
 enum Mode {
     Idle,
-    Adding { cb: u8 },
-    AddingDsk { cb: u8, nwi: [u8; 4] },
+    Adding {
+        cb: u8,
+    },
+    AddingDsk {
+        cb: u8,
+        nwi: [u8; 4],
+        long_range: bool,
+    },
     Listening,
-    Removing { cb: u8 },
+    Removing {
+        cb: u8,
+    },
 }
 
 type Inspector = Box<dyn FnOnce(Option<&SimNode>) + Send>;
@@ -92,6 +103,9 @@ pub struct Simulator {
     suc: u16,
     nvm: Vec<u8>,
     last_added: u16,
+    /// Bytes per node id on the Serial API (2 after SetNodeIDType Long).
+    nid: usize,
+    next_lr_id: u16,
 }
 
 /// Controls a running simulator.
@@ -112,6 +126,8 @@ impl Simulator {
             suc: 0,
             nvm,
             last_added: 0,
+            nid: 1,
+            next_lr_id: 256,
         }
     }
 
@@ -195,7 +211,7 @@ impl Simulator {
         }
     }
 
-    fn app_frames(id: u16, frames: Vec<Vec<u8>>) -> Vec<DataFrame> {
+    fn app_frames(&self, id: u16, frames: Vec<Vec<u8>>) -> Vec<DataFrame> {
         frames
             .into_iter()
             .map(|c| {
@@ -206,7 +222,7 @@ impl Simulator {
                     command: c,
                     rssi: Some(-58),
                 }
-                .to_frame()
+                .to_frame(self.nid)
             })
             .collect()
     }
@@ -230,13 +246,14 @@ impl Simulator {
                 }
                 let nwi = n.spec.dsk().nwi_home_id();
                 let info = n.spec.nif();
+                let long_range = n.spec.long_range;
                 let _ = reply.send(true);
                 vec![ApplicationUpdate::SmartStartHomeIdReceived {
                     nwi_home_id: nwi,
-                    long_range: false,
+                    long_range,
                     info,
                 }
-                .to_frame()]
+                .to_frame(self.nid)]
             }
             Cmd::Wake(name, reply) => {
                 let Some(n) = self.by_name(&name) else {
@@ -249,7 +266,7 @@ impl Simulator {
                 };
                 let f = n.wake();
                 let _ = reply.send(true);
-                Self::app_frames(id, f)
+                self.app_frames(id, f)
             }
             Cmd::SetSensor(name, t, v, reply) => {
                 let Some(n) = self.by_name(&name) else {
@@ -265,7 +282,7 @@ impl Simulator {
                 let _ = reply.send(ok);
                 if ok {
                     let f = n.unsolicited(r);
-                    Self::app_frames(id, f)
+                    self.app_frames(id, f)
                 } else {
                     vec![]
                 }
@@ -293,7 +310,7 @@ impl Simulator {
                 .into();
                 let _ = reply.send(true);
                 let f = n.unsolicited(r);
-                Self::app_frames(id, f)
+                self.app_frames(id, f)
             }
             Cmd::Inspect(name, f) => {
                 f(self.nodes.iter().find(|n| n.spec.name == name));
@@ -325,9 +342,9 @@ impl Simulator {
                 self.mode = Mode::Idle;
                 (
                     vec![
-                        AddNodeStatus::NodeFound.to_frame(cb),
-                        AddNodeStatus::AddingEndNode { node: next, info }.to_frame(cb),
-                        AddNodeStatus::ProtocolDone.to_frame(cb),
+                        AddNodeStatus::NodeFound.to_frame(cb, self.nid),
+                        AddNodeStatus::AddingEndNode { node: next, info }.to_frame(cb, self.nid),
+                        AddNodeStatus::ProtocolDone.to_frame(cb, self.nid),
                     ],
                     Some(next),
                 )
@@ -341,9 +358,9 @@ impl Simulator {
                 self.mode = Mode::Idle;
                 (
                     vec![
-                        RemoveNodeStatus::NodeFound.to_frame(cb),
-                        RemoveNodeStatus::RemovingEndNode { node: id }.to_frame(cb),
-                        RemoveNodeStatus::Done { node: id }.to_frame(cb),
+                        RemoveNodeStatus::NodeFound.to_frame(cb, self.nid),
+                        RemoveNodeStatus::RemovingEndNode { node: id }.to_frame(cb, self.nid),
+                        RemoveNodeStatus::Done { node: id }.to_frame(cb, self.nid),
                     ],
                     Some(id),
                 )
@@ -383,6 +400,7 @@ impl Simulator {
                     F::REMOVE_FAILED_NODE,
                     F::GET_ROUTING_INFO,
                     F::EXTENDED_NVM_OPERATIONS,
+                    F::GET_LONG_RANGE_NODES,
                 ]);
                 let c = SerialApiCapabilities {
                     firmware_major: 7,
@@ -408,11 +426,11 @@ impl Simulator {
                     home_id: home,
                     node_id: 1,
                 }
-                .encode(),
+                .encode(self.nid),
             )],
             F::GET_INIT_DATA => {
                 let mut nodes = vec![1];
-                nodes.extend(self.included());
+                nodes.extend(self.included().into_iter().filter(|&n| n <= 255));
                 let caps = if self.suc == 1 { 0x08 } else { 0 };
                 vec![Self::response(
                     F::GET_INIT_DATA,
@@ -431,16 +449,33 @@ impl Simulator {
             }
             F::SERIAL_API_SETUP => match p.first() {
                 Some(&0x02) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x02, 0x01])],
-                Some(&0x20) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x20, 0x01])],
+                // USA Long Range.
+                Some(&0x20) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x20, 0x09])],
+                Some(&0x80) if self.cfg.long_range => {
+                    self.nid = if p.get(1) == Some(&0x02) { 2 } else { 1 };
+                    vec![Self::response(F::SERIAL_API_SETUP, vec![0x80, 0x01])]
+                }
                 _ => vec![Self::response(F::SERIAL_API_SETUP, vec![0x00])],
             },
-            F::GET_SUC_NODE_ID => vec![Self::response(F::GET_SUC_NODE_ID, vec![self.suc as u8])],
+            F::GET_SUC_NODE_ID => {
+                let mut v = Vec::new();
+                zwave_serial::message::node_bytes(self.suc, self.nid, &mut v);
+                vec![Self::response(F::GET_SUC_NODE_ID, v)]
+            }
+            F::GET_LONG_RANGE_NODES => {
+                let lr: Vec<u16> = self.included().into_iter().filter(|&n| n > 255).collect();
+                let seg = p.first().copied().unwrap_or(0);
+                vec![Self::response(
+                    F::GET_LONG_RANGE_NODES,
+                    zwave_serial::message::encode_long_range_nodes(false, seg, &lr),
+                )]
+            }
             F::SET_SUC_NODE_ID => {
-                self.suc = u16::from(p.first().copied().unwrap_or(0));
+                self.suc = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
                 vec![Self::response(F::SET_SUC_NODE_ID, vec![0x01])]
             }
             F::GET_NODE_PROTOCOL_INFO => {
-                let id = u16::from(p.first().copied().unwrap_or(0));
+                let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
                 let info = self
                     .node_mut(id)
                     .map(|n| n.spec.protocol_info().encode())
@@ -448,7 +483,7 @@ impl Simulator {
                 vec![Self::response(F::GET_NODE_PROTOCOL_INFO, info)]
             }
             F::GET_ROUTING_INFO => {
-                let id = u16::from(p.first().copied().unwrap_or(0));
+                let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
                 let mut neighbors: Vec<u16> = vec![1];
                 neighbors.extend(
                     self.nodes
@@ -463,7 +498,7 @@ impl Simulator {
                 )]
             }
             F::REQUEST_NODE_INFO => {
-                let id = u16::from(p.first().copied().unwrap_or(0));
+                let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
                 let mut out = vec![Self::response(F::REQUEST_NODE_INFO, vec![0x01])];
                 match self.node_mut(id) {
                     Some(n) if n.reachable() => out.push(
@@ -471,9 +506,9 @@ impl Simulator {
                             node: id,
                             info: n.spec.nif(),
                         }
-                        .to_frame(),
+                        .to_frame(self.nid),
                     ),
-                    _ => out.push(ApplicationUpdate::NodeInfoRequestFailed.to_frame()),
+                    _ => out.push(ApplicationUpdate::NodeInfoRequestFailed.to_frame(self.nid)),
                 }
                 out
             }
@@ -484,7 +519,7 @@ impl Simulator {
                 match mode {
                     add_mode::ANY => {
                         self.mode = Mode::Adding { cb };
-                        vec![AddNodeStatus::Ready.to_frame(cb)]
+                        vec![AddNodeStatus::Ready.to_frame(cb, self.nid)]
                     }
                     add_mode::SMART_START_LISTEN => {
                         self.mode = Mode::Listening;
@@ -495,7 +530,14 @@ impl Simulator {
                             .get(2..6)
                             .and_then(|s| s.try_into().ok())
                             .unwrap_or([0; 4]);
-                        self.mode = Mode::AddingDsk { cb, nwi };
+                        let long_range = p
+                            .first()
+                            .is_some_and(|f| f & add_mode::PROTOCOL_LONG_RANGE != 0);
+                        self.mode = Mode::AddingDsk {
+                            cb,
+                            nwi,
+                            long_range,
+                        };
                         self.include_smartstart()
                     }
                     add_mode::STOP => {
@@ -505,7 +547,7 @@ impl Simulator {
                             vec![AddNodeStatus::Done {
                                 node: self.last_added,
                             }
-                            .to_frame(cb)]
+                            .to_frame(cb, self.nid)]
                         } else {
                             vec![]
                         }
@@ -519,7 +561,7 @@ impl Simulator {
                 match mode {
                     add_mode::ANY => {
                         self.mode = Mode::Removing { cb };
-                        vec![RemoveNodeStatus::Ready.to_frame(cb)]
+                        vec![RemoveNodeStatus::Ready.to_frame(cb, self.nid)]
                     }
                     _ => {
                         self.mode = Mode::Idle;
@@ -528,8 +570,8 @@ impl Simulator {
                 }
             }
             F::REMOVE_FAILED_NODE => {
-                let id = u16::from(p.first().copied().unwrap_or(0));
-                let cb = p.get(1).copied().unwrap_or(0);
+                let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
+                let cb = p.get(self.nid).copied().unwrap_or(0);
                 let failed = self.node_mut(id).map(|n| !n.reachable()).unwrap_or(true);
                 let mut out = vec![Self::response(F::REMOVE_FAILED_NODE, vec![0x00])];
                 if failed {
@@ -585,38 +627,57 @@ impl Simulator {
     }
 
     fn include_smartstart(&mut self) -> Vec<DataFrame> {
-        let Mode::AddingDsk { cb, nwi } = self.mode else {
+        let Mode::AddingDsk {
+            cb,
+            nwi,
+            long_range,
+        } = self.mode
+        else {
             return vec![];
         };
-        let next = self.next_id;
+        // A Long Range node only joins over Long Range, with a 16-bit id.
+        if long_range && self.nid != 2 {
+            return vec![AddNodeStatus::Failed.to_frame(cb, self.nid)];
+        }
+        let next = if long_range {
+            self.next_lr_id
+        } else {
+            self.next_id
+        };
         let home = self.cfg.home_id;
-        let Some(n) = self
-            .nodes
-            .iter_mut()
-            .find(|n| n.spec.smartstart && n.id.is_none() && n.spec.dsk().nwi_home_id() == nwi)
-        else {
-            return vec![AddNodeStatus::Failed.to_frame(cb)];
+        let Some(n) = self.nodes.iter_mut().find(|n| {
+            n.spec.smartstart
+                && n.spec.long_range == long_range
+                && n.id.is_none()
+                && n.spec.dsk().nwi_home_id() == nwi
+        }) else {
+            return vec![AddNodeStatus::Failed.to_frame(cb, self.nid)];
         };
         n.join(next, home);
         let info = n.spec.nif();
-        self.next_id += 1;
+        if long_range {
+            self.next_lr_id += 1;
+        } else {
+            self.next_id += 1;
+        }
         self.last_added = next;
         self.mode = Mode::Idle;
         vec![
-            AddNodeStatus::Ready.to_frame(cb),
-            AddNodeStatus::NodeFound.to_frame(cb),
-            AddNodeStatus::AddingEndNode { node: next, info }.to_frame(cb),
-            AddNodeStatus::ProtocolDone.to_frame(cb),
+            AddNodeStatus::Ready.to_frame(cb, self.nid),
+            AddNodeStatus::NodeFound.to_frame(cb, self.nid),
+            AddNodeStatus::AddingEndNode { node: next, info }.to_frame(cb, self.nid),
+            AddNodeStatus::ProtocolDone.to_frame(cb, self.nid),
         ]
     }
 
     fn send_data(&mut self, p: &[u8]) -> Vec<DataFrame> {
-        let id = u16::from(p.first().copied().unwrap_or(0));
-        let len = usize::from(p.get(1).copied().unwrap_or(0));
-        let Some(data) = p.get(2..2 + len).map(<[u8]>::to_vec) else {
+        let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);
+        let at = self.nid;
+        let len = usize::from(p.get(at).copied().unwrap_or(0));
+        let Some(data) = p.get(at + 1..at + 1 + len).map(<[u8]>::to_vec) else {
             return vec![Self::response(F::SEND_DATA, vec![0x00])];
         };
-        let cb = p.get(3 + len).copied().unwrap_or(0);
+        let cb = p.get(at + 2 + len).copied().unwrap_or(0);
         let mut out = vec![Self::response(F::SEND_DATA, vec![0x01])];
         let reply = match self.node_mut(id) {
             Some(n) if n.reachable() => Some(n.receive(&data)),
@@ -642,7 +703,7 @@ impl Simulator {
             out.push(DataFrame::request(F::SEND_DATA, cbp));
         }
         if let Some(frames) = reply {
-            out.extend(Self::app_frames(id, frames));
+            out.extend(self.app_frames(id, frames));
         }
         out
     }

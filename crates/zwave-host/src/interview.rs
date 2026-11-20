@@ -131,7 +131,7 @@ impl Controller {
             .inner
             .api
             .request(
-                DataFrame::request(F::REQUEST_NODE_INFO, vec![node as u8]),
+                DataFrame::request(F::REQUEST_NODE_INFO, self.node_payload(node)),
                 Duration::from_secs(2),
             )
             .await?;

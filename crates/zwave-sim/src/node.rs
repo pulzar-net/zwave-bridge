@@ -36,6 +36,8 @@ pub struct NodeSpec {
     pub security: Security,
     /// Joins by SmartStart instead of a button press.
     pub smartstart: bool,
+    /// A Z-Wave Long Range node (SmartStart only, 16-bit node id).
+    pub long_range: bool,
     /// Generic device class.
     pub generic: u8,
     /// Specific device class.
@@ -58,6 +60,7 @@ impl NodeSpec {
             listening: true,
             security: Security::None,
             smartstart: false,
+            long_range: false,
             generic: 0x10,
             specific: 0x01,
             ccs: vec![
@@ -85,6 +88,7 @@ impl NodeSpec {
             listening: false,
             security: Security::S0,
             smartstart: false,
+            long_range: false,
             generic: 0x21,
             specific: 0x01,
             ccs: vec![
@@ -110,6 +114,7 @@ impl NodeSpec {
             listening: true,
             security: Security::S2(requested),
             smartstart: false,
+            long_range: false,
             generic: 0x21,
             specific: 0x01,
             ccs: vec![
@@ -136,6 +141,16 @@ impl NodeSpec {
         s.smartstart = true;
         s.product_id = 4;
         s.private_key = [0x44; 32];
+        s
+    }
+
+    /// A Long Range sensor that joins by SmartStart with S2 Authenticated.
+    pub fn long_range_sensor(name: &str) -> Self {
+        let mut s = Self::s2_sensor(name, vec![SecurityClass::S2Authenticated]);
+        s.smartstart = true;
+        s.long_range = true;
+        s.product_id = 5;
+        s.private_key = [0x55; 32];
         s
     }
 

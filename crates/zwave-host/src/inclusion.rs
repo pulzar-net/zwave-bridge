@@ -84,7 +84,7 @@ fn s2_cmd(c: impl Into<Command>) -> Vec<u8> {
 
 impl Controller {
     pub(crate) fn on_add_node_status(&self, payload: &[u8]) {
-        match AddNodeStatus::parse(payload, 1) {
+        match AddNodeStatus::parse(payload, self.inner.nid) {
             Ok(s) => {
                 let tx = self.inner.inclusion.lock().expect("lock").add_tx.clone();
                 match tx {
@@ -99,7 +99,7 @@ impl Controller {
     }
 
     pub(crate) fn on_remove_node_status(&self, payload: &[u8]) {
-        match RemoveNodeStatus::parse(payload, 1) {
+        match RemoveNodeStatus::parse(payload, self.inner.nid) {
             Ok(s) => {
                 let tx = self.inner.inclusion.lock().expect("lock").remove_tx.clone();
                 if let Some(tx) = tx {
@@ -276,7 +276,7 @@ impl Controller {
             Ok(vec![])
         } else if supports(0x9f) {
             self.bootstrap_s2(node, opts, entry.as_ref()).await
-        } else if supports(0x98) {
+        } else if supports(0x98) && !crate::is_long_range(node) {
             self.bootstrap_s0(node).await
         } else {
             Ok(vec![])
@@ -292,8 +292,7 @@ impl Controller {
                 (vec![], Some(e.to_string()))
             }
         };
-        self.inner
-            .s2
+        self.s2(node)
             .lock()
             .expect("lock")
             .set_peer_classes(node, &security);
@@ -322,6 +321,15 @@ impl Controller {
         }
     }
 
+    /// The network key a node gets for a class: Long Range nodes have their own.
+    fn network_key(&self, node: NodeId, class: SecurityClass) -> [u8; 16] {
+        let keys = &self.inner.cfg.keys;
+        match (crate::is_long_range(node), keys.long_range_key(class)) {
+            (true, Some(k)) => *k,
+            _ => *keys.key(class),
+        }
+    }
+
     async fn kex_fail(&self, node: NodeId, why: KexFail, sec: TxSecurity) {
         let _ = self
             .send_bytes(
@@ -332,7 +340,7 @@ impl Controller {
                 sec,
             )
             .await;
-        self.inner.s2.lock().expect("lock").end_bootstrap(node);
+        self.s2(node).lock().expect("lock").end_bootstrap(node);
     }
 
     async fn ask<T>(&self, rx: oneshot::Receiver<T>) -> Option<T> {
@@ -368,6 +376,20 @@ impl Controller {
             return Err(Error::Security("no supported ECDH curve".into()));
         }
         let requested = SecurityClass::from_key_bits(report.keys);
+        // Long Range has only the two authenticated S2 classes.
+        let requested: Vec<SecurityClass> = if crate::is_long_range(node) {
+            requested
+                .into_iter()
+                .filter(|c| {
+                    matches!(
+                        c,
+                        SecurityClass::S2AccessControl | SecurityClass::S2Authenticated
+                    )
+                })
+                .collect()
+        } else {
+            requested
+        };
         let intersect = |allowed: &[SecurityClass]| -> Vec<SecurityClass> {
             requested
                 .iter()
@@ -463,15 +485,14 @@ impl Controller {
             }
         };
         let tk = bootstrap_keys(&shared, self.inner.keypair.public(), &node_pub);
-        self.inner
-            .s2
+        self.s2(node)
             .lock()
             .expect("lock")
             .begin_bootstrap(node, tk);
         let result = self.exchange_keys(node, &set, &report, &granted).await;
         match result {
             Ok(()) => {
-                let mut s2 = self.inner.s2.lock().expect("lock");
+                let mut s2 = self.s2(node).lock().expect("lock");
                 s2.end_bootstrap(node);
                 s2.set_peer_classes(node, &granted);
                 Ok(granted)
@@ -556,8 +577,7 @@ impl Controller {
                     };
                     let mut classes = sent.clone();
                     classes.push(class);
-                    self.inner
-                        .s2
+                    self.s2(node)
                         .lock()
                         .expect("lock")
                         .set_peer_classes(node, &classes);
@@ -566,7 +586,7 @@ impl Controller {
                             node,
                             s2_cmd(security_2::NetworkKeyReport {
                                 granted_key: class.key_bit(),
-                                network_key: self.inner.cfg.keys.key(class).to_vec(),
+                                network_key: self.network_key(node, class).to_vec(),
                             }),
                             temp,
                             KEX_TIMEOUT,
@@ -702,7 +722,11 @@ impl Controller {
     pub async fn remove_failed_node(&self, node: NodeId) -> Result<(), Error> {
         let cb = self.inner.api.next_callback_id();
         let req = Request::with_callback(
-            DataFrame::request(F::REMOVE_FAILED_NODE, vec![node as u8, cb]),
+            DataFrame::request(F::REMOVE_FAILED_NODE, {
+                let mut v = self.node_payload(node);
+                v.push(cb);
+                v
+            }),
             Duration::from_secs(2),
             cb,
             Duration::from_secs(30),
@@ -797,7 +821,7 @@ impl Controller {
         }
     }
 
-    pub(crate) fn on_smartstart_request(&self, nwi: [u8; 4]) {
+    pub(crate) fn on_smartstart_request(&self, nwi: [u8; 4], long_range: bool) {
         let entry = self
             .inner
             .store
@@ -815,14 +839,18 @@ impl Controller {
         }
         let c = self.clone();
         tokio::spawn(async move {
-            match c.include_smartstart(entry).await {
+            match c.include_smartstart(entry, long_range).await {
                 Ok(r) => info!(node = r.node, "SmartStart inclusion done"),
                 Err(e) => warn!("SmartStart inclusion: {e}"),
             }
         });
     }
 
-    async fn include_smartstart(&self, entry: Entry) -> Result<InclusionResult, Error> {
+    async fn include_smartstart(
+        &self,
+        entry: Entry,
+        long_range: bool,
+    ) -> Result<InclusionResult, Error> {
         let busy = self.take_busy()?;
         let (tx, rx) = mpsc::channel(16);
         let (ctx, crx) = oneshot::channel();
@@ -832,10 +860,12 @@ impl Controller {
             st.cancel = Some(ctx);
         }
         let cb = self.inner.api.next_callback_id();
-        let mut p = vec![
-            add_mode::SMART_START_DSK | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE,
-            cb,
-        ];
+        let mode = if long_range {
+            add_mode::SMART_START_DSK | add_mode::HIGH_POWER | add_mode::PROTOCOL_LONG_RANGE
+        } else {
+            add_mode::SMART_START_DSK | add_mode::HIGH_POWER | add_mode::NETWORK_WIDE
+        };
+        let mut p = vec![mode, cb];
         p.extend_from_slice(&entry.dsk.nwi_home_id());
         p.extend_from_slice(&entry.dsk.auth_home_id());
         self.add_node(p).await?;

@@ -44,7 +44,18 @@ use zwave_serial::port::Port;
 pub fn load_or_create_keys(dir: &Path) -> Result<NetworkKeys> {
     let path = dir.join("keys.json");
     match std::fs::read(&path) {
-        Ok(b) => serde_json::from_slice(&b).with_context(|| format!("reading {}", path.display())),
+        Ok(b) => {
+            let mut keys: NetworkKeys = serde_json::from_slice(&b)
+                .with_context(|| format!("reading {}", path.display()))?;
+            // Keys made before Long Range support get Long Range keys of their own, once.
+            if keys.fill_long_range().map_err(|e| anyhow::anyhow!("{e}"))? {
+                let tmp = path.with_extension("json.tmp");
+                write_private(&tmp, &serde_json::to_vec_pretty(&keys)?)?;
+                std::fs::rename(&tmp, &path)?;
+                info!("added Long Range keys to {}", path.display());
+            }
+            Ok(keys)
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
             let keys = NetworkKeys::generate().map_err(|e| anyhow::anyhow!("{e}"))?;
