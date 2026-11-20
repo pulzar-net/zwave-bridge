@@ -3,7 +3,7 @@
 All notable changes are listed here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-19)
 
 First release.
 
@@ -11,7 +11,9 @@ First release.
   transmissions with back-off, callback ids, response and callback timeouts),
   typed messages for initialization, SendData with transmit reports,
   inclusion, exclusion, node information, routing information and NVM
-  operations, and `probe`.
+  operations; `probe` and `probe_blocking`, which identify a controller with
+  read-only frames (firmware, series, home id, primary, node count, region)
+  within 2.9 s and close the port.
 - `zwave-security`: S0; S2 key derivation, AES-128 CTR_DRBG (NIST CAVP
   tested), SPAN and MPAN, Message Encapsulation and extensions; X25519 key
   pairs; DSK, PIN, SmartStart home ids, QR codes and the provisioning list.
