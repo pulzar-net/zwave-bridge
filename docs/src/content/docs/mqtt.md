@@ -50,7 +50,7 @@ stops or loses the broker.
   "region": "UsaLongRange",
   "dsk": "36982-35213-13151-10130-14261-37667-55588-29374",
   "nodes": [2, 3],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
 ```
 
