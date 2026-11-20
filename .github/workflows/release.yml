@@ -34,7 +34,7 @@ jobs:
       contents: write
     timeout-minutes: 150
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ env.TAG }}
       - name: The tag is the crate version
