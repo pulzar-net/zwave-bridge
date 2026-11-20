@@ -193,7 +193,11 @@ async fn include_s2_node_over_mqtt_and_get_a_sensor_report() {
                 .unwrap()
         }
     };
-    publish("zwave/bridge/request/include", json!({})).await;
+    publish(
+        "zwave/bridge/request/include",
+        json!({ "transaction": "t-1" }),
+    )
+    .await;
     next(&mut rx, "inclusion started", |t, p| {
         t == "zwave/bridge/event" && js(p)["event"] == "inclusion_started"
     })
@@ -226,6 +230,7 @@ async fn include_s2_node_over_mqtt_and_get_a_sensor_report() {
     .await;
     let res = js(&res);
     assert_eq!(res["ok"], true, "{res}");
+    assert_eq!(res["transaction"], "t-1", "echoed");
     assert_eq!(res["node"], node);
     assert_eq!(
         res["security"],

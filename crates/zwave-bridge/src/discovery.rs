@@ -142,7 +142,7 @@ pub fn for_value(
                 "binary_sensor"
             }
             None => {
-                c["value_template"] = json!("{{ value_json.label }}");
+                c["value_template"] = json!("{{ value_json.state }}");
                 "sensor"
             }
         },

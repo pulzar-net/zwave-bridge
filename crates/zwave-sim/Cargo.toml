@@ -25,5 +25,11 @@ tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
 
+[dev-dependencies]
+# Path only, so publishing drops it (zwave-host's own tests use this crate).
+zwave-host = { path = "../zwave-host" }
+tempfile = "3"
+tokio = { workspace = true, features = ["process"] }
+
 [lints]
 workspace = true

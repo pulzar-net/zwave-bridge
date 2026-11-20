@@ -4,6 +4,7 @@
 //!
 //! Type on stdin to act on the nodes: `press <name>`, `wake <name>`,
 //! `power <name>`, `temp <name> <celsius>`, `motion <name>`, `dsk <name>`.
+//! The simulator keeps running when stdin ends; stop it with a signal.
 
 use tokio::io::AsyncBufReadExt;
 use zwave_security::SecurityClass;
@@ -73,5 +74,9 @@ async fn main() -> std::io::Result<()> {
             _ => println!("press|wake|power|motion <name>, temp <name> <value>, dsk <name>"),
         }
     }
+    // Stdin ended (a script's pipe or FIFO closed): keep serving the host
+    // until killed, as the controller it stands in for would.
+    eprintln!("stdin closed; still serving the host");
+    std::future::pending::<()>().await;
     Ok(())
 }

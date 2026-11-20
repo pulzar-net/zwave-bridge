@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
@@ -117,6 +116,8 @@ struct Bridge {
     base: String,
     discovered: HashMap<u16, HashSet<String>>,
     responses: mpsc::Sender<(String, Json)>,
+    /// The `transaction` of the request being handled, echoed in its response.
+    transaction: Option<Json>,
 }
 
 /// Runs the bridge on `port` until `shutdown` completes.
@@ -203,6 +204,7 @@ pub async fn run<P: Port>(
         base,
         discovered: HashMap::new(),
         responses: rtx,
+        transaction: None,
     };
     for n in b.c.nodes() {
         b.load_device(n.id);
@@ -220,7 +222,7 @@ pub async fn run<P: Port>(
                 None => break,
             },
             r = rrx.recv() => if let Some((action, body)) = r {
-                b.publish(&format!("{}/bridge/response/{action}", b.base), &body, false).await;
+                b.publish_raw(&format!("{}/bridge/response/{action}", b.base), body.to_string().into_bytes(), false).await;
             },
             _ = &mut shutdown => break,
             _ = restart.notified() => {
@@ -255,6 +257,13 @@ impl Bridge {
     }
 
     async fn publish(&self, topic: &str, body: &Json, retain: bool) {
+        if let (Some(t), true) = (&self.transaction, topic.contains("/bridge/response/")) {
+            let mut body = body.clone();
+            body["transaction"] = t.clone();
+            return self
+                .publish_raw(topic, body.to_string().into_bytes(), retain)
+                .await;
+        }
         self.publish_raw(topic, body.to_string().into_bytes(), retain)
             .await;
     }
@@ -466,13 +475,23 @@ impl Bridge {
         fut: impl std::future::Future<Output = Json> + Send + 'static,
     ) {
         let tx = self.responses.clone();
+        let transaction = self.transaction.clone();
         tokio::spawn(async move {
-            let body = fut.await;
+            let mut body = fut.await;
+            if let Some(t) = transaction {
+                body["transaction"] = t;
+            }
             let _ = tx.send((action, body)).await;
         });
     }
 
     async fn request(&mut self, action: String, args: Json) {
+        self.transaction = args.get("transaction").cloned();
+        self.handle_request(action, args).await;
+        self.transaction = None;
+    }
+
+    async fn handle_request(&mut self, action: String, args: Json) {
         debug!(%action, %args, "request");
         let c = self.c.clone();
         let node = args.get("node").and_then(Json::as_u64).map(|n| n as u16);

@@ -1345,11 +1345,13 @@ version = "0.2.0"
 dependencies = [
  "bytes",
  "futures-util",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
  "zwave-cc",
+ "zwave-host",
  "zwave-security",
  "zwave-serial",
 ]

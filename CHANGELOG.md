@@ -49,6 +49,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `zwave-sim`: the binary kept serving only while its stdin was open, so a
+  quick start that typed `press` from a script or FIFO lost the host
+  mid-inclusion. It now serves until stopped; a test drives the binary over TCP.
+- `zwave-bridge`: Home Assistant shows a notification sensor's state, not the
+  value's name; responses echo the request's `transaction`.
 - `zwave-host`: store writes are serialized; `flush` racing the background
   writer could fail on the shared temporary file or leave an older snapshot.
 
