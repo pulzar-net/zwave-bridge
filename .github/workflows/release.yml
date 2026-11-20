@@ -110,7 +110,9 @@ jobs:
   crates:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A first publish of several new crates waits out crates.io's rate limit
+    # on new crates, shared with the account's other repositories.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,5 +136,16 @@ jobs:
               echo "${crate} ${version} is already on crates.io"
               continue
             fi
-            cargo publish -p "${crate}" --locked
+            # crates.io limits how many new crates an account publishes in a
+            # while and answers 429 with the time to try again; wait until then.
+            for attempt in $(seq 1 12); do
+              if cargo publish -p "${crate}" --locked 2>&1 | tee "${RUNNER_TEMP}/publish.log"; then
+                break
+              fi
+              when="$(grep -o 'try again after [A-Z][a-z][a-z], [0-9]* [A-Z][a-z]* [0-9]* [0-9:]* GMT' "${RUNNER_TEMP}/publish.log" | head -1 | sed 's/^try again after //')"
+              [ -n "${when}" ] && [ "${attempt}" -lt 12 ] || exit 1
+              wait=$(( $(date -d "${when}" +%s) - $(date +%s) + 15 ))
+              echo "crates.io asks to wait until ${when}; waiting ${wait}s"
+              [ "${wait}" -le 0 ] || sleep "${wait}"
+            done
           done
