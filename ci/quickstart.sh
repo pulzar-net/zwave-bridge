@@ -35,7 +35,7 @@ trap cleanup EXIT
 wait_for() {
     local deadline=$((SECONDS + $3))
     while [ "${SECONDS}" -lt "${deadline}" ]; do
-        if mosquitto_sub -C 1 -W 5 -t "$1" 2>/dev/null | jq -e -R "fromjson? // . | $2" >/dev/null 2>&1; then
+        if mosquitto_sub -C 1 -W 5 -t "$1" 2>/dev/null | jq -e -R "(. as \$raw | try fromjson catch \$raw) | $2" >/dev/null 2>&1; then
             return 0
         fi
     done
