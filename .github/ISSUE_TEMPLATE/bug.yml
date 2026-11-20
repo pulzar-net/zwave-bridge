@@ -1,0 +1,71 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Search [open issues](https://github.com/pulzar-net/zwave-bridge/issues) first, and read [Troubleshooting](https://pulzar-net.github.io/zwave-bridge/troubleshooting.html).
+        **Security problems:** do not file them here. [Report them privately](https://github.com/pulzar-net/zwave-bridge/security/advisories/new).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest set of steps. Does it happen with the simulator too?
+      placeholder: |
+        1. Start the bridge with the configuration below
+        2. Publish ... to ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `zwave-bridge --version`, or the commit if built from source.
+      placeholder: "zwave-bridge 0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: use
+    attributes:
+      label: How you use it
+      options:
+        - The bridge (release binary)
+        - The bridge (built from source)
+        - The crates as a library
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Controller and devices
+      description: The controller model, as `zwave-bridge probe PORT` prints it, and the devices involved (manufacturer, model, firmware).
+      placeholder: "Zooz ZST39 LR, firmware 7.21; Aeotec MultiSensor 7, firmware 1.04"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Operating system, architecture and board.
+      placeholder: Debian 13 on a Raspberry Pi 4 (aarch64)
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Your configuration file, with passwords removed.
+      render: toml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Run with `RUST_LOG=debug` and paste the relevant part. Check it for anything you consider private first.
+      render: text

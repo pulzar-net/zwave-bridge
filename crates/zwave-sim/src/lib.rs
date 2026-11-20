@@ -1,15 +1,4 @@
-//! A Z-Wave Serial API controller simulator.
-//!
-//! [`Simulator`] speaks the controller side of the Serial API over any byte
-//! stream (an in-memory pipe in tests, TCP for the `zwave-sim` binary), with
-//! simulated end nodes behind it: a mains-powered switch, a sleeping S0
-//! sensor, S2 sensors and a SmartStart node ([`node::NodeSpec`]). Nodes join
-//! when a test presses their button during inclusion, run their side of the
-//! S0 and S2 key exchanges with this repository's security crate, answer the
-//! interview, sleep and wake up, and send reports.
-//!
-//! It is a test double, not an emulator of any chip's quirks; bench
-//! recordings cover those.
+#![doc = include_str!("../README.md")]
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

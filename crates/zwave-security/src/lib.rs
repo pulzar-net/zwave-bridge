@@ -1,24 +1,4 @@
-//! Z-Wave security for host stacks: Security 0 and Security 2.
-//!
-//! This crate holds the parts of Z-Wave security that a controller (or a
-//! simulated node) runs on the host:
-//!
-//! - [`s2`]: Security 2 key derivation (CKDF), the singlecast and multicast
-//!   nonce state (SPAN and MPAN) on top of [`drbg::CtrDrbg`], and the
-//!   Message Encapsulation format with its extensions, all per the
-//!   Z-Wave Alliance's Security 2 specification.
-//! - [`s0`]: Security 0 nonces and Message Encapsulation (AES-OFB with a
-//!   CBC-MAC).
-//! - [`kex`]: the key exchange constants and the Curve25519 key pair.
-//! - [`dsk`]: Device Specific Keys, PINs and the SmartStart home ids derived
-//!   from them.
-//! - [`qr`] and [`provisioning`]: SmartStart QR codes and the provisioning
-//!   list a controller keeps.
-//!
-//! The block cipher, CMAC, CCM, OFB, CBC-MAC and X25519 come from maintained
-//! crates (RustCrypto, dalek). The only construction written here is the
-//! AES-128 CTR_DRBG without a derivation function that S2 nonces need,
-//! checked against NIST's CAVP vectors.
+#![doc = include_str!("../README.md")]
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

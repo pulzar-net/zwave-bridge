@@ -1,0 +1,39 @@
+# zwave-bridge configuration. Only [serial] is required; every other key is
+# shown with its default. The full reference:
+# https://pulzar-net.github.io/zwave-bridge/config-reference.html
+
+[serial]
+# A serial device (use the stable /dev/serial/by-id/ name), or
+# tcp://host:port for a controller behind ser2net or the simulator.
+port = "/dev/ttyUSB0"
+
+[store]
+# nodes.json, keys.json (the network keys: back it up, keep it secret),
+# NVM backups, and firmware/ for firmware_update.
+dir = "/var/lib/zwave-bridge"
+
+[mqtt]
+host = "127.0.0.1"
+port = 1883
+client_id = "zwave-bridge"
+# username = "zwave"
+# A file holding the password, read at start. Preferred over `password`.
+# password_file = "/etc/zwave-bridge/mqtt-password"
+# password = "..."
+base_topic = "zwave"
+keep_alive = 30
+
+[homeassistant]
+enabled = true
+discovery_prefix = "homeassistant"
+
+[network]
+# The wake-up interval set on sleeping devices when they are included, seconds.
+wake_up_interval = 3600
+# How long include and exclude wait for a device, seconds.
+inclusion_timeout = 60
+
+[devices]
+# The config/devices directory of an @zwave-js/config release, read as
+# published. Unset: no device files (values still work).
+# dir = "/var/lib/zwave-bridge/zwave-js-config/package/config/devices"

@@ -1,0 +1,117 @@
+# Checks what the README and the docs site claim, and publishes the site.
+#
+#   reference   the configuration reference and its JSON Schema match the
+#               configuration types; every doctest passes, the README's
+#               library example among them
+#   quickstart  the README's quick start, run as written: download the
+#               latest release and check its sum, then the release binary
+#               and this commit's build against the simulator and a broker
+#   msrv        the workspace builds on the rust-version the badge claims
+#   links       every relative link in the README and the book resolves
+#   book        the mdBook and the API docs; on main, published to Pages
+#
+# The stack's own tests, lints, fuzzing and cross builds are in ci.yml.
+
+name: docs
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MDBOOK: 0.4.52
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: The configuration reference is generated from the code
+        run: cargo test -p zwave-bridge --features schema --test config_reference
+      - name: Doctests, including the README's library example
+        run: cargo test --workspace --doc
+
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Broker and clients
+        run: sudo apt-get update -q && sudo apt-get install -y -q mosquitto mosquitto-clients
+      - name: The README's quick start, as written
+        run: ci/quickstart.sh
+
+  msrv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: The rust-version in Cargo.toml
+        id: msrv
+        run: echo "version=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --locked
+
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress './*.md' './crates/*/README.md' './docs/src/**/*.md'
+          fail: true
+
+  book:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@${{ env.MDBOOK }}
+      - name: Build the book and the API docs
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          set -euo pipefail
+          mdbook build docs
+          cargo doc --workspace --no-deps
+          cp -R target/doc docs/book/api
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/book
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [book, reference, links]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

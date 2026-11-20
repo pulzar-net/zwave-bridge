@@ -1,0 +1,88 @@
+# Configuration
+
+zwave-bridge reads one TOML file, `/etc/zwave-bridge/config.toml` unless
+`--config FILE` names another. Only the controller's port is required:
+
+```toml
+[serial]
+port = "/dev/serial/by-id/usb-Zooz_800_Z-Wave_Stick_..."
+```
+
+Everything else has a default. Unknown keys and wrong types are errors, so a
+typo stops the bridge at startup with the key named. The
+[configuration reference](config-reference.md) lists every key; it is
+generated from the code, so it is always current.
+
+A [JSON Schema](config.schema.json) generated from the same code lets an
+editor with TOML schema support (Taplo, or VS Code's Even Better TOML)
+complete and check the file. Point it at the schema with a first line of:
+
+```toml
+#:schema https://pulzar-net.github.io/zwave-bridge/config.schema.json
+```
+
+## The tables
+
+| Table | What it sets |
+|---|---|
+| `[serial]` | the controller's port: a serial device or `tcp://host:port` |
+| `[store]` | the data directory |
+| `[mqtt]` | broker host and port, client id, user name, password or password file, base topic, keep-alive |
+| `[homeassistant]` | discovery on or off, the discovery prefix |
+| `[network]` | the wake-up interval set on sleeping devices at inclusion, how long inclusion and exclusion wait |
+| `[devices]` | a directory of Z-Wave JS device files (not in 0.1.0); see [Device files](device-files.md) |
+
+## A complete example
+
+[`config.example.toml`](https://github.com/pulzar-net/zwave-bridge/blob/main/config.example.toml)
+in the repository sets every key to its default, with comments. CI checks
+that it parses.
+
+```toml
+{{#include ../../config.example.toml}}
+```
+
+## The port
+
+Use the stable path under `/dev/serial/by-id/`: `/dev/ttyUSB0` and
+`/dev/ttyACM0` can swap when another USB serial device is plugged in. For a
+controller on another machine, share it with
+[ser2net](https://github.com/cminyard/ser2net) at 115200 baud, 8N1, raw,
+and use `tcp://host:port`. The Serial API always runs at 115200 baud, so
+there is no baud setting.
+
+## Secrets
+
+Prefer `mqtt.password_file` (a file holding the password, read at start) to
+`mqtt.password`, so the configuration file holds no secret. Keep the
+password file readable by the bridge's user only.
+
+The network keys are not in the configuration. On first start the bridge
+generates them, with the controller's S2 key pair, and writes `keys.json` to
+the data directory (mode 0600). See [Backup and restore](backup.md).
+
+## The data directory
+
+| File | What it holds | Written |
+|---|---|---|
+| `keys.json` | the S0, S2 and Long Range network keys and the controller's S2 key pair | on first start (and once when Long Range keys are added) |
+| `nodes.json` | every node: protocol info, security, interview, endpoints, names | when a node record changes |
+| `nvm-<time>.bin` | NVM backups taken with the `backup` request | on request |
+| `firmware/` | firmware images for the `firmware_update` request (not in 0.1.0) | by you |
+
+`keys.json` is written atomically and readable by its owner only. Back up
+the whole directory.
+
+## Logging
+
+The bridge logs to standard error. Set the level with `RUST_LOG`:
+
+| `RUST_LOG` | What you see |
+|---|---|
+| unset or `info` | startup, inclusions, interviews, errors |
+| `debug` | every request and value |
+| `info,zwave_serial=trace` | every Serial API frame |
+
+At `trace` level, frames carrying keys during S2 bootstrapping are encrypted
+on the radio but may appear in the host's log before encryption: don't post
+trace logs publicly without checking them.

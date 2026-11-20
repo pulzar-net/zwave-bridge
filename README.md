@@ -1,179 +1,365 @@
 # zwave-bridge
 
-A Z-Wave host stack and MQTT bridge in Rust. Plug a Z-Wave controller stick
-into any Linux box, point the bridge at an MQTT broker, and include, secure,
-interview and use Z-Wave devices from Home Assistant or anything that speaks
-MQTT. Maintained by [Pulzar](https://pulzr.net). MIT licensed.
+[![CI](https://github.com/pulzar-net/zwave-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/pulzar-net/zwave-bridge/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pulzar-net/zwave-bridge)](https://github.com/pulzar-net/zwave-bridge/releases/latest)
+[![Docs](https://img.shields.io/badge/docs-pulzar--net.github.io-blue)](https://pulzar-net.github.io/zwave-bridge/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![MSRV](https://img.shields.io/badge/MSRV-1.89-blue)](Cargo.toml)
 
-The controller chip runs the radio and the mesh. Everything a host has to do
-is here: the Serial API link layer, S0 and S2 security (on the host, as Z-Wave
-requires), SmartStart, inclusion and exclusion, the interview, command
-classes, wake-up queues for sleeping devices, a node store, routing
-information and NVM backups.
+A Z-Wave controller stack and Z-Wave to MQTT bridge, written in Rust. Plug a
+Z-Wave controller stick into a Linux machine, point the bridge at an MQTT
+broker, and include, secure, interview and use Z-Wave devices from Home
+Assistant or anything else that speaks MQTT. It is one static binary with no
+runtime: CI holds it under 4 MB, and the stack under 16 MB of memory with
+200 nodes, so it fits on routers and small gateways as well as on a
+Raspberry Pi or a server. The same stack is a set of library crates for
+anyone building Z-Wave software in Rust.
 
-**Status: 0.1.0, pre-release.** The stack is tested end to end against a
-Serial API simulator in CI; it has not yet been run against a real stick.
-Z-Wave Long Range (SmartStart, 16-bit node ids, its own S2 keys), firmware
-updates and NVM restore onto the same series are in; converting a backup
-between 700 and 800 series is the next step. Not certified by the Z-Wave
-Alliance (see below).
+It exists because the established Z-Wave stack, Z-Wave JS, needs a Node.js
+runtime, and there was no complete, embeddable Z-Wave controller stack in
+Rust.
 
-## Crates
+**[Documentation](https://pulzar-net.github.io/zwave-bridge/)** |
+**[Quick start](#quick-start)** |
+**[Hardware](#supported-hardware)** |
+**[MQTT API](https://pulzar-net.github.io/zwave-bridge/mqtt.html)** |
+**[Library](#use-it-as-a-library)** |
+**[Changelog](CHANGELOG.md)**
 
-| Crate | What it does |
+## Status
+
+zwave-bridge is **0.x and young**. The whole stack is tested in CI against a
+Serial API controller simulator, but **it has not yet been tested on real
+hardware**. Expect rough edges and breaking changes between 0.x releases,
+and back up `keys.json` (see [security](#security)). The project is not
+certified by the Z-Wave Alliance.
+
+| Feature | State |
 |---|---|
-| [`zwave-serial`](crates/zwave-serial) | Serial API frames, ACK/NAK/CAN, retransmits, callback ids and timeouts; typed controller messages; `probe(port)`, which says what controller answers on a port with one read-only frame |
-| [`zwave-security`](crates/zwave-security) | S0; S2 with X25519 ECDH, AES-CMAC key derivation, AES-CCM, the CTR_DRBG nonce generator, SPAN and MPAN; DSK and PIN handling; SmartStart QR codes and the provisioning list |
-| [`zwave-cc`](crates/zwave-cc) | Command classes generated from TOML definitions (`defs/cc`), with bounded parsers and encoders; Transport Service; CRC-16; the Alliance's sensor, meter and notification tables |
-| [`zwave-host`](crates/zwave-host) | The controller: inclusion with S2/S0/SmartStart, interview, node store, wake-up queues, encapsulation (S2, S0, Supervision, Multi Channel, Transport Service), values, topology, NVM backup |
-| [`zwave-sim`](crates/zwave-sim) | A Serial API controller simulator with simulated nodes (switch, sleeping S0 sensor, S2 sensors, SmartStart), as a library and the `zwave-sim` binary |
-| [`zwave-bridge`](crates/zwave-bridge) | The `zwave-bridge` binary: MQTT with Home Assistant discovery and a plain JSON topic scheme |
+| Serial API controllers: 500, 700 and 800 series | done in 0.1.0 |
+| Inclusion and exclusion; S2 (Unauthenticated, Authenticated, Access Control) with DSK and PIN; S0 | done in 0.1.0 |
+| SmartStart: QR codes and the provisioning list | done in 0.1.0 |
+| Interview with resume, wake-up queues for sleeping devices, node store | done in 0.1.0 |
+| 22 command classes (switches, dimmers, sensors, meters, notifications, configuration, battery, wake up, association and more) | done in 0.1.0 |
+| Supervision, Multi Channel, Transport Service and CRC-16 encapsulation | done in 0.1.0 |
+| Home Assistant MQTT discovery | done in 0.1.0 |
+| NVM backup, routes and topology | done in 0.1.0 |
+| Read-only controller probe (`zwave-bridge probe`) | done in 0.1.0 |
+| Z-Wave Long Range | on `main`, next release |
+| Device firmware updates | on `main`, next release |
+| Z-Wave JS device configuration files: parameters by name | on `main`, next release |
+| NVM restore onto a controller of the same series | on `main`, next release |
+| Converting an NVM backup between 700 and 800 series | in progress |
+| Testing on real controllers and devices | in progress |
+| More command classes (Central Scene, Thermostat, Door Lock, Color Switch, ...) | planned |
+| A web frontend | not planned; the bridge is headless by design |
 
-Command classes in this release: Basic, Application Status, Binary Switch,
-Multilevel Switch, Binary Sensor, Multilevel Sensor, Meter, Z-Wave Plus Info,
-Device Reset Locally, CRC-16 Encapsulation, Transport Service, Multi Channel,
-Supervision, Configuration, Notification, Manufacturer Specific, Battery,
-Wake Up, Association, Version, Firmware Update Meta Data, Security 0 and
-Security 2.
+## Supported hardware
 
-## Running the bridge
+A Z-Wave controller is a USB stick (or module) running Silicon Labs' Serial
+API firmware. **Expected** means the controller runs firmware the stack
+implements and is covered by the simulator, but nobody has reported it
+working yet. If you try one, please [tell us how it went](https://github.com/pulzar-net/zwave-bridge/issues/new?template=device.yml).
 
+| Controller | Series | Firmware | State |
+|---|---|---|---|
+| Zooz ZST39 LR | 800 | Serial API, SDK 7.x | expected (Long Range: next release) |
+| Home Assistant Connect ZWA-2 | 800 | Serial API, SDK 7.x | expected |
+| Aeotec Z-Stick 7, Zooz ZST10 700, Silicon Labs UZB-7 | 700 | Serial API, SDK 7.17.2 or newer recommended | expected |
+| Aeotec Z-Stick Gen5 and Gen5+, Zooz ZST10 (500) | 500 | Serial API, SDK 6.x | expected |
+| Z-Wave.Me UZB | 500 | Z-Wave.Me firmware | expected |
+| 300 series and older | | | unsupported |
+| Bridges that do not speak the Serial API (Z-Way, proprietary hubs) | | | unsupported |
+
+Devices: any Z-Wave Plus device whose command classes are implemented works
+without device-specific code; with Z-Wave JS's device files configured, its
+parameters have names. The [hardware page](https://pulzar-net.github.io/zwave-bridge/hardware.html)
+covers regions, firmware and what each command class exposes.
+
+## Quick start
+
+From nothing to a device in Home Assistant, on 64-bit Linux (x86_64 or
+aarch64) with a Z-Wave controller stick. You need an MQTT broker (for
+example Mosquitto) that Home Assistant's MQTT integration already uses.
+
+**1. Download the release and check its checksum.**
+
+<!-- quickstart:download -->
 ```sh
-cargo build --release -p zwave-bridge
+VERSION=0.1.0
+ARCH=$(uname -m)   # x86_64 or aarch64
+BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
+curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
+curl -fsSLO "$BASE/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+sudo install -m 0755 "zwave-bridge-$ARCH-linux-musl" /usr/local/bin/zwave-bridge
+zwave-bridge --version
 ```
 
-`/etc/zwave-bridge/config.toml`:
+**2. Check that the controller answers.** Use the stable name under
+`/dev/serial/by-id/` rather than `/dev/ttyUSB0`, which can change between
+boots.
 
+```sh
+ls /dev/serial/by-id/
+sudo zwave-bridge probe /dev/serial/by-id/usb-...
+```
+
+It prints what it found, for example
+`Z-Wave controller: firmware 7.19, manufacturer 0x0086, product 0x0001:0x005d (Aeotec Z-Stick 7)`.
+
+**3. Write a minimal configuration** to `/etc/zwave-bridge/config.toml`.
+Only `serial.port` is required; everything else has a default.
+
+<!-- quickstart:config -->
 ```toml
 [serial]
-port = "/dev/serial/by-id/usb-..."   # or tcp://host:port for ser2net
-
-[store]
-dir = "/var/lib/zwave-bridge"         # nodes.json, keys.json, NVM backups
+port = "/dev/serial/by-id/usb-..."   # the path from step 2
 
 [mqtt]
-host = "127.0.0.1"
-port = 1883
-base_topic = "zwave"
-# username = "zwave"
-# password_file = "/etc/zwave-bridge/mqtt-password"
-
-[homeassistant]
-enabled = true
-discovery_prefix = "homeassistant"
-
-[network]
-wake_up_interval = 3600
-
-[devices]
-# config/devices of an @zwave-js/config release, read as published
-dir = "/var/lib/zwave-bridge/zwave-js-config/package/config/devices"
+host = "localhost"                   # your broker
 ```
 
-Device files come from Z-Wave JS's library, read in their own format
-(JSON5, `$import` templates, `$if` firmware conditions). Fetch a release once
-and point `[devices] dir` at it:
+**4. Run it.** On first start it generates the network keys and keeps them,
+with the node store, in `/var/lib/zwave-bridge`.
+
+<!-- quickstart:run -->
+```sh
+sudo zwave-bridge --config /etc/zwave-bridge/config.toml
+```
+
+**5. Include a device.** Start inclusion, then press the device's inclusion
+button (see its manual).
+
+<!-- quickstart:pair -->
+```sh
+mosquitto_pub -h localhost -t zwave/bridge/request/include -m '{}'
+```
+
+A device without security joins right away. A device with S2 security asks
+for its keys and its PIN, the five underlined digits on its label; answer on
+MQTT as the [S2 guide](https://pulzar-net.github.io/zwave-bridge/inclusion.html)
+shows. After the interview, the device appears in Home Assistant under
+**Settings > Devices & services > MQTT**. To watch everything the bridge
+publishes:
 
 ```sh
-v=15.32.4
-mkdir -p /var/lib/zwave-bridge/zwave-js-config
-curl -sL https://registry.npmjs.org/@zwave-js/config/-/config-$v.tgz | tar -xz -C /var/lib/zwave-bridge/zwave-js-config
+mosquitto_sub -h localhost -t 'zwave/#' -v
 ```
 
-With a device file, a node's record names the device, its parameters are
-published on `zwave/nodes/<id>/parameters`, and `configure` writes them by
-key, partial parameters included: `{"node": 5, "settings": {"3": 20, "41[0xf00]": 2}}`.
+No controller yet? The [getting started guide](https://pulzar-net.github.io/zwave-bridge/getting-started.html)
+runs the same steps against the simulator. To run the bridge as a service,
+see [installation](#installation).
 
-```sh
-zwave-bridge --config /etc/zwave-bridge/config.toml
-zwave-bridge probe /dev/ttyUSB0      # what controller is on this port?
-```
+## Installation
 
-On first start the bridge generates the network keys and the controller's
-S2 key pair in `keys.json` (mode 0600). **Back it up and keep it secret**:
-anyone with it can read and control the network, and without it secure
-devices must be re-included.
+- **Release binaries.** Each [release](https://github.com/pulzar-net/zwave-bridge/releases)
+  has static Linux binaries of `zwave-bridge` and the `zwave-sim` simulator
+  for `x86_64`, `aarch64` (Raspberry Pi 3 and newer with a 64-bit OS) and
+  `mipsel` (MT7621 and MT7628 routers), with a `SHA256SUMS` file. They have
+  no runtime dependencies.
+- **From source**, with Rust 1.89 or newer:
+  `cargo install --locked --git https://github.com/pulzar-net/zwave-bridge zwave-bridge`
+- **systemd**: a hardened unit is in [`dist/systemd/`](dist/systemd/zwave-bridge.service).
+- **OpenWrt**: a procd init script is in [`dist/openwrt/`](dist/openwrt/zwave-bridge.init).
 
-### Topics
+The [installation guide](https://pulzar-net.github.io/zwave-bridge/installation.html)
+covers each one step by step.
 
-| Topic | | Payload |
+## Configuration
+
+The bridge reads one TOML file, `/etc/zwave-bridge/config.toml` by default
+(`--config FILE` to change it):
+
+| Table | What it sets |
+|---|---|
+| `[serial]` | the controller's port: a serial device or `tcp://host:port` |
+| `[store]` | the data directory: network keys, node store, NVM backups, firmware images |
+| `[mqtt]` | broker, credentials (password from a file), client id, base topic |
+| `[homeassistant]` | discovery on or off, discovery prefix |
+| `[network]` | the wake-up interval given to sleeping devices, the inclusion timeout |
+| `[devices]` | a directory of Z-Wave JS device files (not in 0.1.0) |
+
+Unknown keys are an error, so a typo stops the bridge at startup. Every key,
+its type and default are in the
+[configuration reference](https://pulzar-net.github.io/zwave-bridge/config-reference.html),
+which is generated from the code. [`config.example.toml`](config.example.toml)
+shows them all. Log verbosity comes from `RUST_LOG` (default `info`).
+
+## MQTT API
+
+Everything lives under a base topic, `zwave` by default.
+
+| Topic | Direction | What |
 |---|---|---|
-| `zwave/bridge/state` | out, retained | `online` / `offline` |
-| `zwave/bridge/info` | out, retained | controller identity, home id, controller DSK |
-| `zwave/bridge/event` | out | `inclusion_started`, `grant_security_classes`, `validate_dsk`, `security_bootstrapped`, `interview_completed`, ... |
-| `zwave/bridge/request/<action>` | in | JSON arguments |
-| `zwave/bridge/response/<action>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}` |
-| `zwave/nodes/<id>` | out, retained | node record (device classes, command classes, security, interview stage, status) |
-| `zwave/nodes/<id>/status` | out, retained | `alive`, `awake`, `asleep`, `dead` |
-| `zwave/nodes/<id>/<class>/<property>[/<endpoint>]` | out, retained | `{"value": 22.5, "unit": "°C", "label": "Air temperature", "time": 1763580000000}` |
-| `.../set` on a switch or dimmer value | in | `ON`, `OFF`, a level, or `{"value": ...}` |
-| `zwave/nodes/<id>/route` | out, retained | repeaters and RSSI of the last frame to the node |
+| `zwave/bridge/state` | out, retained | `online` or `offline` (also the last will) |
+| `zwave/bridge/info` | out, retained | controller identity, home id, region, the controller's DSK |
+| `zwave/bridge/event` | out | inclusion progress, key grant and PIN prompts, interviews, firmware update progress |
+| `zwave/bridge/request/<name>` | in | `include`, `exclude`, `stop`, `grant`, `validate_dsk`, `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`, `remove_failed`, `rename`, `topology`; on `main`: `configure`, `restore`, `firmware_update` |
+| `zwave/bridge/response/<name>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}` |
+| `zwave/nodes/<id>` | out, retained | the node: device classes, command classes, security, interview, status |
+| `zwave/nodes/<id>/status` | out, retained | `alive`, `awake`, `asleep` or `dead` |
+| `zwave/nodes/<id>/<class>/<property>[/<endpoint>]` | out, retained | a value: `{"value": 22.5, "unit": "°C", "label": "Air temperature", "time": 1795137000000}` |
+| `zwave/nodes/<id>/<class>/<property>[/<endpoint>]/set` | in | `ON`, `OFF`, a level, or `{"value": ...}` |
+| `zwave/nodes/<id>/route` | out, retained | repeaters and RSSI of the last frame from the node |
 
-Requests: `include`, `exclude`, `stop`, `grant`, `validate_dsk`,
-`provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`,
-`remove_failed`, `rename`, `topology`, `configure`, `restore`
-(`{"file": "nvm-1763580000.bin"}`: writes a `backup` back onto a stick of the
-same series and SDK, then the bridge exits for its service manager to
-restart it), `firmware_update`
-(`{"node": 5, "file": "zse40_v2.gbl"}`, a file you placed in
-`<store dir>/firmware`; `.hex` images are converted, others sent as they are).
+Network keys never appear on MQTT. The
+[MQTT reference](https://pulzar-net.github.io/zwave-bridge/mqtt.html) has
+every request and payload with examples.
 
-Including an S2 device:
+## Use it as a library
 
-```sh
-mosquitto_pub -t zwave/bridge/request/include -m '{}'
-# press the device's button; the bridge asks:
-#   zwave/bridge/event {"event":"grant_security_classes","node":5,"requested":["s2_authenticated","s2_unauthenticated"]}
-mosquitto_pub -t zwave/bridge/request/grant -m '{"classes":["s2_authenticated","s2_unauthenticated"]}'
-#   zwave/bridge/event {"event":"validate_dsk","node":5,"dsk":"xxxxx-23669-..."}
-mosquitto_pub -t zwave/bridge/request/validate_dsk -m '{"pin":"34028"}'   # the underlined digits on the label
+The bridge is a thin layer over library crates you can use on their own.
+
+| Crate | What it is |
+|---|---|
+| [`zwave-host`](crates/zwave-host) | the controller: inclusion with S2, S0 and SmartStart, interview, node store, wake-up queues, encapsulation, values, topology, NVM backup |
+| [`zwave-cc`](crates/zwave-cc) | command classes generated from TOML definitions, Transport Service, CRC-16, the Alliance's sensor, meter and notification tables |
+| [`zwave-security`](crates/zwave-security) | S0 and S2: key exchange, key derivation, encryption, nonces, DSKs, PINs, SmartStart QR codes |
+| [`zwave-serial`](crates/zwave-serial) | the Serial API: frames, the ACK/NAK/CAN link layer, typed controller messages, `probe` |
+| [`zwave-sim`](crates/zwave-sim) | a Serial API controller simulator with simulated nodes, for tests without hardware |
+| [`zwave-bridge`](crates/zwave-bridge) | the MQTT bridge, as a binary and a library |
+
+The crates are not on crates.io yet; depend on them from git:
+
+```toml
+[dependencies]
+zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.1.0" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-SmartStart: scan the device's QR code and provision it; it joins by itself
-when powered on.
+This example starts a controller, includes a switch and turns it on. It runs
+here against the simulator; on hardware, open the port with
+`zwave_serial::port::open("/dev/ttyUSB0").await?` instead.
 
-```sh
-mosquitto_pub -t zwave/bridge/request/provision -m '{"qr":"9001..."}'
+```rust
+use zwave_host::{Controller, Event, HostConfig, InclusionOptions, NetworkKeys, ValueId, ValueKind};
+# use zwave_sim::{node::NodeSpec, SimConfig, Simulator};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   let (port, sim_end) = tokio::io::duplex(16 * 1024);
+#   let sim = Simulator::new(SimConfig::default()).with_node(NodeSpec::switch("switch")).spawn(sim_end);
+    // New network keys. Keep them: they serialize with serde, and secure
+    // devices must be included again without them.
+    let keys = NetworkKeys::generate()?;
+    let (controller, mut events) = Controller::start(port, HostConfig::new(keys, None)).await?;
+
+    // Start inclusion, then press the device's button.
+    let c = controller.clone();
+    let inclusion = tokio::spawn(async move { c.include(InclusionOptions::default()).await });
+#   while !matches!(events.recv().await, Some(Event::InclusionStarted)) {}
+#   sim.press("switch").await;
+    let node = inclusion.await??.node;
+    while let Some(event) = events.recv().await {
+        if matches!(event, Event::InterviewCompleted { node: n } if n == node) {
+            break;
+        }
+    }
+
+    // Turn it on: Binary Switch (command class 0x25), endpoint 0.
+    let switch = ValueId { node, endpoint: 0, cc: 0x25, property: "current".into() };
+    controller.set_value(&switch, &ValueKind::Bool(true)).await?;
+    Ok(())
+}
 ```
 
-## The simulator
+The [library guide](https://pulzar-net.github.io/zwave-bridge/library/index.html)
+covers each crate, and the [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html)
+cover every item.
 
-```sh
-cargo run -p zwave-sim -- 127.0.0.1:4545
-# in another shell, with [serial] port = "tcp://127.0.0.1:4545"
-zwave-bridge --config config.toml
+## Architecture
+
+```text
+ Home Assistant, Node-RED, scripts
+                │  MQTT (JSON, Home Assistant discovery)
+┌───────────────┴───────────────────────────────────────┐
+│ zwave-bridge    topics, requests, discovery, device   │
+│                 files                                 │
+├───────────────────────────────────────────────────────┤
+│ zwave-host      inclusion, S2/S0 bootstrapping,       │
+│                 interview, wake-up queues, values,    │
+│                 node store, topology, NVM, firmware   │
+├──────────────────┬──────────────────┬─────────────────┤
+│ zwave-cc         │ zwave-security   │                 │
+│ command classes  │ S0, S2, DSK, QR  │                 │
+├──────────────────┴──────────────────┘                 │
+│ zwave-serial    Serial API frames and link layer      │
+└──────────────────────────┬────────────────────────────┘
+                           │ serial or TCP
+             Z-Wave controller (or zwave-sim)
+                           │
+               Z-Wave mesh: devices
 ```
 
-Type `press s2`, `wake sleeper`, `temp s2 23.5`, `motion s2` or
-`power smartstart` into the simulator to act on its nodes.
+The controller's firmware runs the radio and the mesh routing. Everything
+above it runs in the host, including S0 and S2 encryption, which Z-Wave
+requires the host to do. The
+[architecture page](https://pulzar-net.github.io/zwave-bridge/architecture.html)
+explains the layers, the event flow and the design rules (no `unsafe`, no
+panics on radio input, bounded memory).
 
-## Budgets
+## Compared with other projects
 
-Designed for small gateways: under 16 MB resident with 200 nodes and a
-static binary under 4 MB (checked in CI for aarch64 and mipsel musl).
+| | zwave-bridge | [Z-Wave JS](https://zwave-js.github.io/zwave-js/) with [Z-Wave JS UI](https://zwave-js.github.io/zwave-js-ui/) |
+|---|---|---|
+| Language and runtime | Rust, one static binary | Node.js |
+| Command classes | 22 so far | nearly all of them |
+| Device database | reads Z-Wave JS's device files (next release) | its own, the largest there is |
+| Interface | MQTT and Home Assistant MQTT discovery | Home Assistant integration, MQTT, web UI |
+| Small hardware | runs on 128 MB MIPS routers | needs a Node.js capable host |
+| Embeddable library | yes, Rust crates | yes, TypeScript |
+| Maturity | 0.x, not yet hardware-tested | mature, very widely used |
 
-## Development
+**Pick Z-Wave JS** if you want the broadest device support today, a web UI,
+or Home Assistant's native Z-Wave integration: it is mature and maintained by
+a large community. **Pick zwave-bridge** if you need Z-Wave on
+hardware too small for Node.js, a single static binary, or a Z-Wave stack to
+embed in Rust software, and your devices use the command classes it
+implements. zwave-bridge reads Z-Wave JS's device files as published rather
+than keeping its own database, so device knowledge is shared, not forked.
 
-```sh
-cargo test --workspace           # unit tests, NIST and RFC vectors, simulator end to end
-cargo clippy --workspace --all-targets -- -D warnings
-cd fuzz && cargo +nightly fuzz run command_classes   # see fuzz/fuzz_targets
-```
+## Roadmap
 
-The MQTT end-to-end test needs `mosquitto` on `PATH` and is skipped without
-it locally; CI requires it. Parsers have no `unsafe`, are bounded by their
-input and are fuzzed in CI on every commit. Crypto primitives come from
-RustCrypto and dalek; the only construction written here is S2's AES-128
-CTR_DRBG, checked against NIST's CAVP vectors.
+- **Next release:** Z-Wave Long Range, device firmware updates, Z-Wave JS
+  device files and parameters by name, NVM restore (all done on `main`); and
+  the first reports from real hardware.
+- **After that:** converting NVM backups between 700 and 800 series, more
+  command classes.
 
-## Certification and trademarks
+Ideas and requests go in [issues](https://github.com/pulzar-net/zwave-bridge/issues).
 
-Z-Wave is a trademark of Silicon Labs. This project is not affiliated with
-or certified by the Z-Wave Alliance. A product that uses it can only be
-marketed as Z-Wave (name or logo) after Z-Wave Alliance certification of that
-product, which requires Alliance membership.
+## Contributing
+
+Contributions are welcome, from hardware reports to code. The whole stack
+can be developed and tested without hardware, using the simulator. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test, fuzz and send a
+change, and [the code of conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+On first start the bridge writes the network keys to `keys.json` in the data
+directory, readable by its owner only. **Back it up and keep it secret:**
+anyone with it can read and control the network, and without it secure
+devices must be included again.
+
+Please report vulnerabilities privately through
+[GitHub private vulnerability reporting](https://github.com/pulzar-net/zwave-bridge/security/advisories/new),
+never in a public issue. See [SECURITY.md](SECURITY.md) for what to include
+and how fast we respond, and the
+[security model](https://pulzar-net.github.io/zwave-bridge/security.html)
+for what the bridge protects.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Data tables derived from Z-Wave JS (MIT) are
+MIT. See [LICENSE](LICENSE). Data tables derived from Z-Wave JS (MIT) are
 credited in [NOTICE](NOTICE).
+
+Z-Wave is a trademark of Silicon Labs. This project is not affiliated with
+or certified by the Z-Wave Alliance; a product that uses it can only be
+marketed as Z-Wave after Z-Wave Alliance certification of that product.
+
+## Maintained by Pulzar
+
+zwave-bridge is maintained by [Pulzar](https://pulzr.net), which uses it in
+its own gateways. It is developed in the open, for anyone to use.

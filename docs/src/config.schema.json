@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Config",
+  "description": "The whole configuration.",
+  "type": "object",
+  "properties": {
+    "serial": {
+      "description": "The controller.",
+      "$ref": "#/$defs/Serial"
+    },
+    "store": {
+      "description": "Where state lives.",
+      "$ref": "#/$defs/Store",
+      "default": {
+        "dir": "/var/lib/zwave-bridge"
+      }
+    },
+    "mqtt": {
+      "description": "The broker.",
+      "$ref": "#/$defs/Mqtt",
+      "default": {
+        "host": "127.0.0.1",
+        "port": 1883,
+        "client_id": "zwave-bridge",
+        "username": null,
+        "password": null,
+        "password_file": null,
+        "base_topic": "zwave",
+        "keep_alive": 30
+      }
+    },
+    "homeassistant": {
+      "description": "Home Assistant discovery.",
+      "$ref": "#/$defs/HomeAssistant",
+      "default": {
+        "enabled": true,
+        "discovery_prefix": "homeassistant"
+      }
+    },
+    "network": {
+      "description": "Network behavior.",
+      "$ref": "#/$defs/Network",
+      "default": {
+        "wake_up_interval": 3600,
+        "inclusion_timeout": 60
+      }
+    },
+    "devices": {
+      "description": "The device library.",
+      "$ref": "#/$defs/Devices",
+      "default": {
+        "dir": null
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "serial"
+  ],
+  "$defs": {
+    "Serial": {
+      "description": "The controller's port.",
+      "type": "object",
+      "properties": {
+        "port": {
+          "description": "A serial device (`/dev/ttyUSB0`, `/dev/serial/by-id/...`) or `tcp://host:port`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "port"
+      ]
+    },
+    "Store": {
+      "description": "State on disk.",
+      "type": "object",
+      "properties": {
+        "dir": {
+          "description": "Directory for `nodes.json`, `keys.json` and NVM backups.",
+          "type": "string",
+          "default": "/var/lib/zwave-bridge"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Mqtt": {
+      "description": "The MQTT broker.",
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "Host.",
+          "type": "string",
+          "default": "127.0.0.1"
+        },
+        "port": {
+          "description": "Port.",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 1883
+        },
+        "client_id": {
+          "description": "Client id.",
+          "type": "string",
+          "default": "zwave-bridge"
+        },
+        "username": {
+          "description": "User name.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "password": {
+          "description": "Password.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "password_file": {
+          "description": "A file holding the password (read at start), instead of `password`.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "base_topic": {
+          "description": "Topic prefix.",
+          "type": "string",
+          "default": "zwave"
+        },
+        "keep_alive": {
+          "description": "Keep-alive, seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 30
+        }
+      },
+      "additionalProperties": false
+    },
+    "HomeAssistant": {
+      "description": "Home Assistant MQTT discovery.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Publish discovery configs.",
+          "type": "boolean",
+          "default": true
+        },
+        "discovery_prefix": {
+          "description": "Discovery prefix.",
+          "type": "string",
+          "default": "homeassistant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Network": {
+      "description": "Network behavior.",
+      "type": "object",
+      "properties": {
+        "wake_up_interval": {
+          "description": "Wake-up interval configured on sleeping nodes, seconds.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 3600
+        },
+        "inclusion_timeout": {
+          "description": "How long inclusion and exclusion wait for a node, seconds.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "Devices": {
+      "description": "Device configuration files in Z-Wave JS's format.",
+      "type": "object",
+      "properties": {
+        "dir": {
+          "description": "The `config/devices` directory of an `@zwave-js/config` release.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

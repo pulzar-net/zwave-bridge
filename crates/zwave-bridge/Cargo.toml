@@ -14,6 +14,11 @@ categories = ["command-line-utilities", "network-programming", "embedded"]
 name = "zwave-bridge"
 path = "src/main.rs"
 
+[features]
+## Derive a JSON Schema for the configuration, from which the docs' configuration
+## reference is generated (tests/config_reference.rs).
+schema = ["dep:schemars"]
+
 [dependencies]
 zwave-host.workspace = true
 zwave-serial = { workspace = true, features = ["serialport"] }
@@ -27,12 +32,17 @@ toml = { version = "0.8", default-features = false, features = ["parse"] }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
 lexopt = "0.3"
+schemars = { version = "1", optional = true, features = ["preserve_order"] }
 anyhow = "1"
 
 [dev-dependencies]
 zwave-sim.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time", "process", "net"] }
 tempfile = "3"
+
+[[test]]
+name = "config_reference"
+required-features = ["schema"]
 
 [lints]
 workspace = true

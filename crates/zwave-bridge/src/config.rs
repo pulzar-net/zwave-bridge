@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 /// The whole configuration.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     /// The controller.
@@ -28,6 +29,7 @@ pub struct Config {
 
 /// Device configuration files in Z-Wave JS's format.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Devices {
     /// The `config/devices` directory of an `@zwave-js/config` release.
@@ -37,6 +39,7 @@ pub struct Devices {
 
 /// The controller's port.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Serial {
     /// A serial device (`/dev/ttyUSB0`, `/dev/serial/by-id/...`) or `tcp://host:port`.
@@ -45,6 +48,7 @@ pub struct Serial {
 
 /// State on disk.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Store {
     /// Directory for `nodes.json`, `keys.json` and NVM backups.
@@ -64,6 +68,7 @@ impl Default for Store {
 
 /// The MQTT broker.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Mqtt {
     /// Host.
@@ -125,6 +130,7 @@ impl Default for Mqtt {
 
 /// Home Assistant MQTT discovery.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HomeAssistant {
     /// Publish discovery configs.
@@ -153,6 +159,7 @@ impl Default for HomeAssistant {
 
 /// Network behavior.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "schema", derive(serde::Serialize, schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Network {
     /// Wake-up interval configured on sleeping nodes, seconds.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/pulzar-net/zwave-bridge/security/advisories/new
+    about: Report it privately. Never open a public issue for a security problem.
+  - name: Documentation
+    url: https://pulzar-net.github.io/zwave-bridge/
+    about: Installation, configuration, MQTT topics, hardware, troubleshooting and FAQ.

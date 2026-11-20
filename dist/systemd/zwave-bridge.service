@@ -1,0 +1,57 @@
+# zwave-bridge as a systemd service.
+#
+#   sudo install -m 0644 zwave-bridge.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now zwave-bridge
+#
+# The bridge runs as an unprivileged dynamic user in the dialout group, which
+# can open USB serial devices on most distributions. Its data directory is
+# /var/lib/zwave-bridge (StateDirectory), its configuration
+# /etc/zwave-bridge/config.toml.
+
+[Unit]
+Description=Z-Wave to MQTT bridge
+Documentation=https://pulzar-net.github.io/zwave-bridge/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/zwave-bridge --config /etc/zwave-bridge/config.toml
+# Any failure restarts it, including the deliberate exit after an NVM restore.
+Restart=on-failure
+RestartSec=5
+Environment=RUST_LOG=info
+
+DynamicUser=yes
+SupplementaryGroups=dialout
+StateDirectory=zwave-bridge
+StateDirectoryMode=0700
+# The MQTT password, if the broker needs one: keep the file readable by root
+# only and point mqtt.password_file at
+# /run/credentials/zwave-bridge.service/mqtt-password.
+#LoadCredential=mqtt-password:/etc/zwave-bridge/mqtt-password
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
