@@ -1,0 +1,18 @@
+# Rust crates (the workspace and the fuzz crate) and GitHub Actions are
+# bumped weekly in one grouped pull request each; CI gates every bump.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories: ["/", "/fuzz"]
+    schedule:
+      interval: weekly
+    groups:
+      rust:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
