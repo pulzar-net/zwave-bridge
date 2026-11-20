@@ -615,3 +615,26 @@ async fn nvm_restore_checks_compatibility() {
     // Something that is not an NVM image at all.
     assert!(c.restore_nvm(&[0u8; 100]).await.is_err());
 }
+
+/// `flush` and the background writer never race on the store's temporary file.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn store_writes_do_not_race() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut cfg = config(NetworkKeys::generate().unwrap(), dir.path());
+    cfg.store_delay = Duration::ZERO;
+    let (host, dev) = tokio::io::duplex(16 * 1024);
+    let h = sim().spawn(dev);
+    let (c, mut ev) = Controller::start(host, cfg).await.unwrap();
+    let r = include(&c, &mut ev, &h, "switch", InclusionOptions::default()).await;
+    for i in 0..200 {
+        c.set_name(r.node, Some(format!("switch {i}")), None)
+            .unwrap();
+        c.flush().unwrap();
+        if i % 20 == 0 {
+            tokio::task::yield_now().await;
+        }
+    }
+    c.flush().unwrap();
+    let stored = zwave_host::store::load(&dir.path().join("nodes.json")).unwrap();
+    assert_eq!(stored.nodes[&r.node].name.as_deref(), Some("switch 199"));
+}

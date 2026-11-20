@@ -5,6 +5,8 @@ All notable changes are listed here. The project follows
 
 ## Unreleased
 
+- `zwave-host`: store writes are serialized; `flush` racing the background
+  writer could fail on the shared temporary file or leave an older snapshot.
 - `zwave-host`: `device_config` reads Z-Wave JS device files as published
   (JSON5, `$import`, `$if`, partial parameters, associations, compat flags)
   from a directory or an in-memory map; `Controller::configure` writes

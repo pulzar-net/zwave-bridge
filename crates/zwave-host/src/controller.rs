@@ -252,6 +252,8 @@ pub(crate) struct Inner {
     pending_events: Arc<AtomicUsize>,
     dirty: Notify,
     store_failed: Mutex<Option<String>>,
+    /// Held while the store file is written, so two writes never race on its temporary file.
+    store_io: Arc<Mutex<()>>,
     node_locks: Mutex<HashMap<NodeId, Arc<tokio::sync::Mutex<()>>>>,
     reassembler: Mutex<transport_service::Reassembler>,
     supervision_session: AtomicU8,
@@ -518,6 +520,7 @@ impl Controller {
             pending_events,
             dirty: Notify::new(),
             store_failed: Mutex::new(None),
+            store_io: Arc::new(Mutex::new(())),
             node_locks: Mutex::new(HashMap::new()),
             reassembler: Mutex::new(transport_service::Reassembler::default()),
             supervision_session: AtomicU8::new(0),
@@ -632,6 +635,7 @@ impl Controller {
         let Some(path) = self.inner.cfg.store_path.clone() else {
             return Ok(());
         };
+        let _io = self.inner.store_io.lock().expect("store io lock");
         let data = self.inner.store.lock().expect("store lock").clone();
         store::save(&path, &data).map_err(Error::Store)
     }
@@ -663,9 +667,16 @@ impl Controller {
             drop(inner);
             tokio::time::sleep(delay).await;
             let Some(inner) = weak.upgrade() else { return };
-            let data = inner.store.lock().expect("store lock").clone();
             let p = path.clone();
-            let res = tokio::task::spawn_blocking(move || store::save(&p, &data)).await;
+            let io = inner.store_io.clone();
+            let snapshot = inner.clone();
+            // Snapshot under the write lock, so the newest data is always written last.
+            let res = tokio::task::spawn_blocking(move || {
+                let _io = io.lock().expect("store io lock");
+                let data = snapshot.store.lock().expect("store lock").clone();
+                store::save(&p, &data)
+            })
+            .await;
             let err = match res {
                 Ok(Ok(())) => None,
                 Ok(Err(e)) => Some(e),
