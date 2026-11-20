@@ -3,6 +3,16 @@
 All notable changes are listed here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- `zwave-host`: `device_config` reads Z-Wave JS device files as published
+  (JSON5, `$import`, `$if`, partial parameters, associations, compat flags)
+  from a directory or an in-memory map; `Controller::configure` writes
+  settings by parameter key, merging partial parameters. CI loads every file
+  of the latest `@zwave-js/config` release.
+- `zwave-bridge`: `[devices] dir`, device names in Home Assistant, the
+  `parameters` topic and the `configure` request.
+
 ## 0.1.0 (2026-11-19)
 
 First release.

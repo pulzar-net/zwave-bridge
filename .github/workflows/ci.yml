@@ -31,6 +31,15 @@ jobs:
       - name: Mosquitto for the MQTT end-to-end test
         timeout-minutes: 10
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mosquitto
+      - name: Latest @zwave-js/config, to load every device file
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          v=$(curl -sf https://registry.npmjs.org/@zwave-js/config/latest | jq -r .version)
+          echo "@zwave-js/config ${v}"
+          curl -sfL "https://registry.npmjs.org/@zwave-js/config/-/config-${v}.tgz" | tar -xz -C "${RUNNER_TEMP}"
+          echo "ZWAVE_JS_CONFIG_DIR=${RUNNER_TEMP}/package/config/devices" >> "${GITHUB_ENV}"
+          echo "ZWAVE_JS_CONFIG_REQUIRED=1" >> "${GITHUB_ENV}"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace

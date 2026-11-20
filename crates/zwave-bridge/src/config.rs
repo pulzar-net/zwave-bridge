@@ -21,6 +21,18 @@ pub struct Config {
     /// Network behavior.
     #[serde(default)]
     pub network: Network,
+    /// The device library.
+    #[serde(default)]
+    pub devices: Devices,
+}
+
+/// Device configuration files in Z-Wave JS's format.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Devices {
+    /// The `config/devices` directory of an `@zwave-js/config` release.
+    #[serde(default)]
+    pub dir: Option<PathBuf>,
 }
 
 /// The controller's port.

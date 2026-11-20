@@ -116,6 +116,8 @@ enum FromMqtt {
 
 struct Bridge {
     cfg: Config,
+    library: Option<std::sync::Arc<zwave_host::device_config::Library>>,
+    devices: HashMap<u16, std::sync::Arc<zwave_host::device_config::DeviceConfig>>,
     c: Controller,
     mqtt: AsyncClient,
     base: String,
@@ -190,14 +192,25 @@ pub async fn run<P: Port>(
         }
     });
     let (rtx, mut rrx) = mpsc::channel::<(String, Json)>(64);
+    let library = cfg.devices.dir.as_ref().map(|d| {
+        info!("device library: {}", d.display());
+        std::sync::Arc::new(zwave_host::device_config::Library::new(
+            zwave_host::device_config::DirSource::new(d),
+        ))
+    });
     let mut b = Bridge {
         cfg,
+        library,
+        devices: HashMap::new(),
         c,
         mqtt,
         base,
         discovered: HashMap::new(),
         responses: rtx,
     };
+    for n in b.c.nodes() {
+        b.load_device(n.id);
+    }
     tokio::pin!(shutdown);
     loop {
         tokio::select! {
@@ -293,11 +306,53 @@ impl Bridge {
         let mut body = serde_json::to_value(&rec).unwrap_or(Json::Null);
         let status = status_name(self.c.status(node));
         body["status"] = json!(status);
+        if let Some(d) = self.devices.get(&node) {
+            body["device"] = json!({"file": d.file, "manufacturer": d.manufacturer, "label": d.label, "description": d.description});
+        }
         self.publish(&format!("{}/nodes/{node}", self.base), &body, true)
             .await;
         self.publish_raw(
             &format!("{}/nodes/{node}/status", self.base),
             status.as_bytes().to_vec(),
+            true,
+        )
+        .await;
+    }
+
+    /// Finds the node's device file in the library, if there is one.
+    fn load_device(&mut self, node: u16) {
+        let (Some(lib), Some(rec)) = (&self.library, self.c.node(node)) else {
+            return;
+        };
+        let Some(id) = zwave_host::device_config::device_id(&rec) else {
+            return;
+        };
+        match lib.lookup(&id) {
+            Ok(Some(d)) => {
+                info!(node, file = %d.file, "device file: {} {}", d.manufacturer, d.label);
+                self.devices.insert(node, std::sync::Arc::new(d));
+            }
+            Ok(None) => debug!(node, "no device file"),
+            Err(e) => warn!(node, "device file: {e}"),
+        }
+    }
+
+    async fn publish_parameters(&self, node: u16) {
+        let Some(d) = self.devices.get(&node) else {
+            return;
+        };
+        let params: Vec<Json> = d
+            .params
+            .iter()
+            .map(|p| {
+                json!({"key": p.key, "label": p.label, "description": p.description, "size": p.size, "min": p.min, "max": p.max,
+                       "default": p.default, "unsigned": p.unsigned, "read_only": p.read_only, "unit": p.unit,
+                       "options": p.options.iter().map(|(v, l)| json!({"value": v, "label": l})).collect::<Vec<_>>()})
+            })
+            .collect();
+        self.publish(
+            &format!("{}/nodes/{node}/parameters", self.base),
+            &json!(params),
             true,
         )
         .await;
@@ -329,7 +384,7 @@ impl Bridge {
                 }
                 if self.cfg.homeassistant.enabled && !self.discovered.get(&v.id.node).is_some_and(|s| s.contains(&key)) {
                     if let Some(rec) = self.c.node(v.id.node) {
-                        if let Some(d) = discovery::for_value(&self.cfg.homeassistant.discovery_prefix, &self.base, self.c.info().home_id, &rec, &v) {
+                        if let Some(d) = discovery::for_value(&self.cfg.homeassistant.discovery_prefix, &self.base, self.c.info().home_id, &rec, self.devices.get(&v.id.node).map(|d| d.as_ref()), &v) {
                             self.publish(&d.topic, &d.config, true).await;
                         }
                         self.discovered.entry(v.id.node).or_default().insert(key);
@@ -349,6 +404,8 @@ impl Bridge {
             }
             Event::NodeUpdated { node } | Event::NodeStatus { node, .. } => self.publish_node(node).await,
             Event::InterviewCompleted { node } => {
+                self.load_device(node);
+                self.publish_parameters(node).await;
                 self.event(json!({"event": "interview_completed", "node": node})).await;
                 self.publish_node(node).await;
             }
@@ -595,6 +652,30 @@ impl Bridge {
                     false,
                 )
                 .await;
+            }
+            "configure" => {
+                let device = node.and_then(|n| self.devices.get(&n).cloned());
+                let settings: Vec<(String, i64)> = args
+                    .get("settings")
+                    .and_then(Json::as_object)
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| Some((k.clone(), v.as_i64()?)))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.respond_later(action, async move {
+                    match (node, device) {
+                        (Some(n), Some(d)) => reply(
+                            c.configure(n, &d, &settings)
+                                .await
+                                .map(|_| json!({"node": n}))
+                                .map_err(|e| e.to_string()),
+                        ),
+                        (Some(n), None) => reply(Err(format!("no device file for node {n}"))),
+                        _ => reply(Err("give \"node\" and \"settings\"".into())),
+                    }
+                });
             }
             "topology" => {
                 self.respond_later(action, async move {

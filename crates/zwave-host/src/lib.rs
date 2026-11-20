@@ -24,6 +24,7 @@
 #![warn(missing_docs)]
 
 mod controller;
+pub mod device_config;
 mod inclusion;
 mod interview;
 pub mod node;

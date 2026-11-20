@@ -3,9 +3,9 @@
 
 use std::collections::BTreeMap;
 use zwave_cc::{
-    association, basic, battery, binary_switch, manufacturer_specific, meter, multilevel_sensor,
-    notification, security, security_2, supervision, version, wake_up, zwave_plus_info, Command,
-    Value,
+    association, basic, battery, binary_switch, configuration, manufacturer_specific, meter,
+    multilevel_sensor, notification, security, security_2, supervision, version, wake_up,
+    zwave_plus_info, Command, Value,
 };
 use zwave_security::dsk::Dsk;
 use zwave_security::kex::{bootstrap_keys, KeyPair, ECDH_CURVE25519, KEX_SCHEME_1};
@@ -69,6 +69,7 @@ impl NodeSpec {
                 (0x85, 2),
                 (0x6c, 1),
                 (0x20, 2),
+                (0x70, 4),
             ],
             secure_only: vec![],
             product_id: 1,
@@ -217,6 +218,8 @@ pub struct SimNode {
     pub lifeline: Vec<u8>,
     /// Configured wake-up interval.
     pub wake_interval: u32,
+    /// Configuration parameters: size and value.
+    pub params: BTreeMap<u8, (u8, i32)>,
     /// Every command received, decrypted, for tests to inspect.
     pub received: Vec<Vec<u8>>,
     keypair: KeyPair,
@@ -249,6 +252,7 @@ impl SimNode {
             switch_on: false,
             lifeline: vec![],
             wake_interval: 3600,
+            params: BTreeMap::new(),
             received: vec![],
             keypair,
             s2: S2Manager::new(0, 0),
@@ -560,6 +564,21 @@ impl SimNode {
             Command::Basic(basic::Command::Set(s)) => {
                 self.switch_on = s.value != 0;
                 None
+            }
+            Command::Configuration(configuration::Command::Set(s)) => {
+                self.params.insert(s.parameter, (s.size, s.value));
+                None
+            }
+            Command::Configuration(configuration::Command::Get(g)) => {
+                let (size, value) = self.params.get(&g.parameter).copied().unwrap_or((1, 0));
+                Some(
+                    configuration::Report {
+                        parameter: g.parameter,
+                        size,
+                        value,
+                    }
+                    .into(),
+                )
             }
             Command::Basic(basic::Command::Get(_)) => Some(
                 basic::Report {

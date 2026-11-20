@@ -1596,6 +1596,66 @@ impl Controller {
         Ok(())
     }
 
+    /// Applies configuration settings keyed as in the node's device file
+    /// (`"3"`, `"41[0xf00]"`): partial parameters are read, merged and written
+    /// as one value; each written parameter is read back so its value is
+    /// reported.
+    pub async fn configure(
+        &self,
+        node: NodeId,
+        config: &crate::device_config::DeviceConfig,
+        settings: &[(String, i64)],
+    ) -> Result<(), Error> {
+        use crate::device_config::plan_settings;
+        use zwave_cc::configuration;
+        let bad = |e: crate::device_config::SettingsError| Error::Controller(e.to_string());
+        let first = plan_settings(config, settings, &|_| None).map_err(bad)?;
+        let mut current: HashMap<u16, u32> = HashMap::new();
+        for w in first.iter().filter(|w| w.needs_current) {
+            let p = w.parameter;
+            let r = self
+                .req(
+                    node,
+                    0,
+                    configuration::Get { parameter: p as u8 },
+                    move |c| match c {
+                        Command::Configuration(configuration::Command::Report(r))
+                            if u16::from(r.parameter) == p =>
+                        {
+                            Some((r.value, r.size))
+                        }
+                        _ => None,
+                    },
+                )
+                .await?;
+            let raw = match r.1 {
+                1 => u32::from(r.0 as u8),
+                2 => u32::from(r.0 as u16),
+                _ => r.0 as u32,
+            };
+            current.insert(p, raw);
+        }
+        let writes = plan_settings(config, settings, &|p| current.get(&p).copied()).map_err(bad)?;
+        let supervised = self
+            .with_node(node, |r| r.root().supports(supervision::ID))
+            .unwrap_or(false);
+        for w in writes {
+            let set = w.command();
+            if supervised {
+                self.send_supervised(node, 0, &set).await?;
+            } else {
+                self.send(node, 0, &set).await?;
+            }
+            let p = w.parameter;
+            let _ = self
+                .req(node, 0, configuration::Get { parameter: p as u8 }, move |c| {
+                    matches!(c, Command::Configuration(configuration::Command::Report(r)) if u16::from(r.parameter) == p).then_some(())
+                })
+                .await;
+        }
+        Ok(())
+    }
+
     /// Pings a node (No Operation); true if it acknowledged.
     pub async fn ping(&self, node: NodeId) -> bool {
         self.transmit(node, vec![0x00]).await.is_ok()

@@ -378,3 +378,67 @@ async fn nvm_backup_store_and_restart() {
     })
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn configure_merges_partial_parameters() {
+    use zwave_host::device_config::{DeviceConfig, ParamConfig};
+    let dir = tempfile::tempdir().unwrap();
+    let (c, mut ev, h) = start(NetworkKeys::generate().unwrap(), dir.path()).await;
+    let r = include(&c, &mut ev, &h, "switch", InclusionOptions::default()).await;
+    interviewed(&mut ev, r.node).await;
+    let param = |key: &str, parameter, mask, size, max| ParamConfig {
+        parameter,
+        mask,
+        key: key.into(),
+        label: key.into(),
+        description: None,
+        size,
+        min: 0,
+        max,
+        default: 0,
+        unsigned: true,
+        read_only: false,
+        write_only: false,
+        allow_manual_entry: true,
+        options: vec![],
+        unit: None,
+    };
+    let cfg = DeviceConfig {
+        file: "test.json".into(),
+        manufacturer: String::new(),
+        manufacturer_id: 0,
+        label: String::new(),
+        description: String::new(),
+        devices: vec![],
+        firmware: ("0.0".into(), "255.255".into()),
+        associations: Default::default(),
+        params: vec![
+            param("3", 3, None, 1, 99),
+            param("7[0xf0]", 7, Some(0xf0), 2, 15),
+            param("7[0x0f]", 7, Some(0x0f), 2, 15),
+        ],
+        compat: None,
+        endpoints: None,
+        metadata: None,
+    };
+    // Parameter 7 starts at 0; each call changes one nibble and keeps the other.
+    c.configure(r.node, &cfg, &[("7[0x0f]".into(), 3)])
+        .await
+        .unwrap();
+    c.configure(r.node, &cfg, &[("3".into(), 42), ("7[0xf0]".into(), 0xa)])
+        .await
+        .unwrap();
+    let params = h.inspect("switch", |n| n.params.clone()).await.unwrap();
+    assert_eq!(params.get(&3), Some(&(1, 42)));
+    assert_eq!(params.get(&7), Some(&(2, 0xa3)));
+    assert!(
+        c.configure(r.node, &cfg, &[("3".into(), 100)])
+            .await
+            .is_err(),
+        "out of range"
+    );
+    assert!(
+        c.configure(r.node, &cfg, &[("9".into(), 1)]).await.is_err(),
+        "unknown parameter"
+    );
+}

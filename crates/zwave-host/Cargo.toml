@@ -20,6 +20,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
 tracing.workspace = true
 hex.workspace = true
+json5 = "1.3"
 
 [dev-dependencies]
 zwave-sim.workspace = true

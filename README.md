@@ -61,7 +61,25 @@ discovery_prefix = "homeassistant"
 
 [network]
 wake_up_interval = 3600
+
+[devices]
+# config/devices of an @zwave-js/config release, read as published
+dir = "/var/lib/zwave-bridge/zwave-js-config/package/config/devices"
 ```
+
+Device files come from Z-Wave JS's library, read in their own format
+(JSON5, `$import` templates, `$if` firmware conditions). Fetch a release once
+and point `[devices] dir` at it:
+
+```sh
+v=15.32.4
+mkdir -p /var/lib/zwave-bridge/zwave-js-config
+curl -sL https://registry.npmjs.org/@zwave-js/config/-/config-$v.tgz | tar -xz -C /var/lib/zwave-bridge/zwave-js-config
+```
+
+With a device file, a node's record names the device, its parameters are
+published on `zwave/nodes/<id>/parameters`, and `configure` writes them by
+key, partial parameters included: `{"node": 5, "settings": {"3": 20, "41[0xf00]": 2}}`.
 
 ```sh
 zwave-bridge --config /etc/zwave-bridge/config.toml
@@ -90,7 +108,7 @@ devices must be re-included.
 
 Requests: `include`, `exclude`, `stop`, `grant`, `validate_dsk`,
 `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`,
-`remove_failed`, `rename`, `topology`.
+`remove_failed`, `rename`, `topology`, `configure`.
 
 Including an S2 device:
 

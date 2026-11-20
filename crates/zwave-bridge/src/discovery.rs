@@ -66,6 +66,7 @@ pub fn for_value(
     base: &str,
     home_id: u32,
     node: &NodeRecord,
+    device_cfg: Option<&zwave_host::device_config::DeviceConfig>,
     v: &ValueUpdate,
 ) -> Option<Discovery> {
     let key = v.id.key();
@@ -80,6 +81,13 @@ pub fn for_value(
     if let Some(m) = node.manufacturer {
         device["manufacturer"] = json!(format!("{:#06x}", m.manufacturer_id));
         device["model"] = json!(format!("{:#06x}:{:#06x}", m.product_type, m.product_id));
+    }
+    if let Some(d) = device_cfg {
+        if node.name.is_none() {
+            device["name"] = json!(format!("{} {}", d.manufacturer, d.label).trim().to_string());
+        }
+        device["manufacturer"] = json!(d.manufacturer);
+        device["model"] = json!(d.label);
     }
     if let Some(fw) = &node.firmware {
         device["sw_version"] = json!(fw);
@@ -209,6 +217,7 @@ mod tests {
             "zwave",
             0xc0ffee01,
             &n,
+            None,
             &upd(0x31, "air_temperature", ValueKind::Number(1.0), Some("°C")),
         )
         .unwrap();
@@ -226,6 +235,7 @@ mod tests {
             "zwave",
             1,
             &n,
+            None,
             &upd(
                 0x71,
                 "home_security_motion_sensor_status",
@@ -244,6 +254,7 @@ mod tests {
             "zwave",
             1,
             &n,
+            None,
             &upd(0x25, "current", ValueKind::Bool(true), None),
         )
         .unwrap();
@@ -256,6 +267,7 @@ mod tests {
             "zwave",
             1,
             &n,
+            None,
             &upd(0x32, "electric_kwh", ValueKind::Number(1.0), Some("kWh")),
         )
         .unwrap();
@@ -265,6 +277,7 @@ mod tests {
             "zwave",
             1,
             &n,
+            None,
             &upd(0x70, "parameter_1", ValueKind::Number(1.0), None)
         )
         .is_none());
