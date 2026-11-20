@@ -74,6 +74,29 @@ fn type_name(root: &Value, schema: &Value) -> String {
     if let Some(vs) = variants(schema) {
         return vs.iter().map(|(v, _)| format!("`{v}`")).collect::<Vec<_>>().join(", ");
     }
+    // Alternatives that are not all constants: `"off"` or `{ interval_ms = integer }`.
+    if let Some(alts) = schema.get("oneOf").or_else(|| schema.get("anyOf")).and_then(Value::as_array) {
+        return alts
+            .iter()
+            .map(|alt| {
+                let alt = resolve(root, alt);
+                if let Some(c) = alt.get("const") {
+                    return format!("`{c}`");
+                }
+                match alt.get("properties").and_then(Value::as_object) {
+                    Some(p) => format!(
+                        "`{{ {} }}`",
+                        p.iter()
+                            .map(|(k, v)| format!("{k} = {}", type_name(root, v).replace('`', "")))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    None => type_name(root, alt),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" or ");
+    }
     let ty = match schema.get("type") {
         Some(Value::String(t)) => t.as_str(),
         Some(Value::Array(ts)) => ts
@@ -116,7 +139,13 @@ fn toml_value(v: &Value) -> String {
             "[{}]",
             items.iter().map(toml_value).collect::<Vec<_>>().join(", ")
         ),
-        Value::Object(m) if m.is_empty() => "{}".into(),
+        Value::Object(m) => format!(
+            "{{ {} }}",
+            m.iter()
+                .map(|(k, v)| format!("{k} = {}", toml_value(v)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         other => other.to_string(),
     }
 }
@@ -184,6 +213,16 @@ fn section(
             .and_then(Value::as_str)
             .map(one_line)
             .unwrap_or_default();
+        if let Some(alts) = inner.get("oneOf").and_then(Value::as_array).filter(|_| variants(inner).is_none()) {
+            let docs: Vec<String> = alts
+                .iter()
+                .filter_map(|a| a.get("description").and_then(Value::as_str))
+                .map(one_line)
+                .collect();
+            if !docs.is_empty() {
+                doc = format!("{doc} {}", docs.join(" "));
+            }
+        }
         if let Some(vs) = variants(inner) {
             let docs: Vec<String> = vs
                 .iter()
