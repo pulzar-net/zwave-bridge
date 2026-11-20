@@ -1861,7 +1861,8 @@ impl Controller {
     ) -> Result<(), Error> {
         use crate::device_config::parse_param_key;
         use zwave_cc::configuration;
-        let mut params: Vec<(u16, Vec<(Option<u32>, i64)>)> = Vec::new();
+        type Parts = Vec<(Option<u32>, i64)>;
+        let mut params: Vec<(u16, Parts)> = Vec::new();
         for (key, value) in settings {
             let (p, mask) = parse_param_key(key)
                 .ok_or_else(|| Error::Controller(format!("bad parameter key {key}")))?;
