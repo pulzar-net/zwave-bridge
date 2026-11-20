@@ -87,7 +87,7 @@ for bridge in zwave-bridge "${build}"; do
     echo "press switch" >&3
     wait_for "homeassistant/switch/zwave_${home}_2/binary_switch_current/config" \
         '.state_topic == "zwave/nodes/2/binary_switch/current"' 90
-    wait_for zwave/nodes/2/binary_switch/current '.value | booleans' 60
+    wait_for zwave/nodes/2/binary_switch/current '.value | type == "boolean"' 60
 
     sudo pkill -f -- "zwave-bridge --config" || true
     sleep 1
