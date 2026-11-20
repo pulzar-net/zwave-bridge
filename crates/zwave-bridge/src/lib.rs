@@ -428,6 +428,12 @@ impl Bridge {
                 let body = json!({"endpoint": endpoint, "cc": command.cc(), "command": command.name(), "frame": hex(&command.encode())});
                 self.publish(&format!("{}/nodes/{node}/command", self.base), &body, false).await;
             }
+            Event::FirmwareUpdateProgress { node, sent, total } => {
+                self.event(json!({"event": "firmware_update_progress", "node": node, "sent": sent, "total": total})).await
+            }
+            Event::FirmwareUpdateFinished { node, status, success } => {
+                self.event(json!({"event": "firmware_update_finished", "node": node, "status": status, "success": success})).await
+            }
             Event::ProvisioningChanged { entries } => self.event(json!({"event": "provisioning_changed", "entries": provisioning_json(&entries)})).await,
         }
     }
@@ -652,6 +658,34 @@ impl Bridge {
                     false,
                 )
                 .await;
+            }
+            "firmware_update" => {
+                // Only files the operator put in <store>/firmware, never a path from the network.
+                let dir = self.cfg.store.dir.join("firmware");
+                let file = args.get("file").and_then(Json::as_str).map(String::from);
+                let target = args.get("target").and_then(Json::as_u64).unwrap_or(0) as u8;
+                self.respond_later(action, async move {
+                    let (Some(n), Some(file)) = (node, file) else {
+                        return reply(Err("give \"node\" and \"file\"".into()));
+                    };
+                    if file.contains('/') || file.contains('\\') || file.starts_with('.') {
+                        return reply(Err("\"file\" is a name in the firmware directory".into()));
+                    }
+                    let bytes = match std::fs::read(dir.join(&file)) {
+                        Ok(b) => b,
+                        Err(e) => return reply(Err(format!("{file}: {e}"))),
+                    };
+                    let image = match zwave_host::firmware::read_image(&file, &bytes) {
+                        Ok(i) => i,
+                        Err(e) => return reply(Err(format!("{file}: {e}"))),
+                    };
+                    reply(
+                        c.update_firmware(n, &image, target)
+                            .await
+                            .map(|r| json!({"node": n, "status": r.status, "success": r.success(), "wait_time": r.wait_time, "activated": r.activated}))
+                            .map_err(|e| e.to_string()),
+                    )
+                });
             }
             "configure" => {
                 let device = node.and_then(|n| self.devices.get(&n).cloned());

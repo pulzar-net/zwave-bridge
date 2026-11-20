@@ -25,6 +25,7 @@
 
 mod controller;
 pub mod device_config;
+pub mod firmware;
 mod inclusion;
 mod interview;
 pub mod node;
@@ -258,6 +259,24 @@ pub enum Event {
         endpoint: u8,
         /// The command.
         command: zwave_cc::Command,
+    },
+    /// Fragments sent so far in a firmware update.
+    FirmwareUpdateProgress {
+        /// The node.
+        node: NodeId,
+        /// Fragments sent.
+        sent: u16,
+        /// Fragments in the image.
+        total: u16,
+    },
+    /// A firmware update ended.
+    FirmwareUpdateFinished {
+        /// The node.
+        node: NodeId,
+        /// The node's status byte.
+        status: u8,
+        /// Whether the node accepted the image.
+        success: bool,
     },
     /// The provisioning list changed.
     ProvisioningChanged {

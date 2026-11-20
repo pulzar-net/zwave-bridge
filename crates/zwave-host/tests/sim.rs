@@ -442,3 +442,47 @@ async fn configure_merges_partial_parameters() {
         "unknown parameter"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn firmware_update_over_s2() {
+    let dir = tempfile::tempdir().unwrap();
+    let (c, mut ev, h) = start(NetworkKeys::generate().unwrap(), dir.path()).await;
+    let r = include(
+        &c,
+        &mut ev,
+        &h,
+        "s2",
+        InclusionOptions {
+            grant: GrantPolicy::Only(vec![SecurityClass::S2Unauthenticated]),
+            ..Default::default()
+        },
+    )
+    .await;
+    interviewed(&mut ev, r.node).await;
+    assert!(c.node(r.node).unwrap().root().ccs[&0x7a].secure);
+    // An image of several fragments, not a multiple of the fragment size.
+    let image: Vec<u8> = (0..1000u32).map(|i| (i * 31 + 7) as u8).collect();
+    let res = c.update_firmware(r.node, &image, 0).await.unwrap();
+    assert!(res.success(), "{res:?}");
+    assert_eq!(res.wait_time, Some(5));
+    assert_eq!(
+        h.inspect("s2", |n| n.firmware.clone()).await.unwrap(),
+        image
+    );
+    expect(&mut ev, "progress", |e| {
+        matches!(e, Event::FirmwareUpdateProgress { sent, total, .. } if sent == total)
+            .then_some(())
+    })
+    .await;
+    // The node got each fragment exactly once (decrypted on its side).
+    let fragments = h
+        .inspect("s2", |n| {
+            n.received
+                .iter()
+                .filter(|f| f.starts_with(&[0x7a, 0x06]))
+                .count()
+        })
+        .await
+        .unwrap();
+    assert_eq!(fragments, 1000usize.div_ceil(28));
+}

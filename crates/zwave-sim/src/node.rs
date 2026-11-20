@@ -3,9 +3,9 @@
 
 use std::collections::BTreeMap;
 use zwave_cc::{
-    association, basic, battery, binary_switch, configuration, manufacturer_specific, meter,
-    multilevel_sensor, notification, security, security_2, supervision, version, wake_up,
-    zwave_plus_info, Command, Value,
+    association, basic, battery, binary_switch, configuration, firmware_update_md,
+    manufacturer_specific, meter, multilevel_sensor, notification, security, security_2,
+    supervision, version, wake_up, zwave_plus_info, Command, Value,
 };
 use zwave_security::dsk::Dsk;
 use zwave_security::kex::{bootstrap_keys, KeyPair, ECDH_CURVE25519, KEX_SCHEME_1};
@@ -70,6 +70,7 @@ impl NodeSpec {
                 (0x6c, 1),
                 (0x20, 2),
                 (0x70, 4),
+                (0x7a, 5),
             ],
             secure_only: vec![],
             product_id: 1,
@@ -121,8 +122,9 @@ impl NodeSpec {
                 (0x72, 2),
                 (0x86, 3),
                 (0x85, 2),
+                (0x7a, 5),
             ],
-            secure_only: vec![0x31, 0x71, 0x72, 0x86, 0x85],
+            secure_only: vec![0x31, 0x71, 0x72, 0x86, 0x85, 0x7a],
             product_id: 3,
             private_key: [0x33; 32],
         }
@@ -218,6 +220,9 @@ pub struct SimNode {
     pub lifeline: Vec<u8>,
     /// Configured wake-up interval.
     pub wake_interval: u32,
+    /// The installed firmware image.
+    pub firmware: Vec<u8>,
+    fw_rx: Option<(u16, u16, Vec<u8>, u16)>,
     /// Configuration parameters: size and value.
     pub params: BTreeMap<u8, (u8, i32)>,
     /// Every command received, decrypted, for tests to inspect.
@@ -252,6 +257,8 @@ impl SimNode {
             switch_on: false,
             lifeline: vec![],
             wake_interval: 3600,
+            firmware: b"simulated firmware 1.2".to_vec(),
+            fw_rx: None,
             params: BTreeMap::new(),
             received: vec![],
             keypair,
@@ -411,6 +418,37 @@ impl SimNode {
 
     fn application(&mut self, frame: &[u8], sec: Sec) -> Vec<Vec<u8>> {
         self.received.push(frame.to_vec());
+        if frame.starts_with(&[0x7a, 0x06]) && self.supports(0x7a, sec) {
+            return self.firmware_fragment(frame, sec);
+        }
+        if frame.starts_with(&[0x7a, 0x03]) && self.supports(0x7a, sec) {
+            if let Ok(Command::FirmwareUpdateMd(firmware_update_md::Command::RequestGet(r))) =
+                Command::parse(frame)
+            {
+                let size = r.fragment_size.unwrap_or(32);
+                self.fw_rx = Some((r.checksum, size, Vec::new(), 1));
+                let mut out = self.send(
+                    Command::from(firmware_update_md::RequestReport {
+                        status: 0xff,
+                        resume: Some(false),
+                        non_secure: Some(false),
+                    })
+                    .encode(),
+                    sec,
+                );
+                out.extend(
+                    self.send(
+                        Command::from(firmware_update_md::Get {
+                            count: 2,
+                            report: 1,
+                        })
+                        .encode(),
+                        sec,
+                    ),
+                );
+                return out;
+            }
+        }
         let Ok(cmd) = Command::parse(frame) else {
             return vec![];
         };
@@ -565,6 +603,18 @@ impl SimNode {
                 self.switch_on = s.value != 0;
                 None
             }
+            Command::FirmwareUpdateMd(firmware_update_md::Command::MetaDataGet(_)) => Some(
+                firmware_update_md::MetaDataReport {
+                    manufacturer_id: 0xfffe,
+                    firmware_id: 0x0001,
+                    checksum: zwave_cc::crc16::checksum(&self.firmware),
+                    upgradable: Some(0xff),
+                    additional_targets: Some(0),
+                    max_fragment_size: Some(36),
+                    rest: vec![],
+                }
+                .into(),
+            ),
             Command::Configuration(configuration::Command::Set(s)) => {
                 self.params.insert(s.parameter, (s.size, s.value));
                 None
@@ -624,6 +674,64 @@ impl SimNode {
             Some(r) => self.send(r.encode(), sec),
             None => vec![],
         }
+    }
+
+    fn firmware_fragment(&mut self, frame: &[u8], sec: Sec) -> Vec<Vec<u8>> {
+        let Some((checksum, _size, data, next)) = self.fw_rx.as_mut() else {
+            return vec![];
+        };
+        if frame.len() < 6 {
+            return vec![];
+        }
+        let (body, crc) = frame.split_at(frame.len() - 2);
+        if zwave_cc::crc16::checksum(body) != u16::from_be_bytes([crc[0], crc[1]]) {
+            // A corrupt fragment: ask for it again.
+            let again = *next;
+            return self.send(
+                Command::from(firmware_update_md::Get {
+                    count: 1,
+                    report: again,
+                })
+                .encode(),
+                sec,
+            );
+        }
+        let header = u16::from_be_bytes([body[2], body[3]]);
+        let (number, last) = (header & 0x7fff, header & 0x8000 != 0);
+        if number != *next {
+            return vec![];
+        }
+        data.extend_from_slice(&body[4..]);
+        *next += 1;
+        if last {
+            let ok = zwave_cc::crc16::checksum(data) == *checksum;
+            let image = std::mem::take(data);
+            self.fw_rx = None;
+            if ok {
+                self.firmware = image;
+            }
+            let status = if ok { 0xff } else { 0x00 };
+            return self.send(
+                Command::from(firmware_update_md::StatusReport {
+                    status,
+                    wait_time: Some(5),
+                })
+                .encode(),
+                sec,
+            );
+        }
+        if (*next - 1) % 2 == 0 {
+            let n = *next;
+            return self.send(
+                Command::from(firmware_update_md::Get {
+                    count: 2,
+                    report: n,
+                })
+                .encode(),
+                sec,
+            );
+        }
+        vec![]
     }
 
     fn switch_report(&self) -> Command {

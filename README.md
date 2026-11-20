@@ -108,7 +108,9 @@ devices must be re-included.
 
 Requests: `include`, `exclude`, `stop`, `grant`, `validate_dsk`,
 `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`,
-`remove_failed`, `rename`, `topology`, `configure`.
+`remove_failed`, `rename`, `topology`, `configure`, `firmware_update`
+(`{"node": 5, "file": "zse40_v2.gbl"}`, a file you placed in
+`<store dir>/firmware`; `.hex` images are converted, others sent as they are).
 
 Including an S2 device:
 

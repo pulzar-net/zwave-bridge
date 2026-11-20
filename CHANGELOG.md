@@ -10,7 +10,10 @@ All notable changes are listed here. The project follows
   from a directory or an in-memory map; `Controller::configure` writes
   settings by parameter key, merging partial parameters. CI loads every file
   of the latest `@zwave-js/config` release.
-- `zwave-bridge`: `[devices] dir`, device names in Home Assistant, the
+- `zwave-cc`: Firmware Update Meta Data (version 8).
+- `zwave-host`: `Controller::update_firmware`: CRC-checked fragments sized for
+  the node's security, activation, Intel HEX images; progress events.
+- `zwave-bridge`: `firmware_update` request; `[devices] dir`, device names in Home Assistant, the
   `parameters` topic and the `configure` request.
 
 ## 0.1.0 (2026-11-19)

@@ -184,12 +184,26 @@ pub(crate) enum Inbound {
 
 type Matcher = Box<dyn Fn(&Inbound) -> bool + Send>;
 
+enum WaiterTx {
+    Once(Option<oneshot::Sender<Inbound>>),
+    Stream(mpsc::UnboundedSender<Inbound>),
+}
+
+impl WaiterTx {
+    fn live(&self) -> bool {
+        match self {
+            WaiterTx::Once(t) => t.is_some(),
+            WaiterTx::Stream(t) => !t.is_closed(),
+        }
+    }
+}
+
 struct Waiter {
     id: u32,
     node: NodeId,
     broadcast: bool,
     matcher: Matcher,
-    tx: Option<oneshot::Sender<Inbound>>,
+    tx: WaiterTx,
 }
 
 /// Removes its waiter when dropped.
@@ -689,7 +703,35 @@ impl Controller {
                 node,
                 broadcast,
                 matcher: Box::new(matcher),
-                tx: Some(tx),
+                tx: WaiterTx::Once(Some(tx)),
+            });
+        (
+            WaitGuard {
+                inner: self.inner.clone(),
+                id,
+            },
+            rx,
+        )
+    }
+
+    /// Registers a waiter that receives every match until its guard is dropped.
+    pub(crate) fn subscribe(
+        &self,
+        node: NodeId,
+        matcher: impl Fn(&Inbound) -> bool + Send + 'static,
+    ) -> (WaitGuard, mpsc::UnboundedReceiver<Inbound>) {
+        let id = self.inner.next_waiter.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = mpsc::unbounded_channel();
+        self.inner
+            .waiters
+            .lock()
+            .expect("waiters lock")
+            .push(Waiter {
+                id,
+                node,
+                broadcast: false,
+                matcher: Box::new(matcher),
+                tx: WaiterTx::Stream(tx),
             });
         (
             WaitGuard {
@@ -705,9 +747,16 @@ impl Controller {
         let mut w = self.inner.waiters.lock().expect("waiters lock");
         let mut taken = false;
         for waiter in w.iter_mut() {
-            if waiter.node == node && waiter.tx.is_some() && (waiter.matcher)(&what) {
-                if let Some(tx) = waiter.tx.take() {
-                    let _ = tx.send(what.clone());
+            if waiter.node == node && waiter.tx.live() && (waiter.matcher)(&what) {
+                match &mut waiter.tx {
+                    WaiterTx::Once(t) => {
+                        if let Some(tx) = t.take() {
+                            let _ = tx.send(what.clone());
+                        }
+                    }
+                    WaiterTx::Stream(tx) => {
+                        let _ = tx.send(what.clone());
+                    }
                 }
                 taken = true;
                 if !waiter.broadcast {
@@ -715,7 +764,7 @@ impl Controller {
                 }
             }
         }
-        w.retain(|w| w.tx.is_some());
+        w.retain(|w| w.tx.live());
         taken
     }
 
@@ -1408,6 +1457,20 @@ impl Controller {
         };
         debug!(node, "waiting for the node to wake up");
         let _ = rx.await;
+    }
+
+    /// Sends already encoded command bytes for a command class, with the
+    /// security the node's record asks for, without waiting for a sleeping node.
+    pub(crate) async fn send_encoded(
+        &self,
+        node: NodeId,
+        endpoint: u8,
+        cc: u16,
+        bytes: Vec<u8>,
+    ) -> Result<(), Error> {
+        let sec = self.resolve(node, endpoint, cc, TxSecurity::Auto);
+        self.send_bytes(node, wrap_endpoint(bytes, endpoint), sec)
+            .await
     }
 
     /// Sends a command to an endpoint now, without waiting for a sleeping node.

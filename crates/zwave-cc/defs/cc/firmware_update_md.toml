@@ -1,0 +1,101 @@
+id = 0x7a
+name = "firmware_update_md"
+title = "Firmware Update Meta Data"
+version = 8
+
+[[command]]
+id = 0x01
+name = "meta_data_get"
+
+# Additional firmware target ids, the hardware version and capabilities
+# follow in `rest` (version 3 and later).
+[[command]]
+id = 0x02
+name = "meta_data_report"
+fields = [
+  { name = "manufacturer_id", type = "u16" },
+  { name = "firmware_id", type = "u16" },
+  { name = "checksum", type = "u16" },
+  { name = "upgradable", type = "u8", optional = true },
+  { name = "additional_targets", type = "u8", optional = true },
+  { name = "max_fragment_size", type = "u16", optional = true },
+  { name = "rest", type = "bytes" },
+]
+
+[[command]]
+id = 0x03
+name = "request_get"
+fields = [
+  { name = "manufacturer_id", type = "u16" },
+  { name = "firmware_id", type = "u16" },
+  { name = "checksum", type = "u16" },
+  { name = "target", type = "u8", optional = true },
+  { name = "fragment_size", type = "u16", optional = true },
+  { type = "bits", optional = true, parts = [
+    { name = "resume", shift = 2, width = 1, kind = "bool" },
+    { name = "non_secure", shift = 1, width = 1, kind = "bool" },
+    { name = "activation", shift = 0, width = 1, kind = "bool" },
+  ] },
+  { name = "hardware_version", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x04
+name = "request_report"
+fields = [
+  { name = "status", type = "u8" },
+  { type = "bits", optional = true, parts = [
+    { name = "resume", shift = 2, width = 1, kind = "bool" },
+    { name = "non_secure", shift = 1, width = 1, kind = "bool" },
+  ] },
+]
+
+# The node asks for `count` fragments from `report` (bit 15 reserved).
+[[command]]
+id = 0x05
+name = "get"
+fields = [
+  { name = "count", type = "u8" },
+  { name = "report", type = "u16" },
+]
+
+# Bit 15 of `header` marks the last fragment, bits 0-14 number it; the data
+# ends with a CRC-16 over the whole command (see zwave-host's firmware module).
+[[command]]
+id = 0x06
+name = "report"
+fields = [
+  { name = "header", type = "u16" },
+  { name = "data", type = "bytes" },
+]
+
+[[command]]
+id = 0x07
+name = "status_report"
+fields = [
+  { name = "status", type = "u8" },
+  { name = "wait_time", type = "u16", optional = true },
+]
+
+[[command]]
+id = 0x08
+name = "activation_set"
+fields = [
+  { name = "manufacturer_id", type = "u16" },
+  { name = "firmware_id", type = "u16" },
+  { name = "checksum", type = "u16" },
+  { name = "target", type = "u8" },
+  { name = "hardware_version", type = "u8", optional = true },
+]
+
+[[command]]
+id = 0x09
+name = "activation_report"
+fields = [
+  { name = "manufacturer_id", type = "u16" },
+  { name = "firmware_id", type = "u16" },
+  { name = "checksum", type = "u16" },
+  { name = "target", type = "u8" },
+  { name = "status", type = "u8" },
+  { name = "hardware_version", type = "u8", optional = true },
+]
