@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Every crate is ready for crates.io: homepage, docs.rs links, its README,
+  LICENSE and NOTICE, and only its sources and tests in the package. CI
+  packages the workspace on every push; a release publishes the crates in
+  dependency order once a `CARGO_REGISTRY_TOKEN` secret exists.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

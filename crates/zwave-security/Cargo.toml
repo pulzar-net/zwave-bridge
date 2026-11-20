@@ -7,8 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/zwave-security"
+readme = "README.md"
 keywords = ["zwave", "z-wave", "security", "s2", "iot"]
 categories = ["cryptography", "embedded"]
+# What crates.io gets: no fuzz corpora, docs site or packaging files.
+include = ["src/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 
 [dependencies]
 aes = "0.9"

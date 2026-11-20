@@ -7,10 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/zwave-cc"
+readme = "README.md"
 keywords = ["zwave", "z-wave", "command-class", "iot", "home-automation"]
 categories = ["embedded", "parser-implementations", "encoding"]
 build = "build.rs"
-include = ["src/**", "defs/**", "build.rs", "Cargo.toml", "README.md"]
+include = ["src/**", "defs/**", "build.rs", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 
 [dependencies]
 crc = "3"

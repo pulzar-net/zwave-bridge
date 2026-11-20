@@ -7,8 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/zwave-serial"
+readme = "README.md"
 keywords = ["zwave", "z-wave", "serial", "iot", "home-automation"]
 categories = ["embedded", "hardware-support", "network-programming"]
+# What crates.io gets: no fuzz corpora, docs site or packaging files.
+include = ["src/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 
 [features]
 default = ["serialport"]

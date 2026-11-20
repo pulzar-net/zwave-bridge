@@ -7,8 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/zwave-bridge"
+readme = "README.md"
 keywords = ["zwave", "z-wave", "mqtt", "home-assistant", "bridge"]
 categories = ["command-line-utilities", "network-programming", "embedded"]
+# What crates.io gets: no fuzz corpora, docs site or packaging files.
+include = ["src/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 
 [[bin]]
 name = "zwave-bridge"
