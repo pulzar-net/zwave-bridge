@@ -101,6 +101,17 @@ jobs:
           (cd docs && npm run build)
           cargo doc --workspace --no-deps
           cp -R target/doc docs/dist/api
+      - name: Links into the API docs open pages that exist
+        # The site's link check skips /api (rustdoc is built here, after it);
+        # this catches a link left behind by a renamed crate or item page.
+        run: |
+          set -euo pipefail
+          grep -rhoE 'href="(https://pulzar-net\.github\.io)?/zwave-bridge/api/[^"#?]*' docs/dist --include='*.html' \
+            | sed -E 's|^href="(https://pulzar-net\.github\.io)?/zwave-bridge/||' | sort -u > "$RUNNER_TEMP/api-links"
+          while read -r p; do
+            case "$p" in */) p="${p}index.html" ;; esac
+            test -e "docs/dist/$p" || { echo "::error::broken API link: /zwave-bridge/$p"; exit 1; }
+          done < "$RUNNER_TEMP/api-links"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/dist
