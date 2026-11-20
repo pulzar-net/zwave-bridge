@@ -169,6 +169,39 @@ async fn details(api: &SerialApi, id: &mut ControllerIdentity) {
     }
 }
 
+/// Identifies the controller behind a running link with read-only
+/// requests (capabilities, version, controller id, init data, controller
+/// capabilities, RF region); `None` if it does not answer like one.
+pub async fn identify(api: &SerialApi) -> Option<ControllerIdentity> {
+    let resp = api
+        .request(
+            DataFrame::request(F::GET_SERIAL_API_CAPABILITIES, vec![]),
+            Duration::from_millis(800),
+        )
+        .await
+        .ok()?;
+    let c = SerialApiCapabilities::parse(&resp.payload).ok()?;
+    let mut id = ControllerIdentity {
+        firmware: format!("{}.{}", c.firmware_major, c.firmware_minor),
+        manufacturer_id: c.manufacturer_id,
+        product_type: c.product_type,
+        product_id: c.product_id,
+        capabilities: c,
+        library_version: None,
+        api_version: None,
+        chip: None,
+        series: None,
+        home_id: None,
+        node_id: None,
+        primary: None,
+        sis: None,
+        node_count: None,
+        region: None,
+    };
+    let _ = tokio::time::timeout(Duration::from_millis(2000), details(api, &mut id)).await;
+    Some(id)
+}
+
 /// Probes an open port. `Ok(None)` means nothing answered like a Z-Wave
 /// controller; `Err` is an I/O failure. The port is closed on return.
 pub async fn probe_port<P: Port>(port: P) -> Result<Option<ControllerIdentity>, SerialError> {

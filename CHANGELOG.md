@@ -5,6 +5,9 @@ All notable changes are listed here. The project follows
 
 ## 0.2.0 (2026-11-20)
 
+- `zwave-serial`: `probe::identify` on a running link. `zwave-host`:
+  `Controller::factory_reset`, `set_region`, and `configure_raw` (settings by
+  parameter key without a device file, sizes read from the device).
 - `zwave-host`: `Controller::replace_failed_node` gives a failed node's id to
   a new node, with security and an interview; `zwave-sim` can power a node off
   and replace it.

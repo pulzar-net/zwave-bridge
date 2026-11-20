@@ -670,3 +670,46 @@ async fn replace_a_failed_node() {
     assert_eq!(h.node_id("spare").await, Some(r.node));
     assert!(c.ping(r.node).await);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn raw_settings_region_and_factory_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let keys = NetworkKeys::generate().unwrap();
+    let (host, dev) = tokio::io::duplex(16 * 1024);
+    let h = sim().spawn(dev);
+    let (c, mut ev) = Controller::start(host, config(keys.clone(), dir.path()))
+        .await
+        .unwrap();
+    let r = include(&c, &mut ev, &h, "switch", InclusionOptions::default()).await;
+    interviewed(&mut ev, r.node).await;
+    // Without a device file: sizes come from the device.
+    c.configure_raw(r.node, &[("7".into(), 0x0102)])
+        .await
+        .unwrap();
+    c.configure_raw(r.node, &[("7[0xf0]".into(), 0xa)])
+        .await
+        .unwrap();
+    assert_eq!(
+        h.inspect("switch", |n| n.params.get(&7).copied())
+            .await
+            .unwrap(),
+        Some((1, 0xa2u8 as i8 as i32))
+    );
+    assert!(c.configure_raw(r.node, &[("x".into(), 1)]).await.is_err());
+
+    c.set_region(zwave_serial::message::RfRegion::Europe)
+        .await
+        .unwrap();
+    let home = c.info().home_id;
+    c.factory_reset().await.unwrap();
+    drop(c);
+    drop(ev);
+    let (host2, dev2) = tokio::io::duplex(16 * 1024);
+    h.attach(dev2).await;
+    let (c2, _ev2) = Controller::start(host2, config(keys, &dir.path().join("2")))
+        .await
+        .unwrap();
+    assert_ne!(c2.info().home_id, home, "a new home id after the reset");
+    assert!(c2.nodes().is_empty());
+    assert_eq!(c2.info().region.as_deref(), Some("Europe"));
+}

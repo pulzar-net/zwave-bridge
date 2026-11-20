@@ -113,6 +113,8 @@ pub struct Simulator {
     last_added: u16,
     /// Bytes per node id on the Serial API (2 after SetNodeIDType Long).
     nid: usize,
+    /// RF region code (USA Long Range by default).
+    region: u8,
     next_lr_id: u16,
 }
 
@@ -139,6 +141,7 @@ impl Simulator {
             last_added: 0,
             nid: 1,
             next_lr_id: 256,
+            region: 0x09,
         }
     }
 
@@ -429,6 +432,7 @@ impl Simulator {
                     F::REQUEST_NODE_INFO,
                     F::REMOVE_FAILED_NODE,
                     F::REPLACE_FAILED_NODE,
+                    F::SET_DEFAULT,
                     F::GET_ROUTING_INFO,
                     F::EXTENDED_NVM_OPERATIONS,
                     F::GET_LONG_RANGE_NODES,
@@ -480,8 +484,11 @@ impl Simulator {
             }
             F::SERIAL_API_SETUP => match p.first() {
                 Some(&0x02) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x02, 0x01])],
-                // USA Long Range.
-                Some(&0x20) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x20, 0x09])],
+                Some(&0x20) => vec![Self::response(F::SERIAL_API_SETUP, vec![0x20, self.region])],
+                Some(&0x40) => {
+                    self.region = p.get(1).copied().unwrap_or(self.region);
+                    vec![Self::response(F::SERIAL_API_SETUP, vec![0x40, 0x01])]
+                }
                 Some(&0x80) if self.cfg.long_range => {
                     self.nid = if p.get(1) == Some(&0x02) { 2 } else { 1 };
                     vec![Self::response(F::SERIAL_API_SETUP, vec![0x80, 0x01])]
@@ -599,6 +606,18 @@ impl Simulator {
                         vec![]
                     }
                 }
+            }
+            F::SET_DEFAULT => {
+                // Factory defaults: every node forgotten, a new home id.
+                for n in &mut self.nodes {
+                    n.leave();
+                }
+                self.cfg.home_id = self.cfg.home_id.rotate_left(8) ^ 0x5a5a_0001;
+                self.next_id = 2;
+                self.next_lr_id = 256;
+                self.suc = 0;
+                let cb = p.first().copied().unwrap_or(0);
+                vec![DataFrame::request(F::SET_DEFAULT, vec![cb])]
             }
             F::REPLACE_FAILED_NODE => {
                 let id = zwave_serial::message::parse_node_id(p, self.nid).unwrap_or(0);

@@ -1807,6 +1807,136 @@ impl Controller {
         Ok(())
     }
 
+    /// Resets the controller to factory defaults: a new home id, no nodes.
+    /// This `Controller` must be dropped and a new one started afterwards.
+    pub async fn factory_reset(&self) -> Result<(), Error> {
+        let cb = self.inner.api.next_callback_id();
+        let mut req = Request::with_callback(
+            DataFrame::request(F::SET_DEFAULT, vec![cb]),
+            Duration::from_secs(2),
+            cb,
+            Duration::from_secs(10),
+        );
+        req.response = None;
+        self.inner.api.execute(req).await?;
+        info!("controller reset to factory defaults");
+        Ok(())
+    }
+
+    /// Sets the controller's RF region and restarts it (the region takes
+    /// effect after a restart). This `Controller` must be dropped and a new
+    /// one started afterwards.
+    pub async fn set_region(&self, region: message::RfRegion) -> Result<(), Error> {
+        let r = self
+            .inner
+            .api
+            .request(
+                DataFrame::request(
+                    F::SERIAL_API_SETUP,
+                    vec![message::setup::SET_RF_REGION, region.to_u8()],
+                ),
+                Duration::from_secs(2),
+            )
+            .await?;
+        if r.payload.first() != Some(&message::setup::SET_RF_REGION) || r.payload.get(1) == Some(&0)
+        {
+            return Err(Error::Controller(
+                "the controller refused the region".into(),
+            ));
+        }
+        self.inner
+            .api
+            .execute(Request::ack_only(DataFrame::request(F::SOFT_RESET, vec![])))
+            .await?;
+        Ok(())
+    }
+
+    /// Applies configuration settings by key (`"3"`, `"41[0xf00]"`) without a
+    /// device file: each parameter is read first for its size and current
+    /// value, partial values are merged into it, and it is read back after.
+    pub async fn configure_raw(
+        &self,
+        node: NodeId,
+        settings: &[(String, i64)],
+    ) -> Result<(), Error> {
+        use crate::device_config::parse_param_key;
+        use zwave_cc::configuration;
+        let mut params: Vec<(u16, Vec<(Option<u32>, i64)>)> = Vec::new();
+        for (key, value) in settings {
+            let (p, mask) = parse_param_key(key)
+                .ok_or_else(|| Error::Controller(format!("bad parameter key {key}")))?;
+            if p > 255 {
+                return Err(Error::Controller(format!(
+                    "parameter {p} needs Configuration version 3 bulk commands"
+                )));
+            }
+            match params.iter_mut().find(|(q, _)| *q == p) {
+                Some((_, v)) => v.push((mask, *value)),
+                None => params.push((p, vec![(mask, *value)])),
+            }
+        }
+        let supervised = self
+            .with_node(node, |r| r.root().supports(supervision::ID))
+            .unwrap_or(false);
+        for (p, parts) in params {
+            let (current, size) = self
+                .req(
+                    node,
+                    0,
+                    configuration::Get { parameter: p as u8 },
+                    move |c| match c {
+                        Command::Configuration(configuration::Command::Report(r))
+                            if u16::from(r.parameter) == p =>
+                        {
+                            Some((r.value, r.size))
+                        }
+                        _ => None,
+                    },
+                )
+                .await?;
+            if !matches!(size, 1 | 2 | 4) {
+                return Err(Error::Controller(format!(
+                    "parameter {p} reports size {size}"
+                )));
+            }
+            let width: u32 = if size == 4 {
+                u32::MAX
+            } else {
+                (1u32 << (8 * u32::from(size))) - 1
+            };
+            let mut raw = (current as u32) & width;
+            for (mask, value) in parts {
+                match mask {
+                    None => raw = (value as u32) & width,
+                    Some(m) => raw = (raw & !m) | (((value as u32) << m.trailing_zeros()) & m),
+                }
+            }
+            let value = match size {
+                1 => i32::from(raw as u8 as i8),
+                2 => i32::from(raw as u16 as i16),
+                _ => raw as i32,
+            };
+            let set: Command = configuration::Set {
+                parameter: p as u8,
+                default: false,
+                size,
+                value,
+            }
+            .into();
+            if supervised {
+                self.send_supervised(node, 0, &set).await?;
+            } else {
+                self.send(node, 0, &set).await?;
+            }
+            let _ = self
+                .req(node, 0, configuration::Get { parameter: p as u8 }, move |c| {
+                    matches!(c, Command::Configuration(configuration::Command::Report(r)) if u16::from(r.parameter) == p).then_some(())
+                })
+                .await;
+        }
+        Ok(())
+    }
+
     /// Pings a node (No Operation); true if it acknowledged.
     pub async fn ping(&self, node: NodeId) -> bool {
         self.transmit(node, vec![0x00]).await.is_ok()
