@@ -172,6 +172,7 @@ impl Current {
 pub struct SerialApi {
     jobs: mpsc::Sender<Job>,
     callback_id: Arc<AtomicU8>,
+    stop: Arc<tokio::sync::Notify>,
 }
 
 impl SerialApi {
@@ -183,11 +184,13 @@ impl SerialApi {
     {
         let (jobs_tx, jobs_rx) = mpsc::channel(64);
         let (unsolicited_tx, unsolicited_rx) = mpsc::channel(config.unsolicited_capacity.max(1));
-        tokio::spawn(run(io, config, jobs_rx, unsolicited_tx));
+        let stop = Arc::new(tokio::sync::Notify::new());
+        tokio::spawn(run(io, config, jobs_rx, unsolicited_tx, stop.clone()));
         (
             SerialApi {
                 jobs: jobs_tx,
                 callback_id: Arc::new(AtomicU8::new(0)),
+                stop,
             },
             unsolicited_rx,
         )
@@ -233,6 +236,13 @@ impl SerialApi {
     pub fn is_open(&self) -> bool {
         !self.jobs.is_closed()
     }
+
+    /// Stops the link task and closes the port, for every clone of this
+    /// handle: the exchange in progress fails, the unsolicited channel ends,
+    /// and later requests fail with [`SerialError::Closed`].
+    pub fn close(&self) {
+        self.stop.notify_one();
+    }
 }
 
 async fn run<T>(
@@ -240,6 +250,7 @@ async fn run<T>(
     config: Config,
     mut jobs: mpsc::Receiver<Job>,
     unsolicited: mpsc::Sender<DataFrame>,
+    stop: Arc<tokio::sync::Notify>,
 ) where
     T: AsyncRead + AsyncWrite + Send + Unpin + 'static,
 {
@@ -262,6 +273,11 @@ async fn run<T>(
         let byte_deadline = partial_since.map(|t| t + config.byte_timeout);
         tokio::select! {
             biased;
+            () = stop.notified() => {
+                fail_all(&mut current, SerialError::Closed("closed by the host".into()));
+                debug!("link closed");
+                return;
+            }
             incoming = framed.next() => {
                 let frame = match incoming {
                     Some(Ok(f)) => f,

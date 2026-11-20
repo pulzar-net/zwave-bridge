@@ -289,3 +289,29 @@ async fn probe_identifies_a_controller_and_ignores_silence() {
     assert_eq!(zwave_serial::probe::probe_port(host).await.unwrap(), None);
     assert!(t.elapsed() < zwave_serial::probe::PROBE_TIMEOUT + Duration::from_millis(200));
 }
+
+#[tokio::test]
+async fn close_ends_the_link_and_releases_the_port() {
+    let (host, mut dev) = tokio::io::duplex(1024);
+    let (api, mut unsolicited) = SerialApi::start(host, fast());
+    let other = api.clone();
+    api.close();
+    // The port is closed: the controller side reads the resync NAK, then EOF.
+    let mut buf = Vec::new();
+    tokio::time::timeout(Duration::from_secs(2), dev.read_to_end(&mut buf))
+        .await
+        .expect("port released")
+        .unwrap();
+    assert!(
+        unsolicited.recv().await.is_none(),
+        "unsolicited channel ends"
+    );
+    let r = other
+        .request(
+            DataFrame::request(FunctionId::GET_CONTROLLER_VERSION, vec![]),
+            Duration::from_millis(200),
+        )
+        .await;
+    assert!(matches!(r, Err(SerialError::Closed(_))), "{r:?}");
+    assert!(!other.is_open());
+}

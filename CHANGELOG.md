@@ -5,6 +5,9 @@ All notable changes are listed here. The project follows
 
 ## 0.2.0 (2026-11-20)
 
+- `zwave-host`: `Controller::close` stops the controller and releases the
+  serial port (`SerialApi::close` underneath); before, a dropped controller
+  kept the port open, so a restart in the same process could not reopen it.
 - `zwave-serial`: `probe::identify` on a running link. `zwave-host`:
   `Controller::factory_reset`, `set_region`, and `configure_raw` (settings by
   parameter key without a device file, sizes read from the device).

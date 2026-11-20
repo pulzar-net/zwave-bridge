@@ -359,6 +359,7 @@ async fn nvm_backup_store_and_restart() {
     c.flush().unwrap();
     let stored = zwave_host::store::load(&dir.path().join("nodes.json")).unwrap();
     assert_eq!(stored.nodes[&r.node].stage, InterviewStage::Complete);
+    c.close().unwrap();
     drop(c);
     drop(ev);
 

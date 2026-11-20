@@ -630,6 +630,16 @@ impl Controller {
         self.inner.store_failed.lock().expect("lock").clone()
     }
 
+    /// Stops the controller: writes the store, closes the serial port and
+    /// ends the event stream. Every clone stops with it; start a new
+    /// [`Controller`] to use the stick again (after a restore or a region
+    /// change, or to hand the port to something else).
+    pub fn close(&self) -> Result<(), Error> {
+        let flushed = self.flush();
+        self.inner.api.close();
+        flushed
+    }
+
     /// Writes the store now (e.g. before shutting down).
     pub fn flush(&self) -> Result<(), Error> {
         let Some(path) = self.inner.cfg.store_path.clone() else {
