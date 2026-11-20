@@ -43,7 +43,8 @@ fn strip_null<'a>(root: &'a Value, schema: &'a Value) -> (&'a Value, bool) {
             return (resolve(root, non_null[0]), true);
         }
     }
-    let nullable = matches!(schema.get("type"), Some(Value::Array(t)) if t.contains(&Value::from("null")));
+    let nullable =
+        matches!(schema.get("type"), Some(Value::Array(t)) if t.contains(&Value::from("null")));
     (resolve(root, schema), nullable)
 }
 
@@ -63,7 +64,10 @@ fn variants(schema: &Value) -> Option<Vec<(String, Option<String>)>> {
                 .get("const")
                 .cloned()
                 .or_else(|| v.get("enum").and_then(|e| e.get(0)).cloned())?;
-            let doc = v.get("description").and_then(Value::as_str).map(str::to_string);
+            let doc = v
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::to_string);
             Some((value.to_string(), doc))
         })
         .collect()
@@ -72,10 +76,18 @@ fn variants(schema: &Value) -> Option<Vec<(String, Option<String>)>> {
 fn type_name(root: &Value, schema: &Value) -> String {
     let (schema, _) = strip_null(root, schema);
     if let Some(vs) = variants(schema) {
-        return vs.iter().map(|(v, _)| format!("`{v}`")).collect::<Vec<_>>().join(", ");
+        return vs
+            .iter()
+            .map(|(v, _)| format!("`{v}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
     }
     // Alternatives that are not all constants: `"off"` or `{ interval_ms = integer }`.
-    if let Some(alts) = schema.get("oneOf").or_else(|| schema.get("anyOf")).and_then(Value::as_array) {
+    if let Some(alts) = schema
+        .get("oneOf")
+        .or_else(|| schema.get("anyOf"))
+        .and_then(Value::as_array)
+    {
         return alts
             .iter()
             .map(|alt| {
@@ -129,7 +141,10 @@ fn type_name(root: &Value, schema: &Value) -> String {
 }
 
 fn one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ").replace('|', "\\|")
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
 }
 
 fn toml_value(v: &Value) -> String {
@@ -159,7 +174,10 @@ fn section(
     required_here: bool,
     out: &mut String,
 ) {
-    let props = schema["properties"].as_object().cloned().unwrap_or_default();
+    let props = schema["properties"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
     let required: Vec<&str> = schema
         .get("required")
         .and_then(Value::as_array)
@@ -186,7 +204,12 @@ fn section(
         let (inner, nullable) = strip_null(root, prop);
         let child = format!("{path}.{key}");
         if is_table(inner) {
-            nested.push((child, false, inner.clone(), required.contains(&key.as_str())));
+            nested.push((
+                child,
+                false,
+                inner.clone(),
+                required.contains(&key.as_str()),
+            ));
             continue;
         }
         if inner.get("type") == Some(&Value::from("array")) {
@@ -201,7 +224,10 @@ fn section(
         let default = if required.contains(&key.as_str()) {
             "required".to_string()
         } else {
-            match prop.get("default").or_else(|| schema.get("default").and_then(|d| d.get(key))) {
+            match prop
+                .get("default")
+                .or_else(|| schema.get("default").and_then(|d| d.get(key)))
+            {
                 Some(Value::Null) | None if nullable => "unset".into(),
                 Some(v) => format!("`{}`", toml_value(v)),
                 None => "unset".into(),
@@ -213,7 +239,11 @@ fn section(
             .and_then(Value::as_str)
             .map(one_line)
             .unwrap_or_default();
-        if let Some(alts) = inner.get("oneOf").and_then(Value::as_array).filter(|_| variants(inner).is_none()) {
+        if let Some(alts) = inner
+            .get("oneOf")
+            .and_then(Value::as_array)
+            .filter(|_| variants(inner).is_none())
+        {
             let docs: Vec<String> = alts
                 .iter()
                 .filter_map(|a| a.get("description").and_then(Value::as_str))
@@ -262,7 +292,10 @@ fn render(schema: &Value) -> String {
          This page is generated from the configuration types; a [JSON Schema](config.schema.json) generated from the same types \
          lets editors with TOML schema support (for example Taplo or Even Better TOML) complete and check the file.\n"
     );
-    let props: Map<String, Value> = schema["properties"].as_object().cloned().unwrap_or_default();
+    let props: Map<String, Value> = schema["properties"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
     let required: Vec<&str> = schema
         .get("required")
         .and_then(Value::as_array)
@@ -271,7 +304,14 @@ fn render(schema: &Value) -> String {
     for (key, prop) in &props {
         let (inner, _) = strip_null(schema, prop);
         if is_table(inner) {
-            section(schema, key, false, inner, required.contains(&key.as_str()), &mut out);
+            section(
+                schema,
+                key,
+                false,
+                inner,
+                required.contains(&key.as_str()),
+                &mut out,
+            );
         } else if inner.get("type") == Some(&Value::from("array")) {
             let item = resolve(schema, &inner["items"]);
             section(schema, key, true, item, false, &mut out);

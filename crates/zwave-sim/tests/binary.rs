@@ -21,13 +21,22 @@ async fn next(ev: &mut zwave_host::Events, what: &str, mut f: impl FnMut(&Event)
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn inclusion_over_tcp_with_presses_on_stdin() {
-    let mut sim = tokio::process::Command::new(env!("CARGO_BIN_EXE_zwave-sim"))
+    let sim = tokio::process::Command::new(env!("CARGO_BIN_EXE_zwave-sim"))
         .arg("127.0.0.1:0")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .kill_on_drop(true)
-        .spawn()
-        .unwrap();
+        .spawn();
+    let mut sim = match sim {
+        Ok(s) => s,
+        // Cross-compiled tests run under qemu-user, which cannot exec the
+        // target's binary as a child; native runs cover this test.
+        Err(e) if e.raw_os_error() == Some(8) => {
+            eprintln!("zwave-sim binary not executable here ({e}); skipped");
+            return;
+        }
+        Err(e) => panic!("zwave-sim did not start: {e}"),
+    };
     let mut stdin = sim.stdin.take().unwrap();
     let mut out = BufReader::new(sim.stdout.take().unwrap()).lines();
     let addr = loop {
