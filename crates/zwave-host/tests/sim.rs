@@ -141,6 +141,7 @@ async fn s2_inclusion_with_pin_interview_and_reports() {
 
     let rec = c.node(node).unwrap();
     assert_eq!(rec.stage, InterviewStage::Complete);
+    assert_eq!(rec.dsk, Some(dsk.to_string()), "the DSK, PIN included");
     assert!(rec.secure_ccs_known);
     assert!(
         rec.root().ccs[&0x31].secure,

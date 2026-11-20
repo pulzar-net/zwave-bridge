@@ -10,6 +10,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `zwave-host`: a node included with S2 Authenticated or Access Control
+  keeps its full DSK in its record (`NodeRecord::dsk`), as SmartStart nodes
+  already did.
 - `zwave-host`: `Controller::close` stops the controller and releases the
   serial port (`SerialApi::close` underneath); before, a dropped controller
   kept the port open, so a restart in the same process could not reopen it.

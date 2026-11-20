@@ -550,6 +550,9 @@ impl Controller {
             self.kex_fail(node, KexFail::Cancel, plain).await;
             return Err(Error::Security("public key is not 32 bytes".into()));
         };
+        // The node's full DSK, once its key is known to be authentic: with the
+        // PIN put back, or matching its provisioning entry.
+        let mut dsk = None;
         if granted.iter().any(|c| c.needs_pin()) {
             let pin = match (entry, opts.pin) {
                 (Some(e), _) => {
@@ -579,6 +582,7 @@ impl Controller {
                 }
             };
             apply_pin(&mut node_pub, pin);
+            dsk = Some(Dsk::from_public_key(&node_pub));
         } else if let Some(e) = entry {
             if e.dsk.0[..] != node_pub[..16] {
                 self.kex_fail(node, KexFail::Auth, plain).await;
@@ -586,6 +590,7 @@ impl Controller {
                     "the node's key does not match its provisioned DSK".into(),
                 ));
             }
+            dsk = Some(e.dsk);
         }
         let shared = match self.inner.keypair.shared_secret(&node_pub) {
             Ok(s) => s,
@@ -602,9 +607,14 @@ impl Controller {
         let result = self.exchange_keys(node, &set, &report, &granted).await;
         match result {
             Ok(()) => {
-                let mut s2 = self.s2(node).lock().expect("lock");
-                s2.end_bootstrap(node);
-                s2.set_peer_classes(node, &granted);
+                {
+                    let mut s2 = self.s2(node).lock().expect("lock");
+                    s2.end_bootstrap(node);
+                    s2.set_peer_classes(node, &granted);
+                }
+                if let Some(d) = dsk {
+                    let _ = self.update_node(node, |r| r.dsk = Some(d.to_string()));
+                }
                 Ok(granted)
             }
             Err((why, e)) => {
