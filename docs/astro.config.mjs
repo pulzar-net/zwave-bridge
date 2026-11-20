@@ -5,7 +5,7 @@
 // .github/workflows/docs.yml, which adds the API docs under /api.
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import { pulzarPlugins } from '@pulzar-net/docs-theme';
+import { pulzarPlugins } from '@pulzr/docs-theme';
 import sidebar from './sidebar.mjs';
 
 export default defineConfig({
