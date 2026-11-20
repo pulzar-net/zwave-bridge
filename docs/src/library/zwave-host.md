@@ -16,8 +16,8 @@ Serial API controller. [API docs](https://pulzar-net.github.io/zwave-bridge/api/
 - **Values**: reports become `ValueUpdate`s with a stable `ValueId`;
   `set_value` writes switches and levels.
 - **Node store**: one JSON file, written atomically, in the background.
-- **NVM** backup and (on `main`) restore; **firmware updates** of devices;
-  **device files** in Z-Wave JS's format (on `main`).
+- **NVM** backup and restore, converting between 700 and 800 series;
+  **firmware updates** of devices; **device files** in Z-Wave JS's format.
 - **Topology** and last routes.
 
 ## The main types

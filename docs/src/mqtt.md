@@ -19,7 +19,7 @@ state topics noted below. This page uses the default base topic throughout.
 | `zwave/nodes/<id>/<value>/set` | in | | set a writable value |
 | `zwave/nodes/<id>/route` | out | yes | how the last frame from the node arrived |
 | `zwave/nodes/<id>/command` | out | no | commands the node sends, such as button presses |
-| `zwave/nodes/<id>/parameters` | out | yes | its configuration parameters, from its device file (not in 0.1.0) |
+| `zwave/nodes/<id>/parameters` | out | yes | its configuration parameters, from its device file (since 0.2.0) |
 
 `<id>` is the node id, a number. Network keys are never published.
 
@@ -74,8 +74,8 @@ region.
 | `interview_stage` | `node`, `stage` |
 | `interview_completed` | `node` |
 | `interview_failed` | `node`, `reason` |
-| `firmware_update_progress` | `node`, `sent`, `total` fragments (not in 0.1.0) |
-| `firmware_update_finished` | `node`, `status`, `success` (not in 0.1.0) |
+| `firmware_update_progress` | `node`, `sent`, `total` fragments (since 0.2.0) |
+| `firmware_update_finished` | `node`, `status`, `success` (since 0.2.0) |
 | `provisioning_changed` | `entries`, the SmartStart list |
 
 ## Requests and responses
@@ -90,7 +90,7 @@ or `"ok": false` and an `error`:
 ```
 
 Put a `transaction` value in a request to have it copied into the response
-(not in 0.1.0), so you can match answers to questions.
+(since 0.2.0), so you can match answers to questions.
 
 An empty payload is the same as `{}`. Requests that wait for a device
 (inclusion, a firmware update) answer when they finish.
@@ -110,9 +110,9 @@ An empty payload is the same as `{}`. Requests that wait for a device
 | `rename` | `node`, `name`, `location` | |
 | `topology` | | `controller`, `nodes`: `id`, `neighbors`, `route`, `rssi`, `listening` |
 | `backup` | | `file`, `bytes` |
-| `restore` | `file` (not in 0.1.0) | `file`, `restart` |
-| `firmware_update` | `node`, `file`, `target` (not in 0.1.0) | `node`, `status`, `success`, `wait_time`, `activated` |
-| `configure` | `node`, `settings` (not in 0.1.0) | `node` |
+| `restore` | `file` (since 0.2.0) | `file`, `restart` |
+| `firmware_update` | `node`, `file`, `target` (since 0.2.0) | `node`, `status`, `success`, `wait_time`, `activated` |
+| `configure` | `node`, `settings` (since 0.2.0) | `node` |
 
 ### `rename`
 
@@ -137,13 +137,13 @@ controller sees it:
 ### `backup` and `restore`
 
 `backup` reads the controller's NVM into `nvm-<unix time>.bin` in the data
-directory and answers with its path. `restore` (not in 0.1.0) writes such a
+directory and answers with its path. `restore` (since 0.2.0) writes such a
 file back; see [Backup and restore](backup.md). `file` must be a file name
 in the data directory, not a path.
 
 ### `firmware_update`
 
-Not in 0.1.0. Updates a device's firmware from a file you put in
+Since 0.2.0. Updates a device's firmware from a file you put in
 `<store dir>/firmware/`. `file` is its name there; `target` is the firmware
 target (0, the default, is the device's main firmware). Intel HEX files
 (`.hex`) are converted; anything else (`.gbl`, `.bin`, `.ota`) is sent as it
@@ -155,7 +155,7 @@ is. Progress comes as `firmware_update_progress` events.
 
 ### `configure`
 
-Not in 0.1.0. Sets configuration parameters by their key in the device's
+Since 0.2.0. Sets configuration parameters by their key in the device's
 [device file](device-files.md). Partial parameters (several settings packed
 in one parameter) are merged for you:
 
@@ -171,7 +171,7 @@ The node record, retained: its protocol information (listening or
 sleeping, device classes), interview stage, security classes,
 manufacturer and product ids, firmware version, Z-Wave Plus information,
 endpoints and their command classes, wake-up interval, neighbors, name,
-location, DSK, and `status`. With a device file (not in 0.1.0), `device`
+location, DSK, and `status`. With a device file (since 0.2.0), `device`
 names it: `{"file", "manufacturer", "label", "description"}`.
 
 ### `nodes/<id>/<value>`

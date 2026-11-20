@@ -45,10 +45,10 @@ certified by the Z-Wave Alliance.
 | Home Assistant MQTT discovery | done in 0.1.0 |
 | NVM backup, routes and topology | done in 0.1.0 |
 | Read-only controller probe (`zwave-bridge probe`) | done in 0.1.0 |
-| Z-Wave Long Range | on `main`, next release |
-| Device firmware updates | on `main`, next release |
-| Z-Wave JS device configuration files: parameters by name | on `main`, next release |
-| NVM restore, converting between 700 and 800 series and SDKs | on `main`, next release |
+| Z-Wave Long Range | done in 0.2.0 |
+| Device firmware updates | done in 0.2.0 |
+| Z-Wave JS device configuration files: parameters by name | done in 0.2.0 |
+| NVM restore, converting between 700 and 800 series and SDKs | done in 0.2.0 |
 | Testing on real controllers and devices | in progress |
 | More command classes (Central Scene, Thermostat, Door Lock, Color Switch, ...) | planned |
 | A web frontend | not planned; the bridge is headless by design |
@@ -62,7 +62,7 @@ working yet. If you try one, please [tell us how it went](https://github.com/pul
 
 | Controller | Series | Firmware | State |
 |---|---|---|---|
-| Zooz ZST39 LR | 800 | Serial API, SDK 7.x | expected (Long Range: next release) |
+| Zooz ZST39 LR | 800 | Serial API, SDK 7.x | expected, with Long Range |
 | Home Assistant Connect ZWA-2 | 800 | Serial API, SDK 7.x | expected |
 | Aeotec Z-Stick 7, Zooz ZST10 700, Silicon Labs UZB-7 | 700 | Serial API, SDK 7.17.2 or newer recommended | expected |
 | Aeotec Z-Stick Gen5 and Gen5+, Zooz ZST10 (500) | 500 | Serial API, SDK 6.x | expected |
@@ -85,7 +85,7 @@ example Mosquitto) that Home Assistant's MQTT integration already uses.
 
 <!-- quickstart:download -->
 ```sh
-VERSION=0.1.0
+VERSION=0.2.0
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
@@ -159,8 +159,8 @@ see [installation](#installation).
   no runtime dependencies.
 - **From source**, with Rust 1.89 or newer:
   `cargo install --locked --git https://github.com/pulzar-net/zwave-bridge zwave-bridge`
-- **systemd**: a hardened unit is in [`dist/systemd/`](dist/systemd/zwave-bridge.service).
-- **OpenWrt**: a procd init script is in [`dist/openwrt/`](dist/openwrt/zwave-bridge.init).
+- **systemd**: a hardened unit is in [`contrib/systemd/`](contrib/systemd/zwave-bridge.service).
+- **OpenWrt**: a procd init script is in [`contrib/openwrt/`](contrib/openwrt/zwave-bridge.init).
 
 The [installation guide](https://pulzar-net.github.io/zwave-bridge/installation.html)
 covers each one step by step.
@@ -177,7 +177,7 @@ The bridge reads one TOML file, `/etc/zwave-bridge/config.toml` by default
 | `[mqtt]` | broker, credentials (password from a file), client id, base topic |
 | `[homeassistant]` | discovery on or off, discovery prefix |
 | `[network]` | the wake-up interval given to sleeping devices, the inclusion timeout |
-| `[devices]` | a directory of Z-Wave JS device files (not in 0.1.0) |
+| `[devices]` | a directory of Z-Wave JS device files (since 0.2.0) |
 
 Unknown keys are an error, so a typo stops the bridge at startup. Every key,
 its type and default are in the
@@ -194,8 +194,8 @@ Everything lives under a base topic, `zwave` by default.
 | `zwave/bridge/state` | out, retained | `online` or `offline` (also the last will) |
 | `zwave/bridge/info` | out, retained | controller identity, home id, region, the controller's DSK |
 | `zwave/bridge/event` | out | inclusion progress, key grant and PIN prompts, interviews, firmware update progress |
-| `zwave/bridge/request/<name>` | in | `include`, `exclude`, `stop`, `grant`, `validate_dsk`, `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`, `remove_failed`, `rename`, `topology`; on `main`: `configure`, `restore`, `firmware_update` |
-| `zwave/bridge/response/<name>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}`, with the request's `transaction` (not in 0.1.0) |
+| `zwave/bridge/request/<name>` | in | `include`, `exclude`, `stop`, `grant`, `validate_dsk`, `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`, `remove_failed`, `rename`, `topology`, `configure`, `restore`, `firmware_update` |
+| `zwave/bridge/response/<name>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}`, with the request's `transaction` (since 0.2.0) |
 | `zwave/nodes/<id>` | out, retained | the node: device classes, command classes, security, interview, status |
 | `zwave/nodes/<id>/status` | out, retained | `alive`, `awake`, `asleep` or `dead` |
 | `zwave/nodes/<id>/<class>/<property>[/<endpoint>]` | out, retained | a value: `{"value": 22.5, "unit": "°C", "label": "Air temperature", "time": 1795137000000}` |
@@ -223,7 +223,7 @@ The crates are not on crates.io yet; depend on them from git:
 
 ```toml
 [dependencies]
-zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.1.0" }
+zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -304,7 +304,7 @@ panics on radio input, bounded memory).
 |---|---|---|
 | Language and runtime | Rust, one static binary | Node.js |
 | Command classes | 22 so far | nearly all of them |
-| Device database | reads Z-Wave JS's device files (next release) | its own, the largest there is |
+| Device database | reads Z-Wave JS's device files | its own, the largest there is |
 | Interface | MQTT and Home Assistant MQTT discovery | Home Assistant integration, MQTT, web UI |
 | Small hardware | runs on 128 MB MIPS routers | needs a Node.js capable host |
 | Embeddable library | yes, Rust crates | yes, TypeScript |
@@ -320,10 +320,7 @@ than keeping its own database, so device knowledge is shared, not forked.
 
 ## Roadmap
 
-- **Next release:** Z-Wave Long Range, device firmware updates, Z-Wave JS
-  device files and parameters by name, NVM restore with conversion between
-  700 and 800 series (all done on `main`); and the first reports from real
-  hardware.
+- **Next:** the first reports from real hardware.
 - **After that:** more command classes: Central Scene, Thermostat (mode and
   setpoint), Door Lock, Color Switch.
 

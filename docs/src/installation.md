@@ -19,7 +19,7 @@ file:
 Download, verify and install (this is the README's quick start; CI runs it):
 
 ```sh
-VERSION=0.1.0
+VERSION=0.2.0
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
@@ -46,7 +46,7 @@ Or from a clone, `cargo build --release -p zwave-bridge`; the binary is
 ## As a systemd service
 
 The repository has a hardened unit in
-[`dist/systemd/zwave-bridge.service`](https://github.com/pulzar-net/zwave-bridge/blob/main/dist/systemd/zwave-bridge.service).
+[`contrib/systemd/zwave-bridge.service`](https://github.com/pulzar-net/zwave-bridge/blob/main/contrib/systemd/zwave-bridge.service).
 It runs the bridge as an unprivileged dynamic user in the `dialout` group,
 keeps its data in `/var/lib/zwave-bridge`, and restarts it on failure
 (including after an NVM restore, when the bridge exits on purpose).
@@ -54,7 +54,7 @@ keeps its data in `/var/lib/zwave-bridge`, and restarts it on failure
 ```sh
 sudo mkdir -p /etc/zwave-bridge
 sudo cp config.example.toml /etc/zwave-bridge/config.toml   # then edit it
-sudo install -m 0644 dist/systemd/zwave-bridge.service /etc/systemd/system/
+sudo install -m 0644 contrib/systemd/zwave-bridge.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now zwave-bridge
 journalctl -u zwave-bridge -f
@@ -81,7 +81,7 @@ The `mipsel` binary runs on MT7621 and MT7628 routers with OpenWrt.
    on flash**, such as `/etc/zwave-bridge/data`: `/var` is in RAM on
    OpenWrt, and the network keys would be lost at reboot.
 4. Install the procd script from
-   [`dist/openwrt/zwave-bridge.init`](https://github.com/pulzar-net/zwave-bridge/blob/main/dist/openwrt/zwave-bridge.init):
+   [`contrib/openwrt/zwave-bridge.init`](https://github.com/pulzar-net/zwave-bridge/blob/main/contrib/openwrt/zwave-bridge.init):
 
 ```sh
 cp zwave-bridge.init /etc/init.d/zwave-bridge

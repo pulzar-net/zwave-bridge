@@ -1,6 +1,6 @@
 # Device files
 
-Not in 0.1.0.
+Since 0.2.0.
 
 Z-Wave devices are configured with numbered parameters: "parameter 3, size
 1, value 20". What each number means is in the device's manual, and in

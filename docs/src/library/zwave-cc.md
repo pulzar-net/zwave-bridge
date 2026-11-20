@@ -18,9 +18,9 @@ Also here:
   types and scales, and notification types, events and states, converted
   from Z-Wave JS's tables (MIT; see NOTICE).
 
-Command classes in 0.1.0: Basic, Application Status, Binary Switch,
+Command classes: Basic, Application Status, Binary Switch,
 Multilevel Switch, Binary Sensor, Multilevel Sensor, Meter, Z-Wave Plus
 Info, Device Reset Locally, CRC-16 Encapsulation, Transport Service, Multi
 Channel, Supervision, Configuration, Notification, Manufacturer Specific,
-Battery, Wake Up, Association, Version, Security 0 and Security 2; Firmware
-Update Meta Data on `main`.
+Battery, Wake Up, Association, Version, Security 0, Security 2 and Firmware
+Update Meta Data.

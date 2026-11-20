@@ -21,7 +21,7 @@ The crates are not published on crates.io yet. Depend on a release tag:
 
 ```toml
 [dependencies]
-zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.1.0" }
+zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0" }
 ```
 
 Every crate shares the workspace version and is released together. While

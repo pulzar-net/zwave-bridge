@@ -109,7 +109,7 @@ is kept in the node store.
 
 ### Long Range
 
-Not in 0.1.0. Z-Wave Long Range devices are included only with SmartStart:
+Since 0.2.0. Z-Wave Long Range devices are included only with SmartStart:
 provision their QR code or DSK as above, with a Long Range capable 800
 series controller. They get node ids from 256 up, talk directly to the
 controller (no mesh routing), and use only S2 Authenticated or S2 Access

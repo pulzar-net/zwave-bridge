@@ -36,7 +36,7 @@ while its memory is read, so do it at a quiet time.
 
 ## Restoring an NVM backup
 
-Not in 0.1.0.
+Since 0.2.0.
 
 > Needs real hardware: restore is tested against the simulator and real
 > NVM images in CI, not yet on a controller.

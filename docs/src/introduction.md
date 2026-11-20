@@ -34,8 +34,8 @@ zwave-bridge is at 0.x. Everything is tested in CI against a Serial API
 controller simulator, but **no release has been tested on real hardware
 yet**. Pages that describe something only real hardware can confirm say so.
 
-Some features documented here are on `main` and not yet in a release; they
-are marked "not in 0.1.0". The [changelog](changelog.md) lists what each
+Features added after the first release are marked with the version that
+brought them ("since 0.2.0"). The [changelog](changelog.md) lists what each
 release contains.
 
 zwave-bridge is not certified by the Z-Wave Alliance. Z-Wave is a trademark

@@ -30,7 +30,7 @@ complete and check the file. Point it at the schema with a first line of:
 | `[mqtt]` | broker host and port, client id, user name, password or password file, base topic, keep-alive |
 | `[homeassistant]` | discovery on or off, the discovery prefix |
 | `[network]` | the wake-up interval set on sleeping devices at inclusion, how long inclusion and exclusion wait |
-| `[devices]` | a directory of Z-Wave JS device files (not in 0.1.0); see [Device files](device-files.md) |
+| `[devices]` | a directory of Z-Wave JS device files (since 0.2.0); see [Device files](device-files.md) |
 
 ## A complete example
 
@@ -68,7 +68,7 @@ the data directory (mode 0600). See [Backup and restore](backup.md).
 | `keys.json` | the S0, S2 and Long Range network keys and the controller's S2 key pair | on first start (and once when Long Range keys are added) |
 | `nodes.json` | every node: protocol info, security, interview, endpoints, names | when a node record changes |
 | `nvm-<time>.bin` | NVM backups taken with the `backup` request | on request |
-| `firmware/` | firmware images for the `firmware_update` request (not in 0.1.0) | by you |
+| `firmware/` | firmware images for the `firmware_update` request (since 0.2.0) | by you |
 
 `keys.json` is written atomically and readable by its owner only. Back up
 the whole directory.

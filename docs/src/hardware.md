@@ -32,7 +32,7 @@ Serial API firmware should work.
 
 - **700 series:** update to SDK 7.17.2 or newer. Older 700 series firmware
   has known bugs that can make the stick stop responding.
-- **800 series:** the stick's current firmware. Long Range (on `main`) needs
+- **800 series:** the stick's current firmware. Long Range (since 0.2.0) needs
   a Long Range capable controller and region.
 - **500 series:** the firmware it shipped with works; there is little to
   gain from updating.
@@ -68,7 +68,7 @@ ModemManager) has it open.
 
 ## Devices
 
-Devices work through the command classes zwave-bridge implements. In 0.1.0:
+Devices work through the command classes zwave-bridge implements:
 
 | Kind | Command classes |
 |---|---|
@@ -78,7 +78,7 @@ Devices work through the command classes zwave-bridge implements. In 0.1.0:
 | Configuration and management | Configuration, Association, Version, Manufacturer Specific, Z-Wave Plus Info, Wake Up, Device Reset Locally, Application Status |
 | Transport | Multi Channel, Supervision, Transport Service, CRC-16 Encapsulation |
 | Security | Security 0, Security 2 |
-| Firmware (not in 0.1.0) | Firmware Update Meta Data |
+| Firmware (since 0.2.0) | Firmware Update Meta Data |
 
 A device that relies on a command class not in this list includes and
 interviews, but its other functions do not appear. Thermostats, locks,

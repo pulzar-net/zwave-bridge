@@ -82,7 +82,7 @@ is simpler and different.
 **Can I change the controller's region?** Not through the bridge yet. Use
 the manufacturer's tool.
 
-**Does it support Z-Wave Long Range?** On `main`, for the next release, with
+**Does it support Z-Wave Long Range?** Since 0.2.0, with
 a Long Range capable 800 series controller.
 
 **Is there a web interface?** No. The bridge is headless; everything goes

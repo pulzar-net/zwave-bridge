@@ -18,5 +18,5 @@ controller. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_seria
   async runtime.
 
 ```toml
-zwave-serial = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.1.0" }
+zwave-serial = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0" }
 ```
