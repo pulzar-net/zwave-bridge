@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/pulzar-net/zwave-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/pulzar-net/zwave-bridge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pulzar-net/zwave-bridge)](https://github.com/pulzar-net/zwave-bridge/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/zwave-host)](https://crates.io/crates/zwave-host)
+[![docs.rs](https://docs.rs/zwave-host/badge.svg)](https://docs.rs/zwave-host)
 [![Docs](https://img.shields.io/badge/docs-pulzar--net.github.io-blue)](https://pulzar-net.github.io/zwave-bridge/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.89-blue)](Cargo.toml)
@@ -85,7 +87,7 @@ example Mosquitto) that Home Assistant's MQTT integration already uses.
 
 <!-- quickstart:download -->
 ```sh
-VERSION=0.2.0
+VERSION=0.2.1
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
@@ -157,8 +159,8 @@ see [installation](#installation).
   for `x86_64`, `aarch64` (Raspberry Pi 3 and newer with a 64-bit OS) and
   `mipsel` (MT7621 and MT7628 routers), with a `SHA256SUMS` file. They have
   no runtime dependencies.
-- **From source**, with Rust 1.89 or newer:
-  `cargo install --locked --git https://github.com/pulzar-net/zwave-bridge zwave-bridge`
+- **From crates.io**, with Rust 1.89 or newer: `cargo install --locked zwave-bridge`
+  (and `cargo install --locked zwave-sim` for the simulator).
 - **systemd**: a hardened unit is in [`contrib/systemd/`](contrib/systemd/zwave-bridge.service).
 - **OpenWrt**: a procd init script is in [`contrib/openwrt/`](contrib/openwrt/zwave-bridge.init).
 
@@ -210,21 +212,19 @@ every request and payload with examples.
 
 The bridge is a thin layer over library crates you can use on their own.
 
-| Crate | What it is |
-|---|---|
-| [`zwave-host`](crates/zwave-host) | the controller: inclusion with S2, S0 and SmartStart, interview, node store, wake-up queues, encapsulation, values, topology, NVM backup |
-| [`zwave-cc`](crates/zwave-cc) | command classes generated from TOML definitions, Transport Service, CRC-16, the Alliance's sensor, meter and notification tables |
-| [`zwave-security`](crates/zwave-security) | S0 and S2: key exchange, key derivation, encryption, nonces, DSKs, PINs, SmartStart QR codes |
-| [`zwave-serial`](crates/zwave-serial) | the Serial API: frames, the ACK/NAK/CAN link layer, typed controller messages, `probe` |
-| [`zwave-sim`](crates/zwave-sim) | a Serial API controller simulator with simulated nodes, for tests without hardware |
-| [`zwave-bridge`](crates/zwave-bridge) | the MQTT bridge, as a binary and a library |
+| Crate | What it is | |
+|---|---|---|
+| [`zwave-host`](crates/zwave-host) | the controller: inclusion with S2, S0 and SmartStart, interview, node store, wake-up queues, encapsulation, values, topology, NVM backup | [crates.io](https://crates.io/crates/zwave-host), [docs.rs](https://docs.rs/zwave-host) |
+| [`zwave-cc`](crates/zwave-cc) | command classes generated from TOML definitions, Transport Service, CRC-16, the Alliance's sensor, meter and notification tables | [crates.io](https://crates.io/crates/zwave-cc), [docs.rs](https://docs.rs/zwave-cc) |
+| [`zwave-security`](crates/zwave-security) | S0 and S2: key exchange, key derivation, encryption, nonces, DSKs, PINs, SmartStart QR codes | [crates.io](https://crates.io/crates/zwave-security), [docs.rs](https://docs.rs/zwave-security) |
+| [`zwave-serial`](crates/zwave-serial) | the Serial API: frames, the ACK/NAK/CAN link layer, typed controller messages, `probe` | [crates.io](https://crates.io/crates/zwave-serial), [docs.rs](https://docs.rs/zwave-serial) |
+| [`zwave-sim`](crates/zwave-sim) | a Serial API controller simulator with simulated nodes, for tests without hardware | [crates.io](https://crates.io/crates/zwave-sim), [docs.rs](https://docs.rs/zwave-sim) |
+| [`zwave-bridge`](crates/zwave-bridge) | the MQTT bridge, as a binary and a library | [crates.io](https://crates.io/crates/zwave-bridge), [docs.rs](https://docs.rs/zwave-bridge) |
 
-The crates are not on crates.io yet; depend on them from git:
-
-```toml
-[dependencies]
-zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0" }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```sh
+cargo add zwave-host        # or zwave-serial, zwave-security, zwave-cc
+cargo add --dev zwave-sim   # the simulator, for tests without hardware
+cargo add tokio --features macros,rt-multi-thread
 ```
 
 This example starts a controller, includes a switch and turns it on. It runs

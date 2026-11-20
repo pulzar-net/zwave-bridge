@@ -4,7 +4,7 @@ description: "The bridge as a library: the same code as the binary."
 ---
 
 The bridge as a library: the same code as the binary.
-[API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_bridge/index.html).
+[crates.io](https://crates.io/crates/zwave-bridge), [docs.rs](https://docs.rs/zwave-bridge), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_bridge/index.html).
 
 - `run(config, port, shutdown)` runs the bridge on an open port until
   `shutdown` completes.

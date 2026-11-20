@@ -20,11 +20,11 @@ The [API documentation](https://pulzar-net.github.io/zwave-bridge/api/zwave_host
 
 ## Depending on the crates
 
-The crates are not published on crates.io yet. Depend on a release tag:
+The crates are on [crates.io](https://crates.io/crates/zwave-host), with their API documentation on [docs.rs](https://docs.rs/zwave-host):
 
-```toml
-[dependencies]
-zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0" }
+```sh
+cargo add zwave-host        # or zwave-serial, zwave-security, zwave-cc
+cargo add --dev zwave-sim   # the simulator, for tests without hardware
 ```
 
 Every crate shares the workspace version and is released together. While

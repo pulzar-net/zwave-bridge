@@ -22,7 +22,7 @@ file:
 Download, verify and install (this is the README's quick start; CI runs it):
 
 ```sh
-VERSION=0.2.0
+VERSION=0.2.1
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
@@ -35,15 +35,16 @@ zwave-bridge --version
 There are no builds for macOS or Windows: build from source there.
 Big-endian MIPS routers are not supported.
 
-## From source
+## From crates.io
 
 With Rust 1.89 or newer:
 
 ```sh
-cargo install --locked --git https://github.com/pulzar-net/zwave-bridge zwave-bridge
+cargo install --locked zwave-bridge
+cargo install --locked zwave-sim     # the controller simulator, if you want it
 ```
 
-Or from a clone, `cargo build --release -p zwave-bridge`; the binary is
+Or build it from a clone, `cargo build --release -p zwave-bridge`; the binary is
 `target/release/zwave-bridge`. No system packages are required.
 
 ## As a systemd service

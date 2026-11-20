@@ -3,7 +3,7 @@ title: "zwave-cc"
 description: "Z-Wave command classes."
 ---
 
-Z-Wave command classes. No I/O. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_cc/index.html).
+Z-Wave command classes. No I/O. [crates.io](https://crates.io/crates/zwave-cc), [docs.rs](https://docs.rs/zwave-cc), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_cc/index.html).
 
 Each command class is defined in a TOML file under
 [`defs/cc`](https://github.com/pulzar-net/zwave-bridge/tree/main/crates/zwave-cc/defs/cc);

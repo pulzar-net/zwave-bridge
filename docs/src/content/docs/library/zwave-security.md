@@ -3,7 +3,7 @@ title: "zwave-security"
 description: "Z-Wave security: S0 and S2."
 ---
 
-Z-Wave security: S0 and S2. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_security/index.html).
+Z-Wave security: S0 and S2. [crates.io](https://crates.io/crates/zwave-security), [docs.rs](https://docs.rs/zwave-security), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_security/index.html).
 
 | Module | What it has |
 |---|---|

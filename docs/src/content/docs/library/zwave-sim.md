@@ -4,7 +4,7 @@ description: "A Serial API controller simulator with simulated nodes, for testin
 ---
 
 A Serial API controller simulator with simulated nodes, for testing Z-Wave
-hosts without hardware. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_sim/index.html).
+hosts without hardware. [crates.io](https://crates.io/crates/zwave-sim), [docs.rs](https://docs.rs/zwave-sim), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_sim/index.html).
 
 `Simulator` plays a controller over any byte stream, with nodes from
 `NodeSpec`: `switch`, `sleeping_sensor` (S0), `s2_sensor` (with the
