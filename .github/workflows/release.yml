@@ -5,17 +5,24 @@
 #   mipsel-unknown-linux-musl    MT7628/MT7621-class OpenWrt routers
 #
 # Every target's test suite runs under qemu-user before anything is published.
+# Run it by hand with a tag to build and publish that tag again with this
+# workflow. Assets are built outside dist/, which is not ours to fill.
 
 name: release
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: The version tag to build and publish (v0.2.0)
+        required: true
 
 permissions:
   contents: read
 
 env:
+  TAG: ${{ inputs.tag || github.ref_name }}
   NIGHTLY: nightly-2026-11-14
   ZIG: 0.16.0
   ZIGBUILD: 0.24.1
@@ -28,11 +35,12 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
       - name: The tag is the crate version
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           want="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
-          [ "${GITHUB_REF_NAME#v}" = "${want}" ] || { echo "tag ${GITHUB_REF_NAME} is not v${want}" >&2; exit 1; }
+          [ "${TAG#v}" = "${want}" ] || { echo "tag ${TAG} is not v${want}" >&2; exit 1; }
       - uses: dtolnay/rust-toolchain@master
         timeout-minutes: 10
         with:
@@ -59,7 +67,8 @@ jobs:
           ZWAVE_BRIDGE_REQUIRE_MQTT: "1"
         run: |
           set -euo pipefail
-          mkdir -p dist
+          out="${RUNNER_TEMP}/assets"
+          mkdir -p "${out}"
           for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl mipsel-unknown-linux-musl; do
             std=()
             case "${target}" in mips*) std=(-Zbuild-std) ;; esac
@@ -69,12 +78,22 @@ jobs:
             for bin in zwave-bridge zwave-sim; do
               f="target/${target}/release/${bin}"
               file "${f}" | grep -q 'statically linked' || { file "${f}"; echo "${target}: ${bin} not static" >&2; exit 1; }
-              cp "${f}" "dist/${bin}-${target%%-*}-linux-musl"
+              cp "${f}" "${out}/${bin}-${target%%-*}-linux-musl"
             done
           done
-          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+          (cd "${out}" && sha256sum *-linux-musl > SHA256SUMS && cat SHA256SUMS)
+      - name: Release notes from the changelog
+        run: |
+          version="${TAG#v}"
+          awk -v v="${version}" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > "${RUNNER_TEMP}/notes.md"
+          [ -s "${RUNNER_TEMP}/notes.md" ] || { echo "no CHANGELOG section for ${version}" >&2; exit 1; }
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --notes-file CHANGELOG.md
+        run: |
+          cd "${RUNNER_TEMP}/assets"
+          gh release create "${TAG}" ./* --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --verify-tag
