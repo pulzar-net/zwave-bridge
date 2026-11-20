@@ -103,13 +103,16 @@ jobs:
           gh release create "${TAG}" ./* --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --verify-tag
 
   # The crates on crates.io, in dependency order, once the binaries are out.
-  # A version already there is skipped, so a re-run finishes the rest.
-  # Today a CARGO_REGISTRY_TOKEN secret; for trusted publishing, give the
-  # job `id-token: write`, add `rust-lang/crates-io-auth-action@v1` (id
-  # auth) before this step and pass its `token` output instead.
+  # A version already there is skipped, so a re-run finishes the rest. With
+  # the TRUSTED_PUBLISHING variable set to true, the token comes from
+  # crates.io trusted publishing; otherwise from the CARGO_REGISTRY_TOKEN
+  # secret.
   crates:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     # A first publish of several new crates waits out crates.io's rate limit
     # on new crates, shared with the account's other repositories.
     timeout-minutes: 180
@@ -119,13 +122,17 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
         timeout-minutes: 10
+      - name: Trusted publishing token
+        id: oidc
+        if: vars.TRUSTED_PUBLISHING == 'true'
+        uses: rust-lang/crates-io-auth-action@v1
       - name: Publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.oidc.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${CARGO_REGISTRY_TOKEN}" ]; then
-            echo "::notice::No CARGO_REGISTRY_TOKEN secret; the crates were not published."
+            echo "::notice::No crates.io token (trusted publishing or CARGO_REGISTRY_TOKEN); the crates were not published."
             exit 0
           fi
           version="${TAG#v}"
