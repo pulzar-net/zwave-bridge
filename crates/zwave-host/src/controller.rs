@@ -1182,7 +1182,8 @@ impl Controller {
             let bytes = wrap_endpoint(report.encode(), endpoint);
             self.send_detached(node, bytes, sec);
         }
-        self.on_command(node, endpoint, command, security).await;
+        self.on_command(node, endpoint, command, security, ac.rssi)
+            .await;
     }
 
     async fn on_command(
@@ -1191,6 +1192,7 @@ impl Controller {
         endpoint: u8,
         command: Command,
         security: Option<RxSecurity>,
+        rssi: Option<i8>,
     ) {
         {
             let mut rt = self.inner.runtime.lock().expect("lock");
@@ -1212,7 +1214,10 @@ impl Controller {
                 "the node was reset locally; remove it with remove_failed_node"
             );
         }
-        let updates = values::from_command(node, endpoint, &command);
+        let mut updates = values::from_command(node, endpoint, &command);
+        for u in &mut updates {
+            u.rssi = rssi;
+        }
         let taken = self.deliver(
             node,
             Inbound::Command {
@@ -1850,6 +1855,27 @@ impl Controller {
         let mut v = Vec::with_capacity(2);
         message::node_bytes(node, self.inner.nid, &mut v);
         v
+    }
+
+    /// Requests waiting for a sleeping node to wake up.
+    pub fn queued(&self, node: NodeId) -> usize {
+        self.inner
+            .runtime
+            .lock()
+            .expect("lock")
+            .get(&node)
+            .map(|r| r.wake_tickets.len())
+            .unwrap_or(0)
+    }
+
+    /// The repeaters (nearest the controller first) and ACK RSSI of the last frame that reached a node.
+    pub fn last_route(&self, node: NodeId) -> Option<(Vec<NodeId>, Option<i8>)> {
+        self.inner
+            .runtime
+            .lock()
+            .expect("lock")
+            .get(&node)
+            .and_then(|r| r.last_route.clone())
     }
 
     /// Reads a node's neighbor table from the controller (no radio traffic).

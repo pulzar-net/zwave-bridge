@@ -11,7 +11,7 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.89"
 license = "MIT"
@@ -19,11 +19,11 @@ repository = "https://github.com/pulzar-net/zwave-bridge"
 authors = ["Pulzar LLC"]
 
 [workspace.dependencies]
-zwave-serial = { path = "crates/zwave-serial", version = "0.1.0", default-features = false }
-zwave-security = { path = "crates/zwave-security", version = "0.1.0" }
-zwave-cc = { path = "crates/zwave-cc", version = "0.1.0" }
-zwave-host = { path = "crates/zwave-host", version = "0.1.0" }
-zwave-sim = { path = "crates/zwave-sim", version = "0.1.0" }
+zwave-serial = { path = "crates/zwave-serial", version = "0.2.0", default-features = false }
+zwave-security = { path = "crates/zwave-security", version = "0.2.0" }
+zwave-cc = { path = "crates/zwave-cc", version = "0.2.0" }
+zwave-host = { path = "crates/zwave-host", version = "0.2.0" }
+zwave-sim = { path = "crates/zwave-sim", version = "0.2.0" }
 thiserror = "2"
 tokio = { version = "1.54", default-features = false }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }

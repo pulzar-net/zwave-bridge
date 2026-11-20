@@ -206,6 +206,7 @@ mod tests {
             unit,
             label: "L".into(),
             writable: false,
+            rssi: None,
         }
     }
 

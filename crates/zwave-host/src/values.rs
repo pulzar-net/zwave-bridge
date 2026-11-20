@@ -66,6 +66,8 @@ pub struct ValueUpdate {
     pub label: String,
     /// Whether the value can be set (switches, levels).
     pub writable: bool,
+    /// Signal strength of the frame that carried it at the controller, dBm.
+    pub rssi: Option<i8>,
 }
 
 fn snake(s: &str) -> String {
@@ -106,6 +108,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: None,
                 label: "Basic".into(),
                 writable: true,
+                rssi: None,
             }),
         Command::BinarySwitch(binary_switch::Command::Report(r)) if r.current != 0xfe => {
             out.push(ValueUpdate {
@@ -114,6 +117,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: None,
                 label: "Switch".into(),
                 writable: true,
+                rssi: None,
             })
         }
         Command::MultilevelSwitch(multilevel_switch::Command::Report(r)) if r.current != 0xfe => {
@@ -123,6 +127,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: None,
                 label: "Level".into(),
                 writable: true,
+                rssi: None,
             })
         }
         Command::MultilevelSensor(multilevel_sensor::Command::Report(r)) => {
@@ -137,6 +142,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: scale.map(|s| s.unit).filter(|u| !u.is_empty()),
                 label: t.map(|t| t.label.to_string()).unwrap_or(name),
                 writable: false,
+                rssi: None,
             });
         }
         Command::Meter(meter::Command::Report(r)) => {
@@ -166,6 +172,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 .trim()
                 .to_string(),
                 writable: false,
+                rssi: None,
             });
         }
         Command::Notification(notification::Command::Report(r)) => {
@@ -208,6 +215,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                     unit: None,
                     label: label.trim().to_string(),
                     writable: false,
+                    rssi: None,
                 });
             } else {
                 out.push(ValueUpdate {
@@ -216,6 +224,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                     unit: None,
                     label: format!("Alarm {}", r.v1_alarm_type),
                     writable: false,
+                    rssi: None,
                 });
             }
         }
@@ -230,6 +239,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: Some("%"),
                 label: "Battery".into(),
                 writable: false,
+                rssi: None,
             });
             out.push(ValueUpdate {
                 id: id(battery::ID, "low"),
@@ -237,6 +247,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: None,
                 label: "Battery low".into(),
                 writable: false,
+                rssi: None,
             });
         }
         Command::BinarySensor(binary_sensor::Command::Report(r)) => {
@@ -262,6 +273,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
                 unit: None,
                 label: format!("Binary sensor {}", name.replace('_', " ")),
                 writable: false,
+                rssi: None,
             });
         }
         Command::Configuration(configuration::Command::Report(r)) => out.push(ValueUpdate {
@@ -270,6 +282,7 @@ pub fn from_command(node: NodeId, endpoint: u8, cmd: &Command) -> Vec<ValueUpdat
             unit: None,
             label: format!("Parameter {}", r.parameter),
             writable: true,
+            rssi: None,
         }),
         _ => {}
     }

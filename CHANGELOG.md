@@ -3,8 +3,10 @@
 All notable changes are listed here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.2.0 (2026-11-20)
 
+- `zwave-host`: `ValueUpdate.rssi` (the carrying frame's RSSI), `Controller::queued`
+  (requests waiting for a sleeping node) and `Controller::last_route`.
 - `zwave-host`: store writes are serialized; `flush` racing the background
   writer could fail on the shared temporary file or leave an older snapshot.
 - `zwave-host`: `device_config` reads Z-Wave JS device files as published

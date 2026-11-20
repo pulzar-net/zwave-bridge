@@ -1197,7 +1197,7 @@ checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[package]]
 name = "zwave-bridge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "lexopt",
@@ -1218,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "zwave-cc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crc",
  "serde",
@@ -1228,7 +1228,7 @@ dependencies = [
 
 [[package]]
 name = "zwave-host"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "ihex",
@@ -1247,7 +1247,7 @@ dependencies = [
 
 [[package]]
 name = "zwave-security"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes",
  "cbc-mac",
@@ -1265,7 +1265,7 @@ dependencies = [
 
 [[package]]
 name = "zwave-serial"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1278,7 +1278,7 @@ dependencies = [
 
 [[package]]
 name = "zwave-sim"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "futures-util",
