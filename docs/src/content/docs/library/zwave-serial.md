@@ -1,4 +1,7 @@
-# zwave-serial
+---
+title: "zwave-serial"
+description: "Silicon Labs' Z-Wave Serial API: the protocol between a host and a controller."
+---
 
 Silicon Labs' Z-Wave Serial API: the protocol between a host and a
 controller. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_serial/index.html).

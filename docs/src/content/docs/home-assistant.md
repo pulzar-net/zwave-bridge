@@ -1,4 +1,7 @@
-# Home Assistant
+---
+title: "Home Assistant"
+description: "zwave-bridge works with Home Assistant through its MQTT integration and MQTT discovery."
+---
 
 zwave-bridge works with Home Assistant through its
 [MQTT integration](https://www.home-assistant.io/integrations/mqtt/) and
@@ -16,7 +19,7 @@ or the other for a given controller, not both.
    Discovery is on by default.
 3. Point zwave-bridge at the same broker (`[mqtt] host`, `port`, and, if the
    broker needs them, `username` and `password_file`).
-4. Start the bridge and [include a device](inclusion.md).
+4. Start the bridge and [include a device](/zwave-bridge/inclusion.html).
 
 Each value appears as an entity the first time the device reports it.
 
@@ -24,8 +27,8 @@ Each value appears as an entity the first time the device reports it.
 
 Each node becomes one Home Assistant device, identified by the network's home
 id and the node id, connected through the controller. Its name is the node's
-name if you [renamed](mqtt.md#rename) it, otherwise the manufacturer and
-label from its [device file](device-files.md), otherwise "Z-Wave node 5".
+name if you [renamed](/zwave-bridge/mqtt.html#rename) it, otherwise the manufacturer and
+label from its [device file](/zwave-bridge/device-files.html), otherwise "Z-Wave node 5".
 
 | Value | Entity | Notes |
 |---|---|---|
@@ -56,7 +59,7 @@ They are retained, so Home Assistant finds them again after a restart.
 
 ## Removing a device
 
-Exclude the device with the bridge's [`exclude`](inclusion.md#exclusion)
+Exclude the device with the bridge's [`exclude`](/zwave-bridge/inclusion.html#exclusion)
 request (or `remove_failed` for a dead one). Deleting it only in Home
 Assistant leaves it in the Z-Wave network.
 
@@ -64,5 +67,5 @@ Assistant leaves it in the Z-Wave network.
 
 Discovery is the only part that is specific to Home Assistant. Node-RED,
 openHAB, scripts and anything else that speaks MQTT can use the
-[topics](mqtt.md) directly; set `homeassistant.enabled = false` if nothing
+[topics](/zwave-bridge/mqtt.html) directly; set `homeassistant.enabled = false` if nothing
 uses discovery.

@@ -1,4 +1,7 @@
-# Architecture
+---
+title: "Architecture"
+description: "A Z-Wave controller is split in two:"
+---
 
 ## Who does what
 

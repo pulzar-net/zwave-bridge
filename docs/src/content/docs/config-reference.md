@@ -1,8 +1,11 @@
-# Configuration reference
+---
+title: Configuration reference
+description: Every key the configuration file accepts, with its type and default, generated from the code.
+---
 
 <!-- Generated from the configuration types by crates/zwave-bridge/tests/config_reference.rs. Do not edit by hand. -->
 
-Every key the configuration file accepts. Unknown keys are an error, so a typo stops the bridge at startup instead of being ignored. This page is generated from the configuration types; a [JSON Schema](config.schema.json) generated from the same types lets editors with TOML schema support (for example Taplo or Even Better TOML) complete and check the file.
+Every key the configuration file accepts. Unknown keys are an error, so a typo stops the bridge at startup instead of being ignored. This page is generated from the configuration types; a [JSON Schema](/zwave-bridge/config.schema.json) generated from the same types lets editors with TOML schema support (for example Taplo or Even Better TOML) complete and check the file.
 
 ## `[serial]`
 

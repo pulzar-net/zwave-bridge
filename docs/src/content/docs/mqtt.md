@@ -1,4 +1,7 @@
-# MQTT API
+---
+title: "MQTT API"
+description: "The bridge publishes and listens under one base topic, zwave unless mqtt.base_topic says otherwise."
+---
 
 The bridge publishes and listens under one base topic, `zwave` unless
 `mqtt.base_topic` says otherwise. Payloads are JSON, except the plain-text
@@ -97,7 +100,7 @@ An empty payload is the same as `{}`. Requests that wait for a device
 
 | Request | Fields | Response |
 |---|---|---|
-| `include` | `strategy`, `classes`, `pin`, `timeout` (all optional; see [Including devices](inclusion.md)) | `node`, `security`, `security_error` |
+| `include` | `strategy`, `classes`, `pin`, `timeout` (all optional; see [Including devices](/zwave-bridge/inclusion.html)) | `node`, `security`, `security_error` |
 | `exclude` | `timeout` (optional) | `node` (`null` for a device from another network) |
 | `stop` | | `ok`: whether an inclusion or exclusion was running |
 | `grant` | `classes` | `ok` |
@@ -138,7 +141,7 @@ controller sees it:
 
 `backup` reads the controller's NVM into `nvm-<unix time>.bin` in the data
 directory and answers with its path. `restore` (since 0.2.0) writes such a
-file back; see [Backup and restore](backup.md). `file` must be a file name
+file back; see [Backup and restore](/zwave-bridge/backup.html). `file` must be a file name
 in the data directory, not a path.
 
 ### `firmware_update`
@@ -156,7 +159,7 @@ is. Progress comes as `firmware_update_progress` events.
 ### `configure`
 
 Since 0.2.0. Sets configuration parameters by their key in the device's
-[device file](device-files.md). Partial parameters (several settings packed
+[device file](/zwave-bridge/device-files.html). Partial parameters (several settings packed
 in one parameter) are merged for you:
 
 ```sh
@@ -229,4 +232,4 @@ a wall controller, with the command's name and its frame in hex:
 
 With `homeassistant.enabled` (the default), the bridge also publishes a
 discovery message under `homeassistant/` the first time each value reports.
-See [Home Assistant](home-assistant.md).
+See [Home Assistant](/zwave-bridge/home-assistant.html).

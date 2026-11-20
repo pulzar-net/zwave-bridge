@@ -1,4 +1,7 @@
-# Including devices
+---
+title: "Including devices"
+description: "Including a device adds it to the network and gives it the network keys it is entitled to."
+---
 
 Including a device adds it to the network and gives it the network keys it
 is entitled to. Z-Wave has three ways to do it.

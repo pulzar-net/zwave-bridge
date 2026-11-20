@@ -1,4 +1,7 @@
-# The library crates
+---
+title: "The library crates"
+description: "zwave-bridge is built as a stack of library crates."
+---
 
 zwave-bridge is built as a stack of library crates. The bridge binary is
 the thinnest layer on top; everything else can be used without it, to build
@@ -6,12 +9,12 @@ a different bridge, a gateway, a test tool or a protocol analyzer.
 
 | Crate | Layer | Use it to |
 |---|---|---|
-| [zwave-host](zwave-host.md) | controller application | run a Z-Wave network from Rust |
-| [zwave-cc](zwave-cc.md) | command classes | encode and decode Z-Wave application frames |
-| [zwave-security](zwave-security.md) | S0 and S2 | encrypt, decrypt and bootstrap keys; DSKs and QR codes |
-| [zwave-serial](zwave-serial.md) | Serial API | talk to a controller directly; identify one |
-| [zwave-sim](zwave-sim.md) | test support | test Z-Wave software without hardware |
-| [zwave-bridge](zwave-bridge.md) | MQTT bridge | run or embed the bridge itself |
+| [zwave-host](/zwave-bridge/library/zwave-host.html) | controller application | run a Z-Wave network from Rust |
+| [zwave-cc](/zwave-bridge/library/zwave-cc.html) | command classes | encode and decode Z-Wave application frames |
+| [zwave-security](/zwave-bridge/library/zwave-security.html) | S0 and S2 | encrypt, decrypt and bootstrap keys; DSKs and QR codes |
+| [zwave-serial](/zwave-bridge/library/zwave-serial.html) | Serial API | talk to a controller directly; identify one |
+| [zwave-sim](/zwave-bridge/library/zwave-sim.html) | test support | test Z-Wave software without hardware |
+| [zwave-bridge](/zwave-bridge/library/zwave-bridge.html) | MQTT bridge | run or embed the bridge itself |
 
 The [API documentation](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html) covers every public item.
 
@@ -26,7 +29,7 @@ zwave-host = { git = "https://github.com/pulzar-net/zwave-bridge", tag = "v0.2.0
 
 Every crate shares the workspace version and is released together. While
 the project is at 0.x, minor versions may break the API; the
-[changelog](../changelog.md) says what changed.
+[changelog](/zwave-bridge/changelog.html) says what changed.
 
 ## Conventions shared by every crate
 

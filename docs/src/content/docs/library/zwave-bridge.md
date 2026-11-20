@@ -1,4 +1,7 @@
-# zwave-bridge (crate)
+---
+title: "zwave-bridge (crate)"
+description: "The bridge as a library: the same code as the binary."
+---
 
 The bridge as a library: the same code as the binary.
 [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_bridge/index.html).
@@ -9,5 +12,5 @@ The bridge as a library: the same code as the binary.
 - `config::Config` is the configuration file; `Config::parse` parses one.
 - `discovery` builds the Home Assistant discovery messages.
 
-The [MQTT API](../mqtt.md) and [configuration reference](../config-reference.md)
+The [MQTT API](/zwave-bridge/mqtt.html) and [configuration reference](/zwave-bridge/config-reference.html)
 document the behavior.

@@ -1,4 +1,7 @@
-# Security model
+---
+title: "Security model"
+description: "This page describes what zwave-bridge protects, what it relies on you for, and what it cannot do."
+---
 
 This page describes what zwave-bridge protects, what it relies on you for,
 and what it cannot do. To report a vulnerability, see

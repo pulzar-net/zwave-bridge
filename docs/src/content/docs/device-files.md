@@ -1,4 +1,7 @@
-# Device files
+---
+title: "Device files"
+description: "Since 0.2.0."
+---
 
 Since 0.2.0.
 

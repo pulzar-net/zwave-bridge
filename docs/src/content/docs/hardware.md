@@ -1,4 +1,7 @@
-# Hardware and firmware
+---
+title: "Hardware and firmware"
+description: "zwave-bridge drives a Z-Wave controller: a USB stick or module running Silicon Labs' Serial API firmware, attached over USB serial, a UART, or TCP (for example through ser2net)."
+---
 
 zwave-bridge drives a Z-Wave controller: a USB stick or module running
 Silicon Labs' Serial API firmware, attached over USB serial, a UART, or TCP
@@ -38,7 +41,7 @@ Serial API firmware should work.
   gain from updating.
 
 Controller firmware updates are done with the manufacturer's tool, not with
-zwave-bridge. zwave-bridge's [`firmware_update`](mqtt.md#firmware_update)
+zwave-bridge. zwave-bridge's [`firmware_update`](/zwave-bridge/mqtt.html#firmware_update)
 updates devices, not the controller.
 
 ## Regions
@@ -90,5 +93,5 @@ supported yet; see the [roadmap](https://github.com/pulzar-net/zwave-bridge#road
 Put the controller on a USB extension cable, away from the computer and
 from USB 3 devices, which radiate noise. Z-Wave is a mesh: mains-powered
 devices repeat for others, so add them between the controller and distant
-battery devices. The [`topology`](mqtt.md#topology) request and each node's
+battery devices. The [`topology`](/zwave-bridge/mqtt.html#topology) request and each node's
 `route` topic show how frames travel.

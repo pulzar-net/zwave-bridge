@@ -1,4 +1,7 @@
-# zwave-security
+---
+title: "zwave-security"
+description: "Z-Wave security: S0 and S2."
+---
 
 Z-Wave security: S0 and S2. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_security/index.html).
 

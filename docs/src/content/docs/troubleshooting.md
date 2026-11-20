@@ -1,13 +1,16 @@
-# Troubleshooting and FAQ
+---
+title: "Troubleshooting and FAQ"
+description: "Start with the log."
+---
 
 Start with the log. Run the bridge with `RUST_LOG=debug` to see every
-request and value; see [logging](configuration.md#logging) for more.
+request and value; see [logging](/zwave-bridge/configuration.html#logging) for more.
 
 ## The bridge does not start
 
 **`opening /dev/...: Permission denied`.** Your user (or the service's)
 needs to be in the group that owns the device, usually `dialout`
-(`ls -l /dev/ttyACM0` shows it). The [systemd unit](installation.md#as-a-systemd-service)
+(`ls -l /dev/ttyACM0` shows it). The [systemd unit](/zwave-bridge/installation.html#as-a-systemd-service)
 adds it.
 
 **`opening ...: Device or resource busy`, or the controller does not
@@ -17,7 +20,7 @@ ModemManager, which probes new serial devices
 whether a controller answers.
 
 **`unknown field` or a TOML error.** The configuration file has an error;
-the message names the key. See the [configuration reference](config-reference.md).
+the message names the key. See the [configuration reference](/zwave-bridge/config-reference.html).
 
 **`reading .../keys.json`.** The keys file is damaged or unreadable by the
 bridge's user. Restore it from your backup. Do not delete it unless you
@@ -29,7 +32,7 @@ again.
 **Nothing happens when I press the button.** Check for `inclusion_started`;
 inclusion lasts `network.inclusion_timeout` seconds (default 60). Most
 devices need a specific press sequence; see the manual. A device that
-belonged to another network must be [excluded](inclusion.md#exclusion)
+belonged to another network must be [excluded](/zwave-bridge/inclusion.html#exclusion)
 first.
 
 **`the controller is busy with another inclusion or exclusion`.** Send
@@ -48,7 +51,7 @@ Wake the device (press its button) a few times during the interview;
 ## Values
 
 **A device is included but some values are missing.** It may use a command
-class not implemented yet; see [Devices](hardware.md#devices). Commands it
+class not implemented yet; see [Devices](/zwave-bridge/hardware.html#devices). Commands it
 sends that are not values appear on `zwave/nodes/<id>/command`.
 
 **A battery device's values are late.** It reports when it wakes up, every

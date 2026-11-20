@@ -1,4 +1,7 @@
-# zwave-cc
+---
+title: "zwave-cc"
+description: "Z-Wave command classes."
+---
 
 Z-Wave command classes. No I/O. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_cc/index.html).
 

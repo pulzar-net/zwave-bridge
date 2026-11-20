@@ -14,8 +14,8 @@ use serde_json::{Map, Value};
 
 use zwave_bridge::config::Config;
 
-const PAGE: &str = "docs/src/config-reference.md";
-const SCHEMA: &str = "docs/src/config.schema.json";
+const PAGE: &str = "docs/src/content/docs/config-reference.md";
+const SCHEMA: &str = "docs/public/config.schema.json";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -281,15 +281,19 @@ fn section(
 
 fn render(schema: &Value) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "# Configuration reference\n");
+    let base = env!("CARGO_PKG_NAME");
     let _ = writeln!(
         out,
-        "<!-- Generated from the configuration types by crates/zwave-bridge/tests/config_reference.rs. Do not edit by hand. -->\n"
+        "---\ntitle: Configuration reference\ndescription: Every key the configuration file accepts, with its type and default, generated from the code.\n---\n"
+    );
+    let _ = writeln!(
+        out,
+        "<!-- Generated from the configuration types by crates/{base}/tests/config_reference.rs. Do not edit by hand. -->\n"
     );
     let _ = writeln!(
         out,
         "Every key the configuration file accepts. Unknown keys are an error, so a typo stops the bridge at startup instead of being ignored. \
-         This page is generated from the configuration types; a [JSON Schema](config.schema.json) generated from the same types \
+         This page is generated from the configuration types; a [JSON Schema](/{base}/config.schema.json) generated from the same types \
          lets editors with TOML schema support (for example Taplo or Even Better TOML) complete and check the file.\n"
     );
     let props: Map<String, Value> = schema["properties"]

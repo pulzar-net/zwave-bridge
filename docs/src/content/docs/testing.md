@@ -1,4 +1,7 @@
-# Testing
+---
+title: "Testing"
+description: "The whole stack is developed and tested without hardware."
+---
 
 The whole stack is developed and tested without hardware. CI runs every
 test on every commit.
@@ -27,7 +30,7 @@ failure, as CI does.
 
 ## The simulator
 
-[zwave-sim](library/zwave-sim.md) plays a Serial API controller with
+[zwave-sim](/zwave-bridge/library/zwave-sim.html) plays a Serial API controller with
 simulated nodes. The nodes run the real S2 node side, so key exchange and
 encryption are exercised end to end.
 
@@ -74,7 +77,7 @@ cargo +nightly fuzz run command_classes -- -max_total_time=600
 ## Documentation
 
 The `docs` workflow checks the claims this site makes: the
-[configuration reference](config-reference.md) is regenerated from the code
+[configuration reference](/zwave-bridge/config-reference.html) is regenerated from the code
 and compared, every doctest runs (the README's library example among them),
 the README's quick start runs, the workspace builds on the minimum supported
 Rust version, and every relative link resolves.

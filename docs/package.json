@@ -1,0 +1,15 @@
+{
+  "name": "zwave-bridge-docs",
+  "private": true,
+  "type": "module",
+  "description": "The zwave-bridge documentation site: Starlight with the Pulzar docs theme.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.43.1",
+    "@pulzar-net/docs-theme": "git+https://github.com/pulzar-net/docs-theme.git#v0.1.0",
+    "astro": "7.4.13"
+  }
+}

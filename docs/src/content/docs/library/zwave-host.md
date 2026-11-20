@@ -1,4 +1,7 @@
-# zwave-host
+---
+title: "zwave-host"
+description: "The Z-Wave controller host: the application that runs a network on top of a Serial API controller."
+---
 
 The Z-Wave controller host: the application that runs a network on top of a
 Serial API controller. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html).

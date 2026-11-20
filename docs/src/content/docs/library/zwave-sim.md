@@ -1,4 +1,7 @@
-# zwave-sim
+---
+title: "zwave-sim"
+description: "A Serial API controller simulator with simulated nodes, for testing Z-Wave hosts without hardware."
+---
 
 A Serial API controller simulator with simulated nodes, for testing Z-Wave
 hosts without hardware. [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_sim/index.html).
@@ -19,7 +22,7 @@ cargo run -p zwave-sim -- 127.0.0.1:4545
 
 and reads commands on standard input: `press <name>`, `wake <name>`,
 `power <name>`, `temp <name> <celsius>`, `motion <name>`, `dsk <name>`.
-See [Getting started](../getting-started.md).
+See [Getting started](/zwave-bridge/getting-started.html).
 
 The simulator is a test tool. It models what a host sees, not radio
 propagation, and is not a reference implementation of the controller

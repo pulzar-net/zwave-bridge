@@ -1,4 +1,7 @@
-# Backup and restore
+---
+title: "Backup and restore"
+description: "A Z-Wave network lives in two places: the controller's non-volatile memory (NVM) holds the node list and routing, and the host holds the security keys and what it learned in each interview."
+---
 
 A Z-Wave network lives in two places: the controller's non-volatile memory
 (NVM) holds the node list and routing, and the host holds the security keys

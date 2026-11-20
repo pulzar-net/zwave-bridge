@@ -7,8 +7,9 @@
 #               latest release and check its sum, then the release binary
 #               and this commit's build against the simulator and a broker
 #   msrv        the workspace builds on the rust-version the badge claims
-#   links       every relative link in the README and the book resolves
-#   book        the mdBook and the API docs; on main, published to Pages
+#   links       every relative link in the README and the crate READMEs resolves
+#   site        the Starlight site (its build fails on a broken internal link)
+#               and the API docs under /api; on main, published to Pages
 #
 # The stack's own tests, lints, fuzzing and cross builds are in ci.yml.
 
@@ -28,7 +29,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  MDBOOK: 0.4.52
 
 jobs:
   reference:
@@ -76,34 +76,38 @@ jobs:
       - uses: actions/checkout@v4
       - uses: lycheeverse/lychee-action@v2
         with:
-          args: --offline --no-progress './*.md' './crates/*/README.md' './docs/src/**/*.md'
+          args: --offline --no-progress './*.md' './crates/*/README.md'
           fail: true
 
-  book:
+  site:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
+      - uses: actions/setup-node@v4
         with:
-          tool: mdbook@${{ env.MDBOOK }}
-      - name: Build the book and the API docs
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+        working-directory: docs
+      - name: Build the site and the API docs
         env:
           RUSTDOCFLAGS: -D warnings
         run: |
           set -euo pipefail
-          mdbook build docs
+          (cd docs && npm run build)
           cargo doc --workspace --no-deps
-          cp -R target/doc docs/book/api
+          cp -R target/doc docs/dist/api
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/book
+          path: docs/dist
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [book, reference, links]
+    needs: [site, reference, links]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

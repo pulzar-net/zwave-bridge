@@ -1,4 +1,10 @@
-# Configuration
+---
+title: "Configuration"
+description: "zwave-bridge reads one TOML file, /etc/zwave-bridge/config.toml unless --config FILE names another."
+---
+
+import config from '../../../../config.example.toml?raw';
+import { Code } from '@astrojs/starlight/components';
 
 zwave-bridge reads one TOML file, `/etc/zwave-bridge/config.toml` unless
 `--config FILE` names another. Only the controller's port is required:
@@ -10,10 +16,10 @@ port = "/dev/serial/by-id/usb-Zooz_800_Z-Wave_Stick_..."
 
 Everything else has a default. Unknown keys and wrong types are errors, so a
 typo stops the bridge at startup with the key named. The
-[configuration reference](config-reference.md) lists every key; it is
+[configuration reference](/zwave-bridge/config-reference.html) lists every key; it is
 generated from the code, so it is always current.
 
-A [JSON Schema](config.schema.json) generated from the same code lets an
+A [JSON Schema](/zwave-bridge/config.schema.json) generated from the same code lets an
 editor with TOML schema support (Taplo, or VS Code's Even Better TOML)
 complete and check the file. Point it at the schema with a first line of:
 
@@ -30,7 +36,7 @@ complete and check the file. Point it at the schema with a first line of:
 | `[mqtt]` | broker host and port, client id, user name, password or password file, base topic, keep-alive |
 | `[homeassistant]` | discovery on or off, the discovery prefix |
 | `[network]` | the wake-up interval set on sleeping devices at inclusion, how long inclusion and exclusion wait |
-| `[devices]` | a directory of Z-Wave JS device files (since 0.2.0); see [Device files](device-files.md) |
+| `[devices]` | a directory of Z-Wave JS device files (since 0.2.0); see [Device files](/zwave-bridge/device-files.html) |
 
 ## A complete example
 
@@ -38,9 +44,7 @@ complete and check the file. Point it at the schema with a first line of:
 in the repository sets every key to its default, with comments. CI checks
 that it parses.
 
-```toml
-{{#include ../../config.example.toml}}
-```
+<Code code={config} lang="toml" />
 
 ## The port
 
@@ -59,7 +63,7 @@ password file readable by the bridge's user only.
 
 The network keys are not in the configuration. On first start the bridge
 generates them, with the controller's S2 key pair, and writes `keys.json` to
-the data directory (mode 0600). See [Backup and restore](backup.md).
+the data directory (mode 0600). See [Backup and restore](/zwave-bridge/backup.html).
 
 ## The data directory
 

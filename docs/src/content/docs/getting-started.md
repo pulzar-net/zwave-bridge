@@ -1,4 +1,7 @@
-# Getting started
+---
+title: "Getting started"
+description: "This page runs zwave-bridge end to end without any Z-Wave hardware: a simulated controller with four simulated devices takes the place of a USB stick."
+---
 
 This page runs zwave-bridge end to end without any Z-Wave hardware: a
 simulated controller with four simulated devices takes the place of a USB
@@ -140,8 +143,8 @@ under **Settings > Devices & services > MQTT**.
 
 ## Next steps
 
-- [Install](installation.md) a release binary as a service.
-- [Choose a controller](hardware.md), then set `serial.port` to it. Use
+- [Install](/zwave-bridge/installation.html) a release binary as a service.
+- [Choose a controller](/zwave-bridge/hardware.html), then set `serial.port` to it. Use
   `zwave-bridge probe PORT` first to check that it answers.
-- Read [Including devices](inclusion.md) for SmartStart, S0 and exclusion,
-  and the [MQTT API](mqtt.md) for every request.
+- Read [Including devices](/zwave-bridge/inclusion.html) for SmartStart, S0 and exclusion,
+  and the [MQTT API](/zwave-bridge/mqtt.html) for every request.

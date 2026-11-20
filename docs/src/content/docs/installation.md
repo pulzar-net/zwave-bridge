@@ -1,7 +1,10 @@
-# Installation
+---
+title: "Installation"
+description: "zwave-bridge is one static Linux binary."
+---
 
 zwave-bridge is one static Linux binary. Pick one of the ways below, then
-[configure](configuration.md) it.
+[configure](/zwave-bridge/configuration.html) it.
 
 ## Release binaries
 
@@ -103,7 +106,7 @@ zwave-bridge --version
 ```
 
 Exit status: 0 on a clean stop; 1 on an error, including the deliberate
-exit after an [NVM restore](backup.md#restoring-an-nvm-backup), after which
+exit after an [NVM restore](/zwave-bridge/backup.html#restoring-an-nvm-backup), after which
 the service manager starts it again.
 
 The log goes to standard error. `RUST_LOG` sets its level, for example
