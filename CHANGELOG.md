@@ -6,12 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-20
+
 ### Changed
 
-- Every crate is ready for crates.io: homepage, docs.rs links, its README,
-  LICENSE and NOTICE, and only its sources and tests in the package. CI
+- The first release on crates.io. Every crate carries its homepage, docs.rs
+  link, README, LICENSE and NOTICE, and only its sources and tests. CI
   packages the workspace on every push; a release publishes the crates in
-  dependency order once a `CARGO_REGISTRY_TOKEN` secret exists.
+  dependency order.
 
 ## [0.2.0] - 2026-11-20
 
@@ -97,6 +99,7 @@ First release.
 - `zwave-bridge`: MQTT bridge with Home Assistant discovery and a JSON topic
   scheme.
 
-[Unreleased]: https://github.com/pulzar-net/zwave-bridge/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/pulzar-net/zwave-bridge/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/pulzar-net/zwave-bridge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/pulzar-net/zwave-bridge/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pulzar-net/zwave-bridge/releases/tag/v0.1.0
