@@ -48,8 +48,7 @@ certified by the Z-Wave Alliance.
 | Z-Wave Long Range | on `main`, next release |
 | Device firmware updates | on `main`, next release |
 | Z-Wave JS device configuration files: parameters by name | on `main`, next release |
-| NVM restore onto a controller of the same series | on `main`, next release |
-| Converting an NVM backup between 700 and 800 series | in progress |
+| NVM restore, converting between 700 and 800 series and SDKs | on `main`, next release |
 | Testing on real controllers and devices | in progress |
 | More command classes (Central Scene, Thermostat, Door Lock, Color Switch, ...) | planned |
 | A web frontend | not planned; the bridge is headless by design |
@@ -196,7 +195,7 @@ Everything lives under a base topic, `zwave` by default.
 | `zwave/bridge/info` | out, retained | controller identity, home id, region, the controller's DSK |
 | `zwave/bridge/event` | out | inclusion progress, key grant and PIN prompts, interviews, firmware update progress |
 | `zwave/bridge/request/<name>` | in | `include`, `exclude`, `stop`, `grant`, `validate_dsk`, `provision`, `unprovision`, `provisioning_list`, `backup`, `reinterview`, `remove_failed`, `rename`, `topology`; on `main`: `configure`, `restore`, `firmware_update` |
-| `zwave/bridge/response/<name>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}` |
+| `zwave/bridge/response/<name>` | out | `{"ok": true, ...}` or `{"ok": false, "error": "..."}`, with the request's `transaction` (not in 0.1.0) |
 | `zwave/nodes/<id>` | out, retained | the node: device classes, command classes, security, interview, status |
 | `zwave/nodes/<id>/status` | out, retained | `alive`, `awake`, `asleep` or `dead` |
 | `zwave/nodes/<id>/<class>/<property>[/<endpoint>]` | out, retained | a value: `{"value": 22.5, "unit": "°C", "label": "Air temperature", "time": 1795137000000}` |
@@ -322,12 +321,13 @@ than keeping its own database, so device knowledge is shared, not forked.
 ## Roadmap
 
 - **Next release:** Z-Wave Long Range, device firmware updates, Z-Wave JS
-  device files and parameters by name, NVM restore (all done on `main`); and
-  the first reports from real hardware.
-- **After that:** converting NVM backups between 700 and 800 series, more
-  command classes.
+  device files and parameters by name, NVM restore with conversion between
+  700 and 800 series (all done on `main`); and the first reports from real
+  hardware.
+- **After that:** more command classes: Central Scene, Thermostat (mode and
+  setpoint), Door Lock, Color Switch.
 
-Ideas and requests go in [issues](https://github.com/pulzar-net/zwave-bridge/issues).
+Questions go in [Discussions](https://github.com/pulzar-net/zwave-bridge/discussions); bugs and requests in [issues](https://github.com/pulzar-net/zwave-bridge/issues).
 
 ## Contributing
 

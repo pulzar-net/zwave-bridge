@@ -41,8 +41,10 @@ Not in 0.1.0.
 > Needs real hardware: restore is tested against the simulator and real
 > NVM images in CI, not yet on a controller.
 
-`restore` writes a backup back onto a controller of the **same series and
-SDK version**, for example to a replacement stick of the same model:
+`restore` writes a backup onto a controller, converting it when the
+controller is of the other series (700 or 800) or runs another SDK, the
+way Z-Wave JS's NVM migration does. It refuses a backup whose format is
+newer than the controller's SDK can read, or whose format cannot be told.
 
 1. Stop the bridge, plug in the replacement, start the bridge. Copy the
    backup file into the data directory if it is not there.
@@ -52,15 +54,15 @@ SDK version**, for example to a replacement stick of the same model:
    mosquitto_pub -t zwave/bridge/request/restore -m '{"file": "nvm-1795137434.bin"}'
    ```
 
-3. The bridge checks that the backup matches the controller's series and
-   SDK, writes it, answers `{"file": "nvm-1795137434.bin", "restart": true, "ok": true}`,
+3. The bridge checks the backup against the controller, converts it if
+   needed, writes it, answers `{"file": "nvm-1795137434.bin", "restart": true, "ok": true}`,
    publishes `offline`, and exits. The service manager (the systemd unit or
    the OpenWrt script) starts it again, now on the restored network.
 
 The keys stay in `keys.json`, so keep the same data directory, or restore it
 from your backup first.
 
-Converting a backup between 700 and 800 series is in progress.
+Conversion covers the 700 and 800 series, whose memory is in NVM3 format.
 
 ## Moving to a new machine
 

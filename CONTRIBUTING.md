@@ -9,6 +9,8 @@ through [private reporting](SECURITY.md), never a public issue.
 
 ## Before you start
 
+- **Questions** (how do I, is this expected): ask in
+  [Discussions](https://github.com/pulzar-net/zwave-bridge/discussions).
 - **Hardware reports and device requests:** use the
   [device or hardware form](https://github.com/pulzar-net/zwave-bridge/issues/new?template=device.yml).
 - **Bugs:** use the [bug form](https://github.com/pulzar-net/zwave-bridge/issues/new?template=bug.yml),
@@ -111,7 +113,10 @@ A new parser needs a new fuzz target.
   key or an MQTT topic.
 - Sign off every commit (see below).
 
-CI must pass before a pull request is merged.
+CI must pass before a pull request is merged: the tests, fuzzing and the
+cross builds. Pull requests are squash-merged, so the pull
+request's title and description become the commit on `main`: write them
+as you would a commit message.
 
 ## Developer Certificate of Origin
 

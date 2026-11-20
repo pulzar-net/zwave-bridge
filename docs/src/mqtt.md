@@ -85,9 +85,12 @@ Publish a request to `zwave/bridge/request/<name>`. The answer comes on
 or `"ok": false` and an `error`:
 
 ```json
-{ "node": 5, "ok": true }
+{ "node": 5, "ok": true, "transaction": "a1" }
 { "ok": false, "error": "no node 9" }
 ```
+
+Put a `transaction` value in a request to have it copied into the response
+(not in 0.1.0), so you can match answers to questions.
 
 An empty payload is the same as `{}`. Requests that wait for a device
 (inclusion, a firmware update) answer when they finish.

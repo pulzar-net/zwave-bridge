@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question
+    url: https://github.com/pulzar-net/zwave-bridge/discussions
+    about: How do I, is this expected, which hardware. Bugs and requests use the forms below.
   - name: Report a security vulnerability
     url: https://github.com/pulzar-net/zwave-bridge/security/advisories/new
     about: Report it privately. Never open a public issue for a security problem.

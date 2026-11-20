@@ -88,6 +88,7 @@ a Long Range capable 800 series controller.
 **Is there a web interface?** No. The bridge is headless; everything goes
 through MQTT. Home Assistant or any MQTT tool is the interface.
 
-**Where do I ask a question?** Open an
-[issue](https://github.com/pulzar-net/zwave-bridge/issues). For security
+**Where do I ask a question?** In
+[Discussions](https://github.com/pulzar-net/zwave-bridge/discussions).
+Bugs go in [issues](https://github.com/pulzar-net/zwave-bridge/issues). For security
 problems, see [SECURITY.md](https://github.com/pulzar-net/zwave-bridge/blob/main/SECURITY.md).

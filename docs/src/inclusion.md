@@ -107,8 +107,14 @@ mosquitto_pub -t zwave/bridge/request/provision \
 removes one. A `provisioning_changed` event follows every change. The list
 is kept in the node store.
 
-With a Long Range capable controller (on `main`), SmartStart includes Long
-Range devices over Long Range.
+### Long Range
+
+Not in 0.1.0. Z-Wave Long Range devices are included only with SmartStart:
+provision their QR code or DSK as above, with a Long Range capable 800
+series controller. They get node ids from 256 up, talk directly to the
+controller (no mesh routing), and use only S2 Authenticated or S2 Access
+Control, with keys of their own: `keys.json` gains Long Range keys
+(added automatically to an older file on first start).
 
 ## Exclusion
 
