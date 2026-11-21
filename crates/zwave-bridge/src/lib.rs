@@ -319,7 +319,8 @@ impl Bridge {
         let status = status_name(self.c.status(node));
         body["status"] = json!(status);
         if let Some(d) = self.devices.get(&node) {
-            body["device"] = json!({"file": d.file, "manufacturer": d.manufacturer, "label": d.label, "description": d.description});
+            body["device"] = json!({"file": d.file, "manufacturer": d.manufacturer, "label": d.label, "description": d.description,
+                                    "endpoints": endpoint_labels(d.endpoints.as_ref())});
         }
         self.publish(&format!("{}/nodes/{node}", self.base), &body, true)
             .await;
@@ -858,4 +859,33 @@ fn provisioning_json(entries: &[Entry]) -> Json {
             .map(|e| json!({"dsk": e.dsk.to_string(), "classes": class_names(&e.granted), "node": e.node_id, "name": e.name, "active": e.status == Default::default()}))
             .collect(),
     )
+}
+
+/// A device file's endpoint names, `{"1": "Relay 1", "2": "Relay 2"}`: what a
+/// multi-channel device calls each channel. Endpoints without a label are left
+/// out, so a device file that names none gives `{}`.
+fn endpoint_labels(endpoints: Option<&Json>) -> serde_json::Map<String, Json> {
+    endpoints
+        .and_then(Json::as_object)
+        .map(|eps| {
+            eps.iter()
+                .filter_map(|(ep, e)| Some((ep.clone(), json!(e.get("label")?.as_str()?))))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod endpoint_label_tests {
+    use super::*;
+
+    #[test]
+    fn names_the_labelled_endpoints() {
+        let file = json!({"0": {"associations": {}}, "1": {"label": "Relay 1"}, "2": {"label": "Relay 2"}});
+        assert_eq!(
+            Json::Object(endpoint_labels(Some(&file))),
+            json!({"1": "Relay 1", "2": "Relay 2"})
+        );
+        assert!(endpoint_labels(None).is_empty());
+    }
 }
