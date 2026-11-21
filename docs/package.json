@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.43.1",
-    "@pulzr/docs-theme": "0.5.0",
+    "@pulzr/docs-theme": "0.6.1",
     "astro": "7.4.13"
   }
 }
