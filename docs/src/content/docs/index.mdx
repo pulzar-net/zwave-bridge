@@ -11,20 +11,20 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 	title="zwave-bridge"
 	tagline="A Z-Wave controller stack and Z-Wave to MQTT bridge in Rust. S2, S0 and SmartStart inclusion, Long Range, and Home Assistant discovery, in one static binary with no runtime."
 	actions={[
-		{ text: 'Get started', link: '/zwave-bridge/getting-started.html', icon: 'right-arrow' },
+		{ text: 'Get started', link: '/zwave-bridge/getting-started.html' },
 		{ text: 'Including devices', link: '/zwave-bridge/inclusion.html', variant: 'minimal' },
-		{ text: 'GitHub', link: 'https://github.com/pulzar-net/zwave-bridge', variant: 'minimal', icon: 'github' },
+		{ text: 'GitHub', link: 'https://github.com/pulzar-net/zwave-bridge', variant: 'minimal' },
 	]}
 />
 
 <Features
 	items={[
-		{ title: 'S2, S0 and SmartStart', body: 'Grant keys and confirm the PIN over MQTT, or scan a QR code once and let the device include itself.', icon: 'approve-check', link: '/zwave-bridge/inclusion.html' },
-		{ title: 'Z-Wave Long Range', body: 'Long Range devices by SmartStart on 800 series controllers, with keys of their own.', icon: 'rocket', link: '/zwave-bridge/inclusion.html#long-range' },
-		{ title: 'Device files from Z-Wave JS', body: 'Parameters by name from the largest Z-Wave device database, read as published.', icon: 'document', link: '/zwave-bridge/device-files.html' },
-		{ title: 'Home Assistant', body: 'Switches, dimmers, sensors and meters appear through MQTT discovery.', icon: 'puzzle', link: '/zwave-bridge/home-assistant.html' },
-		{ title: 'Backups that move', body: 'Read the controller\'s memory and restore it onto another, converting between 700 and 800 series.', icon: 'seti:db', link: '/zwave-bridge/backup.html' },
-		{ title: 'Tested without hardware', body: 'A controller simulator whose nodes run real S2 drives every test; the quick start runs in CI.', icon: 'laptop', link: '/zwave-bridge/testing.html' },
+		{ title: 'S2, S0 and SmartStart', body: 'Grant keys and confirm the PIN over MQTT, or scan a QR code once and let the device include itself.', link: '/zwave-bridge/inclusion.html' },
+		{ title: 'Z-Wave Long Range', body: 'Long Range devices by SmartStart on 800 series controllers, with keys of their own.', link: '/zwave-bridge/inclusion.html#long-range' },
+		{ title: 'Device files from Z-Wave JS', body: 'Parameters by name from the largest Z-Wave device database, read as published.', link: '/zwave-bridge/device-files.html' },
+		{ title: 'Home Assistant', body: 'Switches, dimmers, sensors and meters appear through MQTT discovery.', link: '/zwave-bridge/home-assistant.html' },
+		{ title: 'Backups that move', body: 'Read the controller\'s memory and restore it onto another, converting between 700 and 800 series.', link: '/zwave-bridge/backup.html' },
+		{ title: 'Tested without hardware', body: 'A controller simulator whose nodes run real S2 drives every test; the quick start runs in CI.', link: '/zwave-bridge/testing.html' },
 	]}
 />
 

@@ -38,7 +38,7 @@ controller simulator, but **no release has been tested on real hardware
 yet**. Pages that describe something only real hardware can confirm say so.
 
 Features added after the first release are marked with the version that
-brought them ("since 0.2.0"). The [changelog](/zwave-bridge/changelog.html) lists what each
+brought them ("since 0.2.0"). The [release notes](https://github.com/pulzar-net/zwave-bridge/releases) list what each
 release contains.
 
 zwave-bridge is not certified by the Z-Wave Alliance. Z-Wave is a trademark

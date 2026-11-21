@@ -31,7 +31,7 @@ A useful report says:
 | We release a fix for a medium or low severity issue | in the next release, within 90 days |
 
 We keep you updated in the advisory as we go, agree a disclosure date with
-you, and credit you in the advisory and the changelog unless you prefer not
+you, and credit you in the advisory and the release notes unless you prefer not
 to be named. We publish a GitHub Security Advisory and request a CVE for
 every confirmed vulnerability.
 

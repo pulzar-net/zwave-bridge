@@ -13,6 +13,6 @@
 
 - [ ] `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass
 - [ ] New behavior has a test (simulator, recorded session or unit test)
-- [ ] User-visible changes are in `CHANGELOG.md` under `[Unreleased]`
+- [ ] The description says what a user would notice, for the release notes
 - [ ] Docs updated (README, `docs/`, rustdoc) if behavior, config keys or MQTT topics changed
 - [ ] Every commit is signed off (`git commit -s`, see CONTRIBUTING.md)
