@@ -360,6 +360,70 @@ impl Controller {
                 }
                 Err(e) => warn!(node, ep, "endpoint capability: {e}"),
             }
+            // The capability report lists only the endpoint's non-secure
+            // command classes; on a secure node its secure ones (a relay's
+            // Binary Switch, say) come from the security CC's Commands
+            // Supported Get, sent to the endpoint inside Multi Channel.
+            if let Some(list) = self.endpoint_secure_ccs(node, ep).await {
+                let _ = self.update_node(node, |r| {
+                    let versions: Vec<(u16, crate::node::CcSupport)> =
+                        r.root().ccs.iter().map(|(k, v)| (*k, *v)).collect();
+                    let e = r.endpoints.entry(ep).or_default();
+                    for cc in list {
+                        let root = versions
+                            .iter()
+                            .find(|(k, _)| *k == cc)
+                            .map(|(_, v)| *v)
+                            .unwrap_or_default();
+                        e.ccs.entry(cc).or_insert(root).secure = true;
+                    }
+                });
+            }
+        }
+    }
+
+    /// The command classes an endpoint supports only securely, or `None` when
+    /// the node is not secure or does not answer.
+    async fn endpoint_secure_ccs(&self, node: NodeId, ep: u8) -> Option<Vec<u16>> {
+        let (s2, s0) = self.with_node(node, |r| (r.highest_s2(), r.s0_only()))?;
+        let (get, sec) = match (s2, s0) {
+            (Some(class), _) => (
+                Command::from(security_2::CommandsSupportedGet {}).encode(),
+                TxSecurity::S2(KeyId::Class(class)),
+            ),
+            (None, true) => (
+                Command::from(security::CommandsSupportedGet {}).encode(),
+                TxSecurity::S0 { temp: false },
+            ),
+            _ => return None,
+        };
+        let r = self
+            .request_secured(
+                node,
+                crate::controller::wrap_endpoint(get, ep),
+                sec,
+                self.inner.cfg.request_timeout,
+                move |c, _| {
+                    matches!(
+                        c,
+                        Command::Security2(security_2::Command::CommandsSupportedReport(_))
+                            | Command::Security(security::Command::CommandsSupportedReport(_))
+                    )
+                },
+            )
+            .await;
+        match r {
+            Ok((Command::Security2(security_2::Command::CommandsSupportedReport(r)), _)) => {
+                Some(r.command_classes)
+            }
+            Ok((Command::Security(security::Command::CommandsSupportedReport(r)), _)) => {
+                Some(r.command_classes)
+            }
+            Ok(_) => None,
+            Err(e) => {
+                warn!(node, ep, "endpoint secure command classes: {e}");
+                None
+            }
         }
     }
 
