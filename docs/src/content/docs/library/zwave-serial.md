@@ -4,7 +4,7 @@ description: "Silicon Labs' Z-Wave Serial API: the protocol between a host and a
 ---
 
 Silicon Labs' Z-Wave Serial API: the protocol between a host and a
-controller. [crates.io](https://crates.io/crates/zwave-serial), [docs.rs](https://docs.rs/zwave-serial), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_serial/index.html).
+controller. [crates.io](https://crates.io/crates/zwave-serial), [docs.rs](https://docs.rs/zwave-serial), [API docs for `main`](https://oss.pulzr.net/zwave-bridge/api/zwave_serial/index.html).
 
 - `frame`: SOF data frames, ACK, NAK and CAN, the checksum, and a streaming
   decoder.

@@ -23,8 +23,8 @@ Start one with `Controller::start` and read `Event`s from the
 returned channel.
 
 Part of [zwave-bridge](https://github.com/pulzar-net/zwave-bridge), maintained by
-[Pulzar](https://pulzr.net). See the [user guide](https://pulzar-net.github.io/zwave-bridge/), the
-[library guide](https://pulzar-net.github.io/zwave-bridge/library/index.html) and the
-[API documentation](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html).
+[Pulzar](https://pulzr.net). See the [user guide](https://oss.pulzr.net/zwave-bridge/), the
+[library guide](https://oss.pulzr.net/zwave-bridge/library/index.html) and the
+[API documentation](https://oss.pulzr.net/zwave-bridge/api/zwave_host/index.html).
 
 License: MIT.

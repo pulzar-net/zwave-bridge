@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time. Search [open issues](https://github.com/pulzar-net/zwave-bridge/issues) first, and read [Troubleshooting](https://pulzar-net.github.io/zwave-bridge/troubleshooting.html).
+        Thanks for taking the time. Search [open issues](https://github.com/pulzar-net/zwave-bridge/issues) first, and read [Troubleshooting](https://oss.pulzr.net/zwave-bridge/troubleshooting.html).
         **Security problems:** do not file them here. [Report them privately](https://github.com/pulzar-net/zwave-bridge/security/advisories/new).
   - type: textarea
     id: what

@@ -1,6 +1,6 @@
 # zwave-bridge configuration. Only [serial] is required; every other key is
 # shown with its default. The full reference:
-# https://pulzar-net.github.io/zwave-bridge/config-reference.html
+# https://oss.pulzr.net/zwave-bridge/config-reference.html
 
 [serial]
 # A serial device (use the stable /dev/serial/by-id/ name), or

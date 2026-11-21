@@ -11,7 +11,7 @@
 
 [Unit]
 Description=Z-Wave to MQTT bridge
-Documentation=https://pulzar-net.github.io/zwave-bridge/
+Documentation=https://oss.pulzr.net/zwave-bridge/
 After=network-online.target
 Wants=network-online.target
 

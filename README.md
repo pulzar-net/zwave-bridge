@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/pulzar-net/zwave-bridge)](https://github.com/pulzar-net/zwave-bridge/releases/latest)
 [![crates.io](https://img.shields.io/crates/v/zwave-host)](https://crates.io/crates/zwave-host)
 [![docs.rs](https://docs.rs/zwave-host/badge.svg)](https://docs.rs/zwave-host)
-[![Docs](https://img.shields.io/badge/docs-pulzar--net.github.io-blue)](https://pulzar-net.github.io/zwave-bridge/)
+[![Docs](https://img.shields.io/badge/docs-oss.pulzr.net-blue)](https://oss.pulzr.net/zwave-bridge/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.89-blue)](Cargo.toml)
 
@@ -21,10 +21,10 @@ It exists because the established Z-Wave stack, Z-Wave JS, needs a Node.js
 runtime, and there was no complete, embeddable Z-Wave controller stack in
 Rust.
 
-**[Documentation](https://pulzar-net.github.io/zwave-bridge/)** |
+**[Documentation](https://oss.pulzr.net/zwave-bridge/)** |
 **[Quick start](#quick-start)** |
 **[Hardware](#supported-hardware)** |
-**[MQTT API](https://pulzar-net.github.io/zwave-bridge/mqtt.html)** |
+**[MQTT API](https://oss.pulzr.net/zwave-bridge/mqtt.html)** |
 **[Library](#use-it-as-a-library)** |
 **[Changelog](CHANGELOG.md)**
 
@@ -74,7 +74,7 @@ working yet. If you try one, please [tell us how it went](https://github.com/pul
 
 Devices: any Z-Wave Plus device whose command classes are implemented works
 without device-specific code; with Z-Wave JS's device files configured, its
-parameters have names. The [hardware page](https://pulzar-net.github.io/zwave-bridge/hardware.html)
+parameters have names. The [hardware page](https://oss.pulzr.net/zwave-bridge/hardware.html)
 covers regions, firmware and what each command class exposes.
 
 ## Quick start
@@ -139,7 +139,7 @@ mosquitto_pub -h localhost -t zwave/bridge/request/include -m '{}'
 
 A device without security joins right away. A device with S2 security asks
 for its keys and its PIN, the five underlined digits on its label; answer on
-MQTT as the [S2 guide](https://pulzar-net.github.io/zwave-bridge/inclusion.html)
+MQTT as the [S2 guide](https://oss.pulzr.net/zwave-bridge/inclusion.html)
 shows. After the interview, the device appears in Home Assistant under
 **Settings > Devices & services > MQTT**. To watch everything the bridge
 publishes:
@@ -148,7 +148,7 @@ publishes:
 mosquitto_sub -h localhost -t 'zwave/#' -v
 ```
 
-No controller yet? The [getting started guide](https://pulzar-net.github.io/zwave-bridge/getting-started.html)
+No controller yet? The [getting started guide](https://oss.pulzr.net/zwave-bridge/getting-started.html)
 runs the same steps against the simulator. To run the bridge as a service,
 see [installation](#installation).
 
@@ -164,7 +164,7 @@ see [installation](#installation).
 - **systemd**: a hardened unit is in [`contrib/systemd/`](contrib/systemd/zwave-bridge.service).
 - **OpenWrt**: a procd init script is in [`contrib/openwrt/`](contrib/openwrt/zwave-bridge.init).
 
-The [installation guide](https://pulzar-net.github.io/zwave-bridge/installation.html)
+The [installation guide](https://oss.pulzr.net/zwave-bridge/installation.html)
 covers each one step by step.
 
 ## Configuration
@@ -183,7 +183,7 @@ The bridge reads one TOML file, `/etc/zwave-bridge/config.toml` by default
 
 Unknown keys are an error, so a typo stops the bridge at startup. Every key,
 its type and default are in the
-[configuration reference](https://pulzar-net.github.io/zwave-bridge/config-reference.html),
+[configuration reference](https://oss.pulzr.net/zwave-bridge/config-reference.html),
 which is generated from the code. [`config.example.toml`](config.example.toml)
 shows them all. Log verbosity comes from `RUST_LOG` (default `info`).
 
@@ -205,7 +205,7 @@ Everything lives under a base topic, `zwave` by default.
 | `zwave/nodes/<id>/route` | out, retained | repeaters and RSSI of the last frame from the node |
 
 Network keys never appear on MQTT. The
-[MQTT reference](https://pulzar-net.github.io/zwave-bridge/mqtt.html) has
+[MQTT reference](https://oss.pulzr.net/zwave-bridge/mqtt.html) has
 every request and payload with examples.
 
 ## Use it as a library
@@ -263,8 +263,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The [library guide](https://pulzar-net.github.io/zwave-bridge/library/index.html)
-covers each crate, and the [API docs](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html)
+The [library guide](https://oss.pulzr.net/zwave-bridge/library/index.html)
+covers each crate, and the [API docs](https://oss.pulzr.net/zwave-bridge/api/zwave_host/index.html)
 cover every item.
 
 ## Architecture
@@ -294,7 +294,7 @@ cover every item.
 The controller's firmware runs the radio and the mesh routing. Everything
 above it runs in the host, including S0 and S2 encryption, which Z-Wave
 requires the host to do. The
-[architecture page](https://pulzar-net.github.io/zwave-bridge/architecture.html)
+[architecture page](https://oss.pulzr.net/zwave-bridge/architecture.html)
 explains the layers, the event flow and the design rules (no `unsafe`, no
 panics on radio input, bounded memory).
 
@@ -344,7 +344,7 @@ Please report vulnerabilities privately through
 [GitHub private vulnerability reporting](https://github.com/pulzar-net/zwave-bridge/security/advisories/new),
 never in a public issue. See [SECURITY.md](SECURITY.md) for what to include
 and how fast we respond, and the
-[security model](https://pulzar-net.github.io/zwave-bridge/security.html)
+[security model](https://oss.pulzr.net/zwave-bridge/security.html)
 for what the bridge protects.
 
 ## License

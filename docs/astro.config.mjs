@@ -9,7 +9,7 @@ import { pulzarPlugins } from '@pulzr/docs-theme';
 import sidebar from './sidebar.mjs';
 
 export default defineConfig({
-	site: 'https://pulzar-net.github.io',
+	site: 'https://oss.pulzr.net',
 	base: '/zwave-bridge',
 	// Pages are page.html, the URLs the earlier mdBook site had.
 	build: { format: 'file' },

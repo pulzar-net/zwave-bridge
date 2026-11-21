@@ -4,7 +4,7 @@ description: "The Z-Wave controller host: the application that runs a network on
 ---
 
 The Z-Wave controller host: the application that runs a network on top of a
-Serial API controller. [crates.io](https://crates.io/crates/zwave-host), [docs.rs](https://docs.rs/zwave-host), [API docs for `main`](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html).
+Serial API controller. [crates.io](https://crates.io/crates/zwave-host), [docs.rs](https://docs.rs/zwave-host), [API docs for `main`](https://oss.pulzr.net/zwave-bridge/api/zwave_host/index.html).
 
 ## What it does
 

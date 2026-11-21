@@ -16,7 +16,7 @@ a different bridge, a gateway, a test tool or a protocol analyzer.
 | [zwave-sim](/zwave-bridge/library/zwave-sim.html) | test support | test Z-Wave software without hardware |
 | [zwave-bridge](/zwave-bridge/library/zwave-bridge.html) | MQTT bridge | run or embed the bridge itself |
 
-The [API documentation](https://pulzar-net.github.io/zwave-bridge/api/zwave_host/index.html) covers every public item.
+The [API documentation](https://oss.pulzr.net/zwave-bridge/api/zwave_host/index.html) covers every public item.
 
 ## Depending on the crates
 

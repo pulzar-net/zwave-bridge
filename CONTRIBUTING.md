@@ -48,7 +48,7 @@ unless `ZWAVE_BRIDGE_REQUIRE_MQTT=1` is set, as it is in CI.
 The tests drive the real host against the controller simulator, whose nodes
 run the real S2 node side, so a change to inclusion, security, interviews or
 the bridge is tested end to end without hardware. See
-[Testing](https://pulzar-net.github.io/zwave-bridge/testing.html) for what
+[Testing](https://oss.pulzr.net/zwave-bridge/testing.html) for what
 each suite covers.
 
 If you change a configuration type, regenerate the configuration reference
@@ -68,7 +68,7 @@ cargo run -p zwave-sim -- 127.0.0.1:4545
 cargo run -p zwave-bridge -- --config my-test.toml   # [serial] port = "tcp://127.0.0.1:4545"
 ```
 
-[Getting started](https://pulzar-net.github.io/zwave-bridge/getting-started.html)
+[Getting started](https://oss.pulzr.net/zwave-bridge/getting-started.html)
 walks through it with an MQTT broker.
 
 ## Fuzz

@@ -16,7 +16,7 @@ edition = "2021"
 rust-version = "1.89"
 license = "MIT"
 repository = "https://github.com/pulzar-net/zwave-bridge"
-homepage = "https://pulzar-net.github.io/zwave-bridge/"
+homepage = "https://oss.pulzr.net/zwave-bridge/"
 authors = ["Pulzar LLC"]
 
 [workspace.dependencies]
