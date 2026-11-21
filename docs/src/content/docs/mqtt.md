@@ -175,7 +175,9 @@ sleeping, device classes), interview stage, security classes,
 manufacturer and product ids, firmware version, Z-Wave Plus information,
 endpoints and their command classes, wake-up interval, neighbors, name,
 location, DSK, and `status`. With a device file (since 0.2.0), `device`
-names it: `{"file", "manufacturer", "label", "description"}`.
+names it: `{"file", "manufacturer", "label", "description", "endpoints"}`.
+`endpoints` names a multi-channel device's channels as its device file does,
+`{"1": "Relay 1", "2": "Relay 2"}` (unreleased; `{}` when the file names none).
 
 ### `nodes/<id>/<value>`
 

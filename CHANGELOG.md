@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `device.endpoints` in `zwave/nodes/<id>`: a multi-channel device's channel
+  names from its device file, such as `{"1": "Relay 1", "2": "Relay 2"}`.
+
+### Fixed
+
+- Opening a serial port its last user has just closed waits up to 3 seconds
+  for the kernel to release it, instead of failing with "Unable to acquire
+  exclusive lock" (seen when the bridge restarted at once on a controller's
+  UART).
+
 ## [0.2.1] - 2026-11-20
 
 ### Changed
