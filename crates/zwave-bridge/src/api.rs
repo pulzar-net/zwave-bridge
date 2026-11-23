@@ -1096,7 +1096,7 @@ pub struct IncludeData {
 
 response!(
     /// The response to `include`, once a device joined or listening timed out.
-IncludeResponse,
+    IncludeResponse,
     IncludeData,
     "A device is included"
 );
@@ -1121,7 +1121,7 @@ pub struct ExcludeData {
 
 response!(
     /// The response to `exclude`.
-ExcludeResponse,
+    ExcludeResponse,
     ExcludeData,
     "A device is excluded"
 );
@@ -1134,7 +1134,7 @@ request!(
 response!(
     /// The response to `stop`: `ok` says whether an inclusion or exclusion
     /// was running.
-StopResponse,
+    StopResponse,
     Empty,
     "Including or excluding stopped"
 );
@@ -1150,7 +1150,7 @@ request!(
 
 response!(
     /// The response to `grant`: `ok` is `false` when no node was waiting.
-GrantResponse,
+    GrantResponse,
     Empty,
     "The classes are granted"
 );
@@ -1168,7 +1168,7 @@ request!(
 response!(
     /// The response to `validate_dsk`: `ok` is `false` when no node was
     /// waiting.
-ValidateDskResponse,
+    ValidateDskResponse,
     Empty,
     "The PIN is passed on"
 );
@@ -1199,7 +1199,7 @@ pub struct DskData {
 
 response!(
     /// The response to `provision`.
-ProvisionResponse,
+    ProvisionResponse,
     DskData,
     "The device is provisioned"
 );
@@ -1223,7 +1223,7 @@ pub struct UnprovisionData {
 
 response!(
     /// The response to `unprovision`.
-UnprovisionResponse,
+    UnprovisionResponse,
     UnprovisionData,
     "The device is no longer provisioned"
 );
@@ -1244,7 +1244,7 @@ pub struct ProvisioningListData {
 
 response!(
     /// The response to `provisioning_list`.
-ProvisioningListResponse,
+    ProvisioningListResponse,
     ProvisioningListData,
     "The provisioning list"
 );
@@ -1268,7 +1268,7 @@ pub struct BackupData {
 
 response!(
     /// The response to `backup`.
-BackupResponse,
+    BackupResponse,
     BackupData,
     "The backup is written"
 );
@@ -1296,7 +1296,7 @@ pub struct RestoreData {
 
 response!(
     /// The response to `restore`.
-RestoreResponse,
+    RestoreResponse,
     RestoreData,
     "The backup is restored"
 );
@@ -1311,7 +1311,7 @@ request!(
 
 response!(
     /// The response to `reinterview`, once the interview is queued.
-ReinterviewResponse,
+    ReinterviewResponse,
     Empty,
     "The interview is queued"
 );
@@ -1328,7 +1328,7 @@ request!(
 
 response!(
     /// The response to `remove_failed`.
-RemoveFailedResponse,
+    RemoveFailedResponse,
     NodeData,
     "The node is removed"
 );
@@ -1348,7 +1348,7 @@ request!(
 
 response!(
     /// The response to `rename`.
-RenameResponse,
+    RenameResponse,
     Empty,
     "The node is renamed"
 );
@@ -1386,7 +1386,7 @@ pub struct FirmwareUpdateData {
 
 response!(
     /// The response to `firmware_update`, once the update ends.
-FirmwareUpdateResponse,
+    FirmwareUpdateResponse,
     FirmwareUpdateData,
     "The firmware update ended"
 );
@@ -1407,7 +1407,7 @@ request!(
 
 response!(
     /// The response to `configure`, once every parameter is written.
-ConfigureResponse,
+    ConfigureResponse,
     NodeData,
     "The parameters are set"
 );
@@ -1466,7 +1466,7 @@ impl From<zwave_host::Topology> for TopologyData {
 
 response!(
     /// The response to `topology`.
-TopologyResponse,
+    TopologyResponse,
     TopologyData,
     "The mesh"
 );
@@ -1474,7 +1474,7 @@ TopologyResponse,
 response!(
     /// The response to a request the bridge does not know, or one it could
     /// not read; `error` says which.
-ErrorResponse,
+    ErrorResponse,
     Empty,
     "The request is unknown or unreadable"
 );
