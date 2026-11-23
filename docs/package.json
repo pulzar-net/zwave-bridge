@@ -2,7 +2,7 @@
   "name": "zwave-bridge-docs",
   "private": true,
   "type": "module",
-  "description": "The zwave-bridge documentation site: Starlight with the Pulzar docs theme.",
+  "description": "The zwave-bridge documentation site: Starlight with the Pulzr docs theme.",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build"

@@ -23,7 +23,7 @@ AES-128 CTR_DRBG without a derivation function that S2 nonces need,
 checked against NIST's CAVP vectors.
 
 Part of [zwave-bridge](https://github.com/pulzar-net/zwave-bridge), maintained by
-[Pulzar](https://pulzr.net). See the [user guide](https://oss.pulzr.net/zwave-bridge/), the
+[Pulzr](https://pulzr.net). See the [user guide](https://oss.pulzr.net/zwave-bridge/), the
 [library guide](https://oss.pulzr.net/zwave-bridge/library/index.html) and the
 [API documentation](https://oss.pulzr.net/zwave-bridge/api/zwave_security/index.html).
 

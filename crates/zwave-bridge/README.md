@@ -21,7 +21,7 @@ With Home Assistant discovery on, each value gets a config under
 `<prefix>/<component>/<device>/<object>/config` the first time it reports.
 
 Part of [zwave-bridge](https://github.com/pulzar-net/zwave-bridge), maintained by
-[Pulzar](https://pulzr.net). See the [user guide](https://oss.pulzr.net/zwave-bridge/), the
+[Pulzr](https://pulzr.net). See the [user guide](https://oss.pulzr.net/zwave-bridge/), the
 [library guide](https://oss.pulzr.net/zwave-bridge/library/index.html) and the
 [API documentation](https://oss.pulzr.net/zwave-bridge/api/zwave_bridge/index.html).
 

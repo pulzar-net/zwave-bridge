@@ -16,7 +16,7 @@ updates:
     groups:
       actions:
         patterns: ["*"]
-  # The docs site: the Pulzar docs theme, Astro and Starlight, in one pull request.
+  # The docs site: the Pulzr docs theme, Astro and Starlight, in one pull request.
   - package-ecosystem: npm
     directory: /docs
     schedule:

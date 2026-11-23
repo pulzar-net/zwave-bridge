@@ -62,7 +62,7 @@ UPDATE_DOCS=1 cargo test -p zwave-bridge --features schema --test config_referen
 
 The [MQTT reference](https://oss.pulzr.net/zwave-bridge/mqtt-reference.html)
 is an AsyncAPI 3.0 description generated from the bridge's own payload
-types, so it cannot drift from what the bridge publishes. The other Pulzar
+types, so it cannot drift from what the bridge publishes. The other Pulzr
 bridges follow the same pattern:
 
 - **One module holds every payload** (`crates/zwave-bridge/src/api.rs`): each

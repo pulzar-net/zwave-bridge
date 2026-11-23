@@ -356,7 +356,7 @@ Z-Wave is a trademark of Silicon Labs. This project is not affiliated with
 or certified by the Z-Wave Alliance; a product that uses it can only be
 marketed as Z-Wave after Z-Wave Alliance certification of that product.
 
-## Maintained by Pulzar
+## Maintained by Pulzr
 
-zwave-bridge is maintained by [Pulzar](https://pulzr.net), which uses it in
+zwave-bridge is maintained by [Pulzr](https://pulzr.net), which uses it in
 its own gateways. It is developed in the open, for anyone to use.
