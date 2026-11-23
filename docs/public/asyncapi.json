@@ -1,0 +1,4310 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "zwave-bridge MQTT API",
+    "version": "0.2.1",
+    "description": "Everything zwave-bridge publishes and accepts on MQTT.\n\nTopics here use the default base topic, `zwave` (`mqtt.base_topic` in the configuration), and Home Assistant's default discovery prefix, `homeassistant` (`homeassistant.discovery_prefix`). `{node}` is a node id: 2 to 232, or 256 and up for Long Range.\n\nThe bridge publishes and subscribes at QoS 1. Payloads are JSON unless a message says otherwise. Requests go to `zwave/bridge/request/<name>`; the answer comes on `zwave/bridge/response/<name>` with `ok` and the result's fields, or `ok: false` and an `error`, echoing the request's `transaction` so a client can match the two. Network keys never appear on MQTT."
+  },
+  "servers": {
+    "broker": {
+      "host": "localhost:1883",
+      "protocol": "mqtt",
+      "description": "Your MQTT broker: `mqtt.host` and `mqtt.port` in the configuration. The bridge connects with its `mqtt.client_id` and `zwave/bridge/state` set to offline as its last will.",
+      "bindings": {
+        "mqtt": {
+          "clientId": "zwave-bridge",
+          "cleanSession": true,
+          "lastWill": {
+            "topic": "zwave/bridge/state",
+            "qos": 1,
+            "message": "offline",
+            "retain": true
+          },
+          "keepAlive": 30
+        }
+      }
+    }
+  },
+  "channels": {
+    "bridgeState": {
+      "address": "zwave/bridge/state",
+      "description": "The bridge's availability, retained, as plain text. `offline` is also the bridge's last will.",
+      "messages": {
+        "BridgeState": {
+          "$ref": "#/components/messages/BridgeState"
+        }
+      }
+    },
+    "bridgeInfo": {
+      "address": "zwave/bridge/info",
+      "description": "The bridge, its controller and its network, retained.",
+      "messages": {
+        "BridgeInfo": {
+          "$ref": "#/components/messages/BridgeInfo"
+        }
+      }
+    },
+    "bridgeEvent": {
+      "address": "zwave/bridge/event",
+      "description": "Inclusion, exclusion, security, interviews, firmware updates and SmartStart, as they happen. `event` names the event.",
+      "messages": {
+        "InclusionStarted": {
+          "$ref": "#/components/messages/InclusionStarted"
+        },
+        "InclusionStopped": {
+          "$ref": "#/components/messages/InclusionStopped"
+        },
+        "ExclusionStarted": {
+          "$ref": "#/components/messages/ExclusionStarted"
+        },
+        "ExclusionStopped": {
+          "$ref": "#/components/messages/ExclusionStopped"
+        },
+        "NodeAdded": {
+          "$ref": "#/components/messages/NodeAdded"
+        },
+        "NodeRemoved": {
+          "$ref": "#/components/messages/NodeRemoved"
+        },
+        "GrantSecurityClasses": {
+          "$ref": "#/components/messages/GrantSecurityClasses"
+        },
+        "ValidateDsk": {
+          "$ref": "#/components/messages/ValidateDsk"
+        },
+        "SecurityBootstrapped": {
+          "$ref": "#/components/messages/SecurityBootstrapped"
+        },
+        "SecurityFailed": {
+          "$ref": "#/components/messages/SecurityFailed"
+        },
+        "InterviewStage": {
+          "$ref": "#/components/messages/InterviewStage"
+        },
+        "InterviewCompleted": {
+          "$ref": "#/components/messages/InterviewCompleted"
+        },
+        "InterviewFailed": {
+          "$ref": "#/components/messages/InterviewFailed"
+        },
+        "FirmwareUpdateProgress": {
+          "$ref": "#/components/messages/FirmwareUpdateProgress"
+        },
+        "FirmwareUpdateFinished": {
+          "$ref": "#/components/messages/FirmwareUpdateFinished"
+        },
+        "ProvisioningChanged": {
+          "$ref": "#/components/messages/ProvisioningChanged"
+        }
+      }
+    },
+    "node": {
+      "address": "zwave/nodes/{node}",
+      "description": "A node's record: protocol information, interview, security, endpoints, name and status. Retained; an empty retained message clears it when the node leaves.",
+      "messages": {
+        "Node": {
+          "$ref": "#/components/messages/Node"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        }
+      }
+    },
+    "nodeStatus": {
+      "address": "zwave/nodes/{node}/status",
+      "description": "A node's status as plain text, retained; an empty retained message clears it when the node leaves.",
+      "messages": {
+        "NodeStatusMessage": {
+          "$ref": "#/components/messages/NodeStatusMessage"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        }
+      }
+    },
+    "nodeParameters": {
+      "address": "zwave/nodes/{node}/parameters",
+      "description": "A node's configuration parameters from its device file, retained. Only with `[devices] dir`.",
+      "messages": {
+        "NodeParameters": {
+          "$ref": "#/components/messages/NodeParameters"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        }
+      }
+    },
+    "nodeValue": {
+      "address": "zwave/nodes/{node}/{command_class}/{property}",
+      "description": "A value each time the node reports it, retained. A Multi Channel endpoint's value has the endpoint after the property, as in `binary_switch/current/2`.",
+      "messages": {
+        "ValueMessage": {
+          "$ref": "#/components/messages/ValueMessage"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        },
+        "command_class": {
+          "description": "The command class's name.",
+          "examples": [
+            "multilevel_sensor",
+            "binary_switch",
+            "notification"
+          ]
+        },
+        "property": {
+          "description": "The value's property, with `/<endpoint>` after it for a Multi Channel endpoint.",
+          "examples": [
+            "air_temperature",
+            "current",
+            "home_security_motion_sensor_status"
+          ]
+        }
+      }
+    },
+    "nodeValueSet": {
+      "address": "zwave/nodes/{node}/{command_class}/{property}/set",
+      "description": "Set a value: switch, dim or turn on and off. For a Multi Channel endpoint the endpoint goes before `/set`.",
+      "messages": {
+        "SetRequest": {
+          "$ref": "#/components/messages/SetRequest"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        },
+        "command_class": {
+          "description": "The command class's name.",
+          "examples": [
+            "multilevel_sensor",
+            "binary_switch",
+            "notification"
+          ]
+        },
+        "property": {
+          "description": "The value's property, with `/<endpoint>` after it for a Multi Channel endpoint.",
+          "examples": [
+            "air_temperature",
+            "current",
+            "home_security_motion_sensor_status"
+          ]
+        }
+      }
+    },
+    "nodeRoute": {
+      "address": "zwave/nodes/{node}/route",
+      "description": "The route the node was last reached by, retained.",
+      "messages": {
+        "Route": {
+          "$ref": "#/components/messages/Route"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        }
+      }
+    },
+    "nodeCommand": {
+      "address": "zwave/nodes/{node}/command",
+      "description": "Commands the node sends that are not values: scenes, central scene key presses, unsupported reports.",
+      "messages": {
+        "NodeCommand": {
+          "$ref": "#/components/messages/NodeCommand"
+        }
+      },
+      "parameters": {
+        "node": {
+          "description": "The node id.",
+          "examples": [
+            "5",
+            "260"
+          ]
+        }
+      }
+    },
+    "includeRequest": {
+      "address": "zwave/bridge/request/include",
+      "description": "Include a device. Answers when a device joined or listening timed out.",
+      "messages": {
+        "IncludeRequest": {
+          "$ref": "#/components/messages/IncludeRequest"
+        }
+      }
+    },
+    "includeResponse": {
+      "address": "zwave/bridge/response/include",
+      "description": "The answer to `include`.",
+      "messages": {
+        "IncludeResponse": {
+          "$ref": "#/components/messages/IncludeResponse"
+        }
+      }
+    },
+    "excludeRequest": {
+      "address": "zwave/bridge/request/exclude",
+      "description": "Exclude a device. Answers when a device left or listening timed out.",
+      "messages": {
+        "ExcludeRequest": {
+          "$ref": "#/components/messages/ExcludeRequest"
+        }
+      }
+    },
+    "excludeResponse": {
+      "address": "zwave/bridge/response/exclude",
+      "description": "The answer to `exclude`.",
+      "messages": {
+        "ExcludeResponse": {
+          "$ref": "#/components/messages/ExcludeResponse"
+        }
+      }
+    },
+    "stopRequest": {
+      "address": "zwave/bridge/request/stop",
+      "description": "Stop an inclusion or exclusion.",
+      "messages": {
+        "StopRequest": {
+          "$ref": "#/components/messages/StopRequest"
+        }
+      }
+    },
+    "stopResponse": {
+      "address": "zwave/bridge/response/stop",
+      "description": "The answer to `stop`.",
+      "messages": {
+        "StopResponse": {
+          "$ref": "#/components/messages/StopResponse"
+        }
+      }
+    },
+    "grantRequest": {
+      "address": "zwave/bridge/request/grant",
+      "description": "Grant security classes to the joining node.",
+      "messages": {
+        "GrantRequest": {
+          "$ref": "#/components/messages/GrantRequest"
+        }
+      }
+    },
+    "grantResponse": {
+      "address": "zwave/bridge/response/grant",
+      "description": "The answer to `grant`.",
+      "messages": {
+        "GrantResponse": {
+          "$ref": "#/components/messages/GrantResponse"
+        }
+      }
+    },
+    "validateDskRequest": {
+      "address": "zwave/bridge/request/validate_dsk",
+      "description": "Confirm the joining node's PIN.",
+      "messages": {
+        "ValidateDskRequest": {
+          "$ref": "#/components/messages/ValidateDskRequest"
+        }
+      }
+    },
+    "validateDskResponse": {
+      "address": "zwave/bridge/response/validate_dsk",
+      "description": "The answer to `validate_dsk`.",
+      "messages": {
+        "ValidateDskResponse": {
+          "$ref": "#/components/messages/ValidateDskResponse"
+        }
+      }
+    },
+    "provisionRequest": {
+      "address": "zwave/bridge/request/provision",
+      "description": "Add a SmartStart device to the provisioning list.",
+      "messages": {
+        "ProvisionRequest": {
+          "$ref": "#/components/messages/ProvisionRequest"
+        }
+      }
+    },
+    "provisionResponse": {
+      "address": "zwave/bridge/response/provision",
+      "description": "The answer to `provision`.",
+      "messages": {
+        "ProvisionResponse": {
+          "$ref": "#/components/messages/ProvisionResponse"
+        }
+      }
+    },
+    "unprovisionRequest": {
+      "address": "zwave/bridge/request/unprovision",
+      "description": "Remove a device from the provisioning list.",
+      "messages": {
+        "UnprovisionRequest": {
+          "$ref": "#/components/messages/UnprovisionRequest"
+        }
+      }
+    },
+    "unprovisionResponse": {
+      "address": "zwave/bridge/response/unprovision",
+      "description": "The answer to `unprovision`.",
+      "messages": {
+        "UnprovisionResponse": {
+          "$ref": "#/components/messages/UnprovisionResponse"
+        }
+      }
+    },
+    "provisioningListRequest": {
+      "address": "zwave/bridge/request/provisioning_list",
+      "description": "Read the SmartStart provisioning list.",
+      "messages": {
+        "ProvisioningListRequest": {
+          "$ref": "#/components/messages/ProvisioningListRequest"
+        }
+      }
+    },
+    "provisioningListResponse": {
+      "address": "zwave/bridge/response/provisioning_list",
+      "description": "The answer to `provisioning_list`.",
+      "messages": {
+        "ProvisioningListResponse": {
+          "$ref": "#/components/messages/ProvisioningListResponse"
+        }
+      }
+    },
+    "backupRequest": {
+      "address": "zwave/bridge/request/backup",
+      "description": "Back up the controller's memory to the store directory. The backup holds the network, so it is never published.",
+      "messages": {
+        "BackupRequest": {
+          "$ref": "#/components/messages/BackupRequest"
+        }
+      }
+    },
+    "backupResponse": {
+      "address": "zwave/bridge/response/backup",
+      "description": "The answer to `backup`.",
+      "messages": {
+        "BackupResponse": {
+          "$ref": "#/components/messages/BackupResponse"
+        }
+      }
+    },
+    "restoreRequest": {
+      "address": "zwave/bridge/request/restore",
+      "description": "Restore a backup onto the controller, converting it between 700 and 800 series. The bridge then exits for its service manager to restart it.",
+      "messages": {
+        "RestoreRequest": {
+          "$ref": "#/components/messages/RestoreRequest"
+        }
+      }
+    },
+    "restoreResponse": {
+      "address": "zwave/bridge/response/restore",
+      "description": "The answer to `restore`.",
+      "messages": {
+        "RestoreResponse": {
+          "$ref": "#/components/messages/RestoreResponse"
+        }
+      }
+    },
+    "reinterviewRequest": {
+      "address": "zwave/bridge/request/reinterview",
+      "description": "Interview a node again.",
+      "messages": {
+        "ReinterviewRequest": {
+          "$ref": "#/components/messages/ReinterviewRequest"
+        }
+      }
+    },
+    "reinterviewResponse": {
+      "address": "zwave/bridge/response/reinterview",
+      "description": "The answer to `reinterview`.",
+      "messages": {
+        "ReinterviewResponse": {
+          "$ref": "#/components/messages/ReinterviewResponse"
+        }
+      }
+    },
+    "removeFailedRequest": {
+      "address": "zwave/bridge/request/remove_failed",
+      "description": "Remove a node that no longer answers.",
+      "messages": {
+        "RemoveFailedRequest": {
+          "$ref": "#/components/messages/RemoveFailedRequest"
+        }
+      }
+    },
+    "removeFailedResponse": {
+      "address": "zwave/bridge/response/remove_failed",
+      "description": "The answer to `remove_failed`.",
+      "messages": {
+        "RemoveFailedResponse": {
+          "$ref": "#/components/messages/RemoveFailedResponse"
+        }
+      }
+    },
+    "renameRequest": {
+      "address": "zwave/bridge/request/rename",
+      "description": "Name a node and give it a location.",
+      "messages": {
+        "RenameRequest": {
+          "$ref": "#/components/messages/RenameRequest"
+        }
+      }
+    },
+    "renameResponse": {
+      "address": "zwave/bridge/response/rename",
+      "description": "The answer to `rename`.",
+      "messages": {
+        "RenameResponse": {
+          "$ref": "#/components/messages/RenameResponse"
+        }
+      }
+    },
+    "firmwareUpdateRequest": {
+      "address": "zwave/bridge/request/firmware_update",
+      "description": "Update a node's firmware from the firmware directory. Answers when the update ends.",
+      "messages": {
+        "FirmwareUpdateRequest": {
+          "$ref": "#/components/messages/FirmwareUpdateRequest"
+        }
+      }
+    },
+    "firmwareUpdateResponse": {
+      "address": "zwave/bridge/response/firmware_update",
+      "description": "The answer to `firmware_update`.",
+      "messages": {
+        "FirmwareUpdateResponse": {
+          "$ref": "#/components/messages/FirmwareUpdateResponse"
+        }
+      }
+    },
+    "configureRequest": {
+      "address": "zwave/bridge/request/configure",
+      "description": "Set a node's configuration parameters by key, from its device file.",
+      "messages": {
+        "ConfigureRequest": {
+          "$ref": "#/components/messages/ConfigureRequest"
+        }
+      }
+    },
+    "configureResponse": {
+      "address": "zwave/bridge/response/configure",
+      "description": "The answer to `configure`.",
+      "messages": {
+        "ConfigureResponse": {
+          "$ref": "#/components/messages/ConfigureResponse"
+        }
+      }
+    },
+    "topologyRequest": {
+      "address": "zwave/bridge/request/topology",
+      "description": "Ask every node for its neighbors, then read the mesh.",
+      "messages": {
+        "TopologyRequest": {
+          "$ref": "#/components/messages/TopologyRequest"
+        }
+      }
+    },
+    "topologyResponse": {
+      "address": "zwave/bridge/response/topology",
+      "description": "The answer to `topology`.",
+      "messages": {
+        "TopologyResponse": {
+          "$ref": "#/components/messages/TopologyResponse"
+        }
+      }
+    },
+    "homeAssistantDiscovery": {
+      "address": "homeassistant/{component}/{node_id}/{object_id}/config",
+      "description": "Home Assistant MQTT discovery: one retained config per value, sent the first time the value is reported after the bridge connects. Only with `homeassistant.enabled`.",
+      "messages": {
+        "DiscoveryConfig": {
+          "$ref": "#/components/messages/DiscoveryConfig"
+        }
+      },
+      "parameters": {
+        "component": {
+          "description": "The entity type.",
+          "enum": [
+            "sensor",
+            "binary_sensor",
+            "switch",
+            "light"
+          ]
+        },
+        "node_id": {
+          "description": "The node, as `zwave_<home id>_<node>`.",
+          "examples": [
+            "zwave_c0ffee01_5"
+          ]
+        },
+        "object_id": {
+          "description": "The value's key with `_` for `/`, as `multilevel_sensor_air_temperature`.",
+          "examples": [
+            "multilevel_sensor_air_temperature"
+          ]
+        }
+      }
+    }
+  },
+  "operations": {
+    "publishBridgeState": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/bridgeState"
+      },
+      "summary": "The bridge is online or offline",
+      "description": "Published `online` on connecting and `offline` on stopping.",
+      "messages": [
+        {
+          "$ref": "#/channels/bridgeState/messages/BridgeState"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishBridgeInfo": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/bridgeInfo"
+      },
+      "summary": "The bridge's version, controller and network",
+      "description": "Published on connecting and when the controller is ready.",
+      "messages": [
+        {
+          "$ref": "#/channels/bridgeInfo/messages/BridgeInfo"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishBridgeEvent": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/bridgeEvent"
+      },
+      "summary": "Something happened in the network",
+      "description": "Published as each event happens.",
+      "messages": [
+        {
+          "$ref": "#/channels/bridgeEvent/messages/InclusionStarted"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/InclusionStopped"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/ExclusionStarted"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/ExclusionStopped"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/NodeAdded"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/NodeRemoved"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/GrantSecurityClasses"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/ValidateDsk"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/SecurityBootstrapped"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/SecurityFailed"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/InterviewStage"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/InterviewCompleted"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/InterviewFailed"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/FirmwareUpdateProgress"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/FirmwareUpdateFinished"
+        },
+        {
+          "$ref": "#/channels/bridgeEvent/messages/ProvisioningChanged"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "publishNode": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/node"
+      },
+      "summary": "A node, its interview and its status",
+      "description": "Published on connecting, and when the node joins, its interview moves on, its status changes or it is renamed.",
+      "messages": [
+        {
+          "$ref": "#/channels/node/messages/Node"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishNodeStatus": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/nodeStatus"
+      },
+      "summary": "Whether the node answers",
+      "description": "Published with the node's record.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeStatus/messages/NodeStatusMessage"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishNodeParameters": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/nodeParameters"
+      },
+      "summary": "The node's configuration parameters",
+      "description": "Published when the node's interview finishes and its device file is found.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeParameters/messages/NodeParameters"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishNodeValue": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/nodeValue"
+      },
+      "summary": "A value the node reported",
+      "description": "Published for each report.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeValue/messages/ValueMessage"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishNodeRoute": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/nodeRoute"
+      },
+      "summary": "The route the node was last reached by",
+      "description": "Published when a frame reaches the node by a new route.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeRoute/messages/Route"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "publishNodeCommand": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/nodeCommand"
+      },
+      "summary": "A command the node sent",
+      "description": "Published for each such command.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeCommand/messages/NodeCommand"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "publishDiscovery": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/homeAssistantDiscovery"
+      },
+      "summary": "A Home Assistant entity",
+      "description": "Published per value.",
+      "messages": [
+        {
+          "$ref": "#/channels/homeAssistantDiscovery/messages/DiscoveryConfig"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": true
+        }
+      }
+    },
+    "receiveNodeValueSet": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/nodeValueSet"
+      },
+      "summary": "Switch, dim or set a value",
+      "description": "A bare value or `{\"value\": ...}`; the node's next report confirms it.",
+      "messages": [
+        {
+          "$ref": "#/channels/nodeValueSet/messages/SetRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "receiveInclude": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/includeRequest"
+      },
+      "summary": "Include a device",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/includeRequest/messages/IncludeRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendInclude": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/includeResponse"
+      },
+      "summary": "A device is included",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/includeResponse/messages/IncludeResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveExclude": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/excludeRequest"
+      },
+      "summary": "Exclude a device",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/excludeRequest/messages/ExcludeRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendExclude": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/excludeResponse"
+      },
+      "summary": "A device is excluded",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/excludeResponse/messages/ExcludeResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveStop": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/stopRequest"
+      },
+      "summary": "Stop including or excluding",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/stopRequest/messages/StopRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendStop": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/stopResponse"
+      },
+      "summary": "Including or excluding stopped",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/stopResponse/messages/StopResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveGrant": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/grantRequest"
+      },
+      "summary": "Grant security classes",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/grantRequest/messages/GrantRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendGrant": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/grantResponse"
+      },
+      "summary": "The classes are granted",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/grantResponse/messages/GrantResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveValidateDsk": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/validateDskRequest"
+      },
+      "summary": "Confirm the joining node's PIN",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/validateDskRequest/messages/ValidateDskRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendValidateDsk": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/validateDskResponse"
+      },
+      "summary": "The PIN is passed on",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/validateDskResponse/messages/ValidateDskResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveProvision": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/provisionRequest"
+      },
+      "summary": "Add a SmartStart device",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/provisionRequest/messages/ProvisionRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendProvision": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/provisionResponse"
+      },
+      "summary": "The device is provisioned",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/provisionResponse/messages/ProvisionResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveUnprovision": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/unprovisionRequest"
+      },
+      "summary": "Remove a SmartStart device",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/unprovisionRequest/messages/UnprovisionRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendUnprovision": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/unprovisionResponse"
+      },
+      "summary": "The device is no longer provisioned",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/unprovisionResponse/messages/UnprovisionResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveProvisioningList": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/provisioningListRequest"
+      },
+      "summary": "Read the provisioning list",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/provisioningListRequest/messages/ProvisioningListRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendProvisioningList": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/provisioningListResponse"
+      },
+      "summary": "The provisioning list",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/provisioningListResponse/messages/ProvisioningListResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveBackup": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/backupRequest"
+      },
+      "summary": "Back up the controller",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/backupRequest/messages/BackupRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendBackup": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/backupResponse"
+      },
+      "summary": "The backup is written",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/backupResponse/messages/BackupResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveRestore": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/restoreRequest"
+      },
+      "summary": "Restore a backup",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/restoreRequest/messages/RestoreRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendRestore": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/restoreResponse"
+      },
+      "summary": "The backup is restored",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/restoreResponse/messages/RestoreResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveReinterview": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/reinterviewRequest"
+      },
+      "summary": "Interview a node again",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/reinterviewRequest/messages/ReinterviewRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendReinterview": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/reinterviewResponse"
+      },
+      "summary": "The interview is queued",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/reinterviewResponse/messages/ReinterviewResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveRemoveFailed": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/removeFailedRequest"
+      },
+      "summary": "Remove a failed node",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/removeFailedRequest/messages/RemoveFailedRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendRemoveFailed": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/removeFailedResponse"
+      },
+      "summary": "The node is removed",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/removeFailedResponse/messages/RemoveFailedResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveRename": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/renameRequest"
+      },
+      "summary": "Name a node",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/renameRequest/messages/RenameRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendRename": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/renameResponse"
+      },
+      "summary": "The node is renamed",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/renameResponse/messages/RenameResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveFirmwareUpdate": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/firmwareUpdateRequest"
+      },
+      "summary": "Update a node's firmware",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/firmwareUpdateRequest/messages/FirmwareUpdateRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendFirmwareUpdate": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/firmwareUpdateResponse"
+      },
+      "summary": "The firmware update ended",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/firmwareUpdateResponse/messages/FirmwareUpdateResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveConfigure": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/configureRequest"
+      },
+      "summary": "Set configuration parameters",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/configureRequest/messages/ConfigureRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendConfigure": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/configureResponse"
+      },
+      "summary": "The parameters are set",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/configureResponse/messages/ConfigureResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    },
+    "receiveTopology": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/topologyRequest"
+      },
+      "summary": "Map the mesh",
+      "description": "Read from any client; the answer comes on the matching response channel.",
+      "messages": [
+        {
+          "$ref": "#/channels/topologyRequest/messages/TopologyRequest"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1
+        }
+      }
+    },
+    "sendTopology": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/topologyResponse"
+      },
+      "summary": "The mesh",
+      "description": "Published once per request, echoing its `transaction`. Not retained.",
+      "messages": [
+        {
+          "$ref": "#/channels/topologyResponse/messages/TopologyResponse"
+        }
+      ],
+      "bindings": {
+        "mqtt": {
+          "qos": 1,
+          "retain": false
+        }
+      }
+    }
+  },
+  "components": {
+    "messages": {
+      "BridgeState": {
+        "name": "BridgeState",
+        "title": "BridgeState",
+        "summary": "The bridge is online or offline",
+        "contentType": "text/plain",
+        "payload": {
+          "$ref": "#/components/schemas/Availability"
+        }
+      },
+      "BridgeInfo": {
+        "name": "BridgeInfo",
+        "title": "BridgeInfo",
+        "summary": "The bridge's version, controller and network",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "home_id": {
+              "type": "string",
+              "description": "The network's home id, 8 hex digits."
+            },
+            "node_id": {
+              "type": "integer",
+              "description": "The controller's own node id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "library_version": {
+              "type": "string",
+              "description": "The controller's Z-Wave library, such as `Z-Wave 7.21`."
+            },
+            "library_type": {
+              "type": "string",
+              "description": "The library type, such as `Static Controller`."
+            },
+            "firmware": {
+              "type": "string",
+              "description": "The controller's Serial API firmware version."
+            },
+            "manufacturer_id": {
+              "type": "integer",
+              "description": "The controller's manufacturer id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "product_type": {
+              "type": "integer",
+              "description": "The controller's product type.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "product_id": {
+              "type": "integer",
+              "description": "The controller's product id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "chip_type": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The chip series: 7 for 700 series, 8 for 800 series; `null` when the\ncontroller does not say (500 series).",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "sis": {
+              "type": "boolean",
+              "description": "The controller is the network's SUC/SIS."
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The RF region, such as `EU` or `US_LR`; `null` when the controller\ndoes not report it."
+            },
+            "dsk": {
+              "type": "string",
+              "description": "The controller's own DSK, for adding it to another controller's\nnetwork. Not secret."
+            },
+            "nodes": {
+              "type": "array",
+              "description": "The node ids in the network, without the controller.",
+              "items": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "version": {
+              "type": "string",
+              "description": "The bridge's version."
+            }
+          },
+          "required": [
+            "home_id",
+            "node_id",
+            "library_version",
+            "library_type",
+            "firmware",
+            "manufacturer_id",
+            "product_type",
+            "product_id",
+            "sis",
+            "dsk",
+            "nodes",
+            "version"
+          ],
+          "description": "The bridge, its controller and its network, retained on `bridge/info`.\nRepublished on connecting and when the controller is ready.",
+          "title": "BridgeInfo",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "InclusionStarted": {
+        "name": "InclusionStarted",
+        "title": "InclusionStarted",
+        "summary": "Inclusion started",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "inclusion_started"
+            }
+          },
+          "required": [
+            "event"
+          ],
+          "description": "The controller listens for a device to include."
+        }
+      },
+      "InclusionStopped": {
+        "name": "InclusionStopped",
+        "title": "InclusionStopped",
+        "summary": "Inclusion stopped",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "inclusion_stopped"
+            }
+          },
+          "required": [
+            "event"
+          ],
+          "description": "The controller stopped listening for a device to include."
+        }
+      },
+      "ExclusionStarted": {
+        "name": "ExclusionStarted",
+        "title": "ExclusionStarted",
+        "summary": "Exclusion started",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "exclusion_started"
+            }
+          },
+          "required": [
+            "event"
+          ],
+          "description": "The controller listens for a device to exclude."
+        }
+      },
+      "ExclusionStopped": {
+        "name": "ExclusionStopped",
+        "title": "ExclusionStopped",
+        "summary": "Exclusion stopped",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "exclusion_stopped"
+            }
+          },
+          "required": [
+            "event"
+          ],
+          "description": "The controller stopped listening for a device to exclude."
+        }
+      },
+      "NodeAdded": {
+        "name": "NodeAdded",
+        "title": "NodeAdded",
+        "summary": "A node joined",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "node_added"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The new node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "required": [
+            "event",
+            "node"
+          ],
+          "description": "A node joined the network."
+        }
+      },
+      "NodeRemoved": {
+        "name": "NodeRemoved",
+        "title": "NodeRemoved",
+        "summary": "A node left",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "node_removed"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "required": [
+            "event",
+            "node"
+          ],
+          "description": "A node left the network, was excluded or was removed as failed."
+        }
+      },
+      "GrantSecurityClasses": {
+        "name": "GrantSecurityClasses",
+        "title": "GrantSecurityClasses",
+        "summary": "A joining node asks for security classes",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "grant_security_classes"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The joining node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "requested": {
+              "type": "array",
+              "description": "The classes it asks for, highest first.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              }
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "requested"
+          ],
+          "description": "A joining S2 node asks for these classes. Answer with `grant`."
+        }
+      },
+      "ValidateDsk": {
+        "name": "ValidateDsk",
+        "title": "ValidateDsk",
+        "summary": "Confirm the joining node's PIN",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "validate_dsk"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The joining node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "dsk": {
+              "type": "string",
+              "description": "Its DSK with the PIN hidden, `xxxxx-12345-...`."
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "dsk"
+          ],
+          "description": "Confirm the joining node's DSK. Answer with `validate_dsk` and the\nPIN, the first five digits of the DSK on the device."
+        }
+      },
+      "SecurityBootstrapped": {
+        "name": "SecurityBootstrapped",
+        "title": "SecurityBootstrapped",
+        "summary": "The node has its keys",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "security_bootstrapped"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "classes": {
+              "type": "array",
+              "description": "The classes granted, highest first.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              }
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "classes"
+          ],
+          "description": "The key exchange finished."
+        }
+      },
+      "SecurityFailed": {
+        "name": "SecurityFailed",
+        "title": "SecurityFailed",
+        "summary": "The key exchange failed",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "security_failed"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "reason": {
+              "type": "string",
+              "description": "Why."
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "reason"
+          ],
+          "description": "The key exchange failed; the node is included without security."
+        }
+      },
+      "InterviewStage": {
+        "name": "InterviewStage",
+        "title": "InterviewStage",
+        "summary": "The interview moved on",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "interview_stage"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "stage": {
+              "$ref": "#/components/schemas/InterviewStage"
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "stage"
+          ],
+          "description": "A node's interview reached a stage."
+        }
+      },
+      "InterviewCompleted": {
+        "name": "InterviewCompleted",
+        "title": "InterviewCompleted",
+        "summary": "The interview finished",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "interview_completed"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "required": [
+            "event",
+            "node"
+          ],
+          "description": "A node's interview finished."
+        }
+      },
+      "InterviewFailed": {
+        "name": "InterviewFailed",
+        "title": "InterviewFailed",
+        "summary": "The interview failed",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "interview_failed"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "reason": {
+              "type": "string",
+              "description": "Why."
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "reason"
+          ],
+          "description": "A node's interview stopped; it resumes when the node is next heard,\nor with `reinterview`."
+        }
+      },
+      "FirmwareUpdateProgress": {
+        "name": "FirmwareUpdateProgress",
+        "title": "FirmwareUpdateProgress",
+        "summary": "A firmware update's progress",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "firmware_update_progress"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "sent": {
+              "type": "integer",
+              "description": "Fragments sent.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "total": {
+              "type": "integer",
+              "description": "Fragments in the image.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "sent",
+            "total"
+          ],
+          "description": "Fragments sent so far in a firmware update."
+        }
+      },
+      "FirmwareUpdateFinished": {
+        "name": "FirmwareUpdateFinished",
+        "title": "FirmwareUpdateFinished",
+        "summary": "A firmware update ended",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "firmware_update_finished"
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "status": {
+              "type": "integer",
+              "description": "The node's status: 255 done and restarting, 254 done without a\nrestart, 253 waiting for activation; below 16 an error.",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "success": {
+              "type": "boolean",
+              "description": "The node accepted the image."
+            }
+          },
+          "required": [
+            "event",
+            "node",
+            "status",
+            "success"
+          ],
+          "description": "A firmware update ended."
+        }
+      },
+      "ProvisioningChanged": {
+        "name": "ProvisioningChanged",
+        "title": "ProvisioningChanged",
+        "summary": "The provisioning list changed",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "event": {
+              "type": "string",
+              "const": "provisioning_changed"
+            },
+            "entries": {
+              "type": "array",
+              "description": "The whole list.",
+              "items": {
+                "$ref": "#/components/schemas/ProvisioningEntry"
+              }
+            }
+          },
+          "required": [
+            "event",
+            "entries"
+          ],
+          "description": "The SmartStart provisioning list changed."
+        }
+      },
+      "Node": {
+        "name": "Node",
+        "title": "Node",
+        "summary": "A node, its interview and its status",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "The node id: 2 to 232, or 256 and up for Long Range.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "protocol": {
+              "$ref": "#/components/schemas/ProtocolInfo"
+            },
+            "stage": {
+              "$ref": "#/components/schemas/InterviewStage"
+            },
+            "security": {
+              "type": "array",
+              "description": "The security classes granted, highest first; empty when included\nwithout security.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              }
+            },
+            "secure_ccs_known": {
+              "type": "boolean",
+              "description": "The node's secure command class list is known."
+            },
+            "manufacturer": {
+              "description": "The manufacturer and product, once the interview reads them.",
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Manufacturer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "firmware": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The firmware version, `major.minor`."
+            },
+            "zwave_plus": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Z-Wave Plus role type, node type, installer icon and user icon.",
+              "prefixItems": [
+                {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                {
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                {
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              ],
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "endpoints": {
+              "type": "object",
+              "description": "The endpoints, by number; `0` is the root device.",
+              "additionalProperties": false,
+              "patternProperties": {
+                "^\\d+$": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            },
+            "wake_up_interval": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The wake-up interval the bridge set, in seconds (sleeping nodes).",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "neighbors": {
+              "type": "array",
+              "description": "Neighbors from the controller's routing table.",
+              "items": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The name a person gave it with `rename`."
+            },
+            "location": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The location a person gave it with `rename`."
+            },
+            "dsk": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The DSK it was included with (S2), for SmartStart and support."
+            },
+            "status": {
+              "$ref": "#/components/schemas/NodeStatus"
+            },
+            "device": {
+              "description": "The device file that describes it, when `[devices] dir` has one.",
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DeviceFile"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "protocol",
+            "stage",
+            "security",
+            "secure_ccs_known",
+            "endpoints",
+            "neighbors",
+            "status"
+          ],
+          "description": "Everything the bridge knows about a node, retained on `nodes/<node>`.\nRepublished when the node joins, its interview moves on, its status\nchanges or it is renamed. An empty retained message clears it when the\nnode leaves.",
+          "title": "Node",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "NodeStatusMessage": {
+        "name": "NodeStatusMessage",
+        "title": "NodeStatusMessage",
+        "summary": "Whether the node answers",
+        "contentType": "text/plain",
+        "payload": {
+          "$ref": "#/components/schemas/NodeStatus"
+        }
+      },
+      "NodeParameters": {
+        "name": "NodeParameters",
+        "title": "NodeParameters",
+        "summary": "The node's configuration parameters",
+        "contentType": "application/json",
+        "payload": {
+          "type": "array",
+          "description": "A node's configuration parameters, retained on `nodes/<node>/parameters`,\nfrom its device file. Published after the node's interview when\n`[devices] dir` has a file for it; set them with `configure`.",
+          "title": "NodeParameters",
+          "items": {
+            "$ref": "#/components/schemas/Parameter"
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ValueMessage": {
+        "name": "ValueMessage",
+        "title": "ValueMessage",
+        "summary": "A value the node reported",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "integer",
+              "description": "When the bridge received it, in milliseconds since the Unix epoch.",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "label": {
+              "type": "string",
+              "description": "What the value is, such as `Air temperature`."
+            },
+            "value": {
+              "$ref": "#/components/schemas/Reading"
+            },
+            "state": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "For a notification, the event's name, such as `Motion detection`."
+            },
+            "unit": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The unit, such as `°C`, `%` or `kWh`."
+            }
+          },
+          "required": [
+            "time",
+            "label",
+            "value"
+          ],
+          "description": "A value, retained on `nodes/<node>/<command class>/<property>`, or\n`.../<property>/<endpoint>` for a Multi Channel endpoint. Published each\ntime the node reports it.",
+          "title": "ValueMessage",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "Route": {
+        "name": "Route",
+        "title": "Route",
+        "summary": "The route the node was last reached by",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "repeaters": {
+              "type": "array",
+              "description": "The repeaters, from the controller outwards; empty when direct, and\nalways for Long Range.",
+              "items": {
+                "type": "integer",
+                "format": "uint16",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "rssi": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The RSSI of the node's acknowledgement at the controller, in dBm.",
+              "format": "int8",
+              "minimum": -128,
+              "maximum": 127
+            },
+            "time": {
+              "type": "integer",
+              "description": "When, in milliseconds since the Unix epoch.",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "repeaters",
+            "time"
+          ],
+          "description": "The route of the last frame that reached a node, retained on\n`nodes/<node>/route`.",
+          "title": "Route",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "NodeCommand": {
+        "name": "NodeCommand",
+        "title": "NodeCommand",
+        "summary": "A command the node sent",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "endpoint": {
+              "type": "integer",
+              "description": "The endpoint it came from; 0 is the root device.",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "cc": {
+              "type": "integer",
+              "description": "The command class id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "command": {
+              "type": "string",
+              "description": "The command's name, such as `central_scene_notification`."
+            },
+            "frame": {
+              "type": "string",
+              "description": "The command as received, hex."
+            }
+          },
+          "required": [
+            "endpoint",
+            "cc",
+            "command",
+            "frame"
+          ],
+          "description": "A command a node sent that the bridge did not turn into a value, on\n`nodes/<node>/command`: a scene, a central scene key press, an\nunsupported report. Not retained.",
+          "title": "NodeCommand",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "DiscoveryConfig": {
+        "name": "DiscoveryConfig",
+        "title": "DiscoveryConfig",
+        "summary": "A Home Assistant entity for one of a node's values",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The entity's name: the value's label."
+            },
+            "unique_id": {
+              "type": "string",
+              "description": "Unique across Home Assistant: `zwave_<home id>_<node>_<value>`."
+            },
+            "object_id": {
+              "type": "string",
+              "description": "The entity id Home Assistant derives, the same as `unique_id`."
+            },
+            "state_topic": {
+              "type": "string",
+              "description": "The value's topic."
+            },
+            "availability_topic": {
+              "type": "string",
+              "description": "The bridge's availability topic."
+            },
+            "device": {
+              "$ref": "#/components/schemas/DiscoveryDevice"
+            },
+            "command_topic": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The value's `/set` topic, for switches and lights."
+            },
+            "value_template": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Picks the state out of the value."
+            },
+            "state_value_template": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Lights: picks on or off out of the value."
+            },
+            "brightness_state_topic": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Lights: the value's topic."
+            },
+            "brightness_value_template": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Lights: picks the level out of the value."
+            },
+            "brightness_command_topic": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Lights: the value's `/set` topic."
+            },
+            "brightness_scale": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Lights: the highest level, 99.",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "on_command_type": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Lights: `brightness`, so turning on sends the level."
+            },
+            "payload_on": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The payload for on: `ON`."
+            },
+            "payload_off": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The payload for off: `OFF`."
+            },
+            "device_class": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Home Assistant's device class, such as `temperature` or `motion`."
+            },
+            "entity_category": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "`diagnostic` for battery levels."
+            },
+            "unit_of_measurement": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The unit, in Home Assistant's spelling."
+            },
+            "state_class": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "`measurement`, or `total_increasing` for energy meters."
+            }
+          },
+          "required": [
+            "name",
+            "unique_id",
+            "object_id",
+            "state_topic",
+            "availability_topic",
+            "device"
+          ],
+          "description": "A Home Assistant MQTT discovery config, retained on\n`<discovery_prefix>/<component>/zwave_<home id>_<node>/<value>/config`:\none entity per value. Keys are Home Assistant's; see its MQTT integration\ndocumentation.",
+          "title": "DiscoveryConfig",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "SetRequest": {
+        "name": "SetRequest",
+        "title": "SetRequest",
+        "summary": "Switch, dim or set a value",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/SetPayload"
+        }
+      },
+      "IncludeRequest": {
+        "name": "IncludeRequest",
+        "title": "IncludeRequest",
+        "summary": "Include a device",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "description": "`requested` grants what the device asks for; `insecure` includes\nit without security.",
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InclusionStrategy"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "classes": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Grant these classes without a prompt.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              },
+              "default": null
+            },
+            "pin": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The device's PIN, the first five digits of its DSK, given up\nfront so the bridge does not ask.",
+              "default": null
+            },
+            "timeout": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Seconds to listen, instead of `network.inclusion_timeout`.",
+              "format": "uint64",
+              "minimum": 0,
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Include a device, on `bridge/request/include`. Without `strategy`\nor `classes`, the bridge asks which classes to grant with a\n`grant_security_classes` event and, for S2 Authenticated and Access\nControl, the PIN with `validate_dsk`.\n\nAn empty payload is the same as `{}`.",
+          "title": "IncludeRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "IncludeResponse": {
+        "name": "IncludeResponse",
+        "title": "IncludeResponse",
+        "summary": "A device is included",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "node": {
+              "type": "integer",
+              "description": "The new node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "security": {
+              "type": "array",
+              "description": "The classes granted, highest first; empty when included without\nsecurity.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              }
+            },
+            "security_error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Why security failed, when it did: the node is then included without\nit."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `include`, once a device joined or listening timed out.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "IncludeResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ExcludeRequest": {
+        "name": "ExcludeRequest",
+        "title": "ExcludeRequest",
+        "summary": "Exclude a device",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "timeout": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Seconds to listen, instead of `network.inclusion_timeout`.",
+              "format": "uint64",
+              "minimum": 0,
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Exclude a device, on `bridge/request/exclude`: the controller listens\nuntil the device's button is pressed.\n\nAn empty payload is the same as `{}`.",
+          "title": "ExcludeRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ExcludeResponse": {
+        "name": "ExcludeResponse",
+        "title": "ExcludeResponse",
+        "summary": "A device is excluded",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node that left; `null` for a device from another network, which\nis reset all the same.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `exclude`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ExcludeResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "StopRequest": {
+        "name": "StopRequest",
+        "title": "StopRequest",
+        "summary": "Stop including or excluding",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Stop an inclusion or exclusion, on `bridge/request/stop`.\n\nAn empty payload is the same as `{}`.",
+          "title": "StopRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "StopResponse": {
+        "name": "StopResponse",
+        "title": "StopResponse",
+        "summary": "Including or excluding stopped",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `stop`: `ok` says whether an inclusion or exclusion\nwas running.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "StopResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "GrantRequest": {
+        "name": "GrantRequest",
+        "title": "GrantRequest",
+        "summary": "Grant security classes",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "classes": {
+              "type": "array",
+              "description": "The classes to grant; empty includes the node without security.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              },
+              "default": []
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Grant security classes to the joining node, on\n`bridge/request/grant`, after a `grant_security_classes` event.\n\nAn empty payload is the same as `{}`.",
+          "title": "GrantRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "GrantResponse": {
+        "name": "GrantResponse",
+        "title": "GrantResponse",
+        "summary": "The classes are granted",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `grant`: `ok` is `false` when no node was waiting.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "GrantResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ValidateDskRequest": {
+        "name": "ValidateDskRequest",
+        "title": "ValidateDskRequest",
+        "summary": "Confirm the joining node's PIN",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "pin": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The first five digits of the DSK on the device; absent to\nrefuse it.",
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Confirm the joining node's PIN, on `bridge/request/validate_dsk`,\nafter a `validate_dsk` event.\n\nAn empty payload is the same as `{}`.",
+          "title": "ValidateDskRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ValidateDskResponse": {
+        "name": "ValidateDskResponse",
+        "title": "ValidateDskResponse",
+        "summary": "The PIN is passed on",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `validate_dsk`: `ok` is `false` when no node was\nwaiting.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ValidateDskResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ProvisionRequest": {
+        "name": "ProvisionRequest",
+        "title": "ProvisionRequest",
+        "summary": "Add a SmartStart device",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "qr": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The device's QR code, `90...`.",
+              "default": null
+            },
+            "dsk": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Or its DSK, `12345-12345-...`.",
+              "default": null
+            },
+            "classes": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "With a DSK, the classes to grant; S2 Authenticated and\nUnauthenticated when absent.",
+              "items": {
+                "$ref": "#/components/schemas/SecurityClass"
+              },
+              "default": null
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "With a DSK, a name for people.",
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Add a SmartStart device to the provisioning list, on\n`bridge/request/provision`: it is included when it is powered on.\n\nAn empty payload is the same as `{}`.",
+          "title": "ProvisionRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ProvisionResponse": {
+        "name": "ProvisionResponse",
+        "title": "ProvisionResponse",
+        "summary": "The device is provisioned",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "dsk": {
+              "type": "string",
+              "description": "The device's DSK."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `provision`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ProvisionResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "UnprovisionRequest": {
+        "name": "UnprovisionRequest",
+        "title": "UnprovisionRequest",
+        "summary": "Remove a SmartStart device",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dsk": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The device's DSK.",
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Remove a device from the provisioning list, on\n`bridge/request/unprovision`.\n\nAn empty payload is the same as `{}`.",
+          "title": "UnprovisionRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "UnprovisionResponse": {
+        "name": "UnprovisionResponse",
+        "title": "UnprovisionResponse",
+        "summary": "The device is no longer provisioned",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "removed": {
+              "type": "boolean",
+              "description": "The list had the device."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `unprovision`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "UnprovisionResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ProvisioningListRequest": {
+        "name": "ProvisioningListRequest",
+        "title": "ProvisioningListRequest",
+        "summary": "Read the provisioning list",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Read the SmartStart provisioning list, on\n`bridge/request/provisioning_list`.\n\nAn empty payload is the same as `{}`.",
+          "title": "ProvisioningListRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ProvisioningListResponse": {
+        "name": "ProvisioningListResponse",
+        "title": "ProvisioningListResponse",
+        "summary": "The provisioning list",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "entries": {
+              "type": "array",
+              "description": "Every entry.",
+              "items": {
+                "$ref": "#/components/schemas/ProvisioningEntry"
+              }
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `provisioning_list`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ProvisioningListResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "BackupRequest": {
+        "name": "BackupRequest",
+        "title": "BackupRequest",
+        "summary": "Back up the controller",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Back up the controller's memory to the store directory, on\n`bridge/request/backup`. The backup holds the network, so it is\nwritten to disk and never published.\n\nAn empty payload is the same as `{}`.",
+          "title": "BackupRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "BackupResponse": {
+        "name": "BackupResponse",
+        "title": "BackupResponse",
+        "summary": "The backup is written",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "file": {
+              "type": "string",
+              "description": "The file written, `<store dir>/nvm-<unix time>.bin`."
+            },
+            "bytes": {
+              "type": "integer",
+              "description": "Its size in bytes.",
+              "format": "uint",
+              "minimum": 0
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `backup`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "BackupResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RestoreRequest": {
+        "name": "RestoreRequest",
+        "title": "RestoreRequest",
+        "summary": "Restore a backup",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The backup's name in the store directory, such as\n`nvm-1763600000.bin`.",
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Restore a backup onto the controller, on `bridge/request/restore`.\nA backup from a 700 series controller restores onto an 800 series one\nand back. The bridge then exits for its service manager to restart it.\n\nAn empty payload is the same as `{}`.",
+          "title": "RestoreRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RestoreResponse": {
+        "name": "RestoreResponse",
+        "title": "RestoreResponse",
+        "summary": "The backup is restored",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "file": {
+              "type": "string",
+              "description": "The backup restored."
+            },
+            "restart": {
+              "type": "boolean",
+              "description": "The bridge is restarting: always `true`."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `restore`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "RestoreResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ReinterviewRequest": {
+        "name": "ReinterviewRequest",
+        "title": "ReinterviewRequest",
+        "summary": "Interview a node again",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Interview a node again, on `bridge/request/reinterview`.\n\nAn empty payload is the same as `{}`.",
+          "title": "ReinterviewRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ReinterviewResponse": {
+        "name": "ReinterviewResponse",
+        "title": "ReinterviewResponse",
+        "summary": "The interview is queued",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `reinterview`, once the interview is queued.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ReinterviewResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RemoveFailedRequest": {
+        "name": "RemoveFailedRequest",
+        "title": "RemoveFailedRequest",
+        "summary": "Remove a failed node",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Remove a node that no longer answers, on\n`bridge/request/remove_failed`. The controller refuses a node that\nanswers.\n\nAn empty payload is the same as `{}`.",
+          "title": "RemoveFailedRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RemoveFailedResponse": {
+        "name": "RemoveFailedResponse",
+        "title": "RemoveFailedResponse",
+        "summary": "The node is removed",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `remove_failed`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "RemoveFailedResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RenameRequest": {
+        "name": "RenameRequest",
+        "title": "RenameRequest",
+        "summary": "Name a node",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": null
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Its name; absent clears it.",
+              "default": null
+            },
+            "location": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Its location; absent clears it.",
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Give a node a name and a location, on `bridge/request/rename`. Home\nAssistant shows the name.\n\nAn empty payload is the same as `{}`.",
+          "title": "RenameRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "RenameResponse": {
+        "name": "RenameResponse",
+        "title": "RenameResponse",
+        "summary": "The node is renamed",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `rename`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "RenameResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "FirmwareUpdateRequest": {
+        "name": "FirmwareUpdateRequest",
+        "title": "FirmwareUpdateRequest",
+        "summary": "Update a node's firmware",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": null
+            },
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The file's name in the firmware directory.",
+              "default": null
+            },
+            "target": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The firmware target: 0, the default, is the node's own firmware.",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255,
+              "default": null
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Update a node's firmware, on `bridge/request/firmware_update`, from a\nfile in `<store dir>/firmware/`. Intel HEX is converted; `.gbl`, `.bin`\nand `.ota` files are sent as they are. Progress comes as events.\n\nAn empty payload is the same as `{}`.",
+          "title": "FirmwareUpdateRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "FirmwareUpdateResponse": {
+        "name": "FirmwareUpdateResponse",
+        "title": "FirmwareUpdateResponse",
+        "summary": "The firmware update ended",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "status": {
+              "type": "integer",
+              "description": "The node's status: 255 done and restarting, 254 done without a\nrestart, 253 waiting for activation; below 16 an error.",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "success": {
+              "type": "boolean",
+              "description": "The node accepted the image."
+            },
+            "wait_time": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Seconds until the node is back, when it says.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "activated": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "Whether activation succeeded, when it was needed."
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `firmware_update`, once the update ends.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "FirmwareUpdateResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ConfigureRequest": {
+        "name": "ConfigureRequest",
+        "title": "ConfigureRequest",
+        "summary": "Set configuration parameters",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "The node.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535,
+              "default": null
+            },
+            "settings": {
+              "type": "object",
+              "description": "Values by parameter key, as in `nodes/<node>/parameters`, such as\n`{\"41\": 1, \"42[0xff00]\": 3}`.",
+              "additionalProperties": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "default": {}
+            },
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Set a node's configuration parameters by key, on\n`bridge/request/configure`, from its device file. Partial parameters\nare merged into their parameter.\n\nAn empty payload is the same as `{}`.",
+          "title": "ConfigureRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "ConfigureResponse": {
+        "name": "ConfigureResponse",
+        "title": "ConfigureResponse",
+        "summary": "The parameters are set",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "node": {
+              "type": "integer",
+              "description": "The node id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `configure`, once every parameter is written.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "ConfigureResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "TopologyRequest": {
+        "name": "TopologyRequest",
+        "title": "TopologyRequest",
+        "summary": "Map the mesh",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "transaction": {
+              "description": "Any value; the response echoes it, so a client can match the\ntwo."
+            }
+          },
+          "description": "Ask every node for its neighbors, then read the mesh, on\n`bridge/request/topology`. Sleeping nodes answer when they wake.\n\nAn empty payload is the same as `{}`.",
+          "title": "TopologyRequest",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "TopologyResponse": {
+        "name": "TopologyResponse",
+        "title": "TopologyResponse",
+        "summary": "The mesh",
+        "contentType": "application/json",
+        "payload": {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "type": "boolean",
+              "description": "Whether it was done; when `false`, `error` says why."
+            },
+            "controller": {
+              "type": "integer",
+              "description": "The controller's node id.",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "nodes": {
+              "type": "array",
+              "description": "Every node.",
+              "items": {
+                "$ref": "#/components/schemas/TopologyNode"
+              }
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "What went wrong, when `ok` is `false`."
+            },
+            "transaction": {
+              "description": "The request's `transaction`, echoed when it had one."
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "description": "The response to `topology`.\n\nA response is published once per request, to\n`bridge/response/<request>`, and is not retained. Requests that\nwait for a device answer when they finish.",
+          "title": "TopologyResponse",
+          "$schema": "https://json-schema.org/draft/2020-12/schema"
+        }
+      }
+    },
+    "schemas": {
+      "Availability": {
+        "description": "Online or offline.",
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Running and connected to the controller.",
+            "const": "online"
+          },
+          {
+            "type": "string",
+            "description": "Stopped, or the MQTT connection dropped.",
+            "const": "offline"
+          }
+        ]
+      },
+      "SecurityClass": {
+        "description": "A security class.",
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "S2 Access Control: locks and garage doors. Needs the device's PIN.",
+            "const": "s2_access_control"
+          },
+          {
+            "type": "string",
+            "description": "S2 Authenticated. Needs the device's PIN.",
+            "const": "s2_authenticated"
+          },
+          {
+            "type": "string",
+            "description": "S2 Unauthenticated.",
+            "const": "s2_unauthenticated"
+          },
+          {
+            "type": "string",
+            "description": "Security 0, the legacy scheme.",
+            "const": "s0_legacy"
+          }
+        ]
+      },
+      "InterviewStage": {
+        "description": "How far a node's interview got.",
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Nothing known yet.",
+            "const": "new"
+          },
+          {
+            "type": "string",
+            "description": "Protocol information (listening, routing, device class) known.",
+            "const": "protocol_info"
+          },
+          {
+            "type": "string",
+            "description": "The node information frame (command classes) known.",
+            "const": "node_info"
+          },
+          {
+            "type": "string",
+            "description": "The secure command classes known.",
+            "const": "security"
+          },
+          {
+            "type": "string",
+            "description": "Manufacturer, product and Z-Wave Plus information known.",
+            "const": "identity"
+          },
+          {
+            "type": "string",
+            "description": "Command class versions known.",
+            "const": "versions"
+          },
+          {
+            "type": "string",
+            "description": "Endpoints known.",
+            "const": "endpoints"
+          },
+          {
+            "type": "string",
+            "description": "Each command class's capabilities known and the node configured.",
+            "const": "command_classes"
+          },
+          {
+            "type": "string",
+            "description": "Done.",
+            "const": "complete"
+          }
+        ]
+      },
+      "ProvisioningEntry": {
+        "type": "object",
+        "properties": {
+          "dsk": {
+            "type": "string",
+            "description": "The node's DSK."
+          },
+          "classes": {
+            "type": "array",
+            "description": "The security classes it gets.",
+            "items": {
+              "$ref": "#/components/schemas/SecurityClass"
+            }
+          },
+          "node": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The node id, once it is included.",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A name for people."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "The node is included when it asks; `false` keeps the entry but\nignores it."
+          }
+        },
+        "required": [
+          "dsk",
+          "classes",
+          "active"
+        ],
+        "description": "A SmartStart provisioning list entry."
+      },
+      "ProtocolInfo": {
+        "type": "object",
+        "properties": {
+          "listening": {
+            "type": "boolean",
+            "description": "Always listening (mains powered)."
+          },
+          "flirs": {
+            "type": "boolean",
+            "description": "Frequently listening (FLiRS): reachable with a beam, such as a lock."
+          },
+          "routing": {
+            "type": "boolean",
+            "description": "The node repeats frames for others."
+          },
+          "controller": {
+            "type": "boolean",
+            "description": "The node is a controller."
+          },
+          "basic": {
+            "type": "integer",
+            "description": "Basic device class.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "generic": {
+            "type": "integer",
+            "description": "Generic device class.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "specific": {
+            "type": "integer",
+            "description": "Specific device class.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "required": [
+          "listening",
+          "flirs",
+          "routing",
+          "controller",
+          "basic",
+          "generic",
+          "specific"
+        ],
+        "description": "A node's protocol information, from the controller."
+      },
+      "Manufacturer": {
+        "type": "object",
+        "properties": {
+          "manufacturer_id": {
+            "type": "integer",
+            "description": "Manufacturer id.",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "product_type": {
+            "type": "integer",
+            "description": "Product type.",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "product_id": {
+            "type": "integer",
+            "description": "Product id.",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "manufacturer_id",
+          "product_type",
+          "product_id"
+        ],
+        "description": "A node's manufacturer and product, from Manufacturer Specific."
+      },
+      "Endpoint": {
+        "type": "object",
+        "properties": {
+          "generic": {
+            "type": "integer",
+            "description": "Generic device class (Multi Channel endpoints only; 0 on the root).",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "specific": {
+            "type": "integer",
+            "description": "Specific device class (Multi Channel endpoints only; 0 on the root).",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "ccs": {
+            "type": "object",
+            "description": "Supported command classes, by command class id in decimal.",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^\\d+$": {
+                "$ref": "#/components/schemas/CcSupport"
+              }
+            }
+          },
+          "caps": {
+            "$ref": "#/components/schemas/Capabilities"
+          }
+        },
+        "required": [
+          "generic",
+          "specific",
+          "ccs",
+          "caps"
+        ],
+        "description": "An endpoint: the root device (`0`) or a Multi Channel endpoint."
+      },
+      "CcSupport": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "description": "The version the node implements; 0 until the interview reads it.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "Supported only with security."
+          }
+        },
+        "required": [
+          "version",
+          "secure"
+        ],
+        "description": "A command class on an endpoint."
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "sensors": {
+            "type": "object",
+            "description": "Multilevel sensor types and their scales.",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^\\d+$": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            }
+          },
+          "meter": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "The meter type and its scales.",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0,
+                "maximum": 255
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "notifications": {
+            "type": "object",
+            "description": "Notification types and their events.",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^\\d+$": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            }
+          },
+          "binary_sensors": {
+            "type": "array",
+            "description": "Binary sensor types.",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0,
+              "maximum": 255
+            }
+          },
+          "switch_type": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The multilevel switch's primary type.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "description": "What an endpoint's command classes reported in the interview. Empty\nentries are left out."
+      },
+      "NodeStatus": {
+        "description": "Whether a node answers.",
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Not heard from since the bridge started.",
+            "const": "unknown"
+          },
+          {
+            "type": "string",
+            "description": "Listening and answering.",
+            "const": "alive"
+          },
+          {
+            "type": "string",
+            "description": "A sleeping node that is awake now.",
+            "const": "awake"
+          },
+          {
+            "type": "string",
+            "description": "A sleeping node that is asleep: requests wait for its next wake-up.",
+            "const": "asleep"
+          },
+          {
+            "type": "string",
+            "description": "Listening but not answering.",
+            "const": "dead"
+          }
+        ]
+      },
+      "DeviceFile": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The file, relative to the devices directory."
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "The manufacturer's name."
+          },
+          "label": {
+            "type": "string",
+            "description": "The product's label."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product's description."
+          },
+          "endpoints": {
+            "type": "object",
+            "description": "What a multi-channel device calls each endpoint, such as\n`{\"1\": \"Relay 1\", \"2\": \"Relay 2\"}`. Endpoints without a name are left\nout.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "file",
+          "manufacturer",
+          "label",
+          "description",
+          "endpoints"
+        ],
+        "description": "The device file that describes a node, when `[devices] dir` has one."
+      },
+      "Parameter": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key `configure` takes: the parameter number, as `\"41\"`, or a\npartial parameter with its bit mask, as `\"41[0xf00]\"`."
+          },
+          "label": {
+            "type": "string",
+            "description": "The parameter's name."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it does."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Its size in bytes: 1, 2 or 4.",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "min": {
+            "type": "integer",
+            "description": "The smallest value.",
+            "format": "int64"
+          },
+          "max": {
+            "type": "integer",
+            "description": "The largest value.",
+            "format": "int64"
+          },
+          "default": {
+            "type": "integer",
+            "description": "The value the device ships with.",
+            "format": "int64"
+          },
+          "unsigned": {
+            "type": "boolean",
+            "description": "The value is unsigned."
+          },
+          "read_only": {
+            "type": "boolean",
+            "description": "The parameter cannot be written."
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The value's unit."
+          },
+          "options": {
+            "type": "array",
+            "description": "Named values; empty when any value in range goes.",
+            "items": {
+              "$ref": "#/components/schemas/ParameterOption"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "size",
+          "min",
+          "max",
+          "default",
+          "unsigned",
+          "read_only",
+          "options"
+        ],
+        "description": "A configuration parameter from the node's device file."
+      },
+      "ParameterOption": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "description": "The value.",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string",
+            "description": "What it means."
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "description": "A named value of a configuration parameter."
+      },
+      "Reading": {
+        "description": "A value's reading.",
+        "anyOf": [
+          {
+            "type": "boolean",
+            "description": "On or off, open or closed, detected or idle."
+          },
+          {
+            "type": "integer",
+            "description": "A level, 0 to 99; 255 is \"on at the last level\".",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          },
+          {
+            "type": "number",
+            "description": "A measurement, in `unit`.",
+            "format": "double"
+          }
+        ]
+      },
+      "DiscoveryDevice": {
+        "type": "object",
+        "properties": {
+          "identifiers": {
+            "type": "array",
+            "description": "`zwave_<home id>_<node>`.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string",
+            "description": "The node's name, its device file's manufacturer and label, or\n`Z-Wave node <node>`."
+          },
+          "via_device": {
+            "type": "string",
+            "description": "The controller, `zwave_<home id>_controller`."
+          },
+          "manufacturer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The manufacturer: from the device file, or the manufacturer id in hex."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model: from the device file, or product type and id in hex."
+          },
+          "sw_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The node's firmware version."
+          },
+          "suggested_area": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The node's location."
+          }
+        },
+        "required": [
+          "identifiers",
+          "name",
+          "via_device"
+        ],
+        "description": "A node, as a Home Assistant device."
+      },
+      "SetPayload": {
+        "description": "A bare value, or one in an object.",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "value": {
+                "$ref": "#/components/schemas/SetValue"
+              }
+            },
+            "required": [
+              "value"
+            ],
+            "description": "The value in an object."
+          },
+          {
+            "$ref": "#/components/schemas/SetValue"
+          }
+        ]
+      },
+      "SetValue": {
+        "description": "A value to set.",
+        "anyOf": [
+          {
+            "type": "boolean",
+            "description": "On or off."
+          },
+          {
+            "type": "number",
+            "description": "A level, 0 to 99, or 255 for on at the last level.",
+            "format": "double"
+          },
+          {
+            "type": "string",
+            "description": "`ON`, `OFF`, `TRUE` or `FALSE`, in any case."
+          }
+        ]
+      },
+      "InclusionStrategy": {
+        "description": "How to secure a device being included.",
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Grant every class the device asks for, without a prompt.",
+            "const": "requested"
+          },
+          {
+            "type": "string",
+            "description": "Include the device without security.",
+            "const": "insecure"
+          }
+        ]
+      },
+      "TopologyNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The node id.",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "neighbors": {
+            "type": "array",
+            "description": "Its neighbors in the controller's routing table.",
+            "items": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "route": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "description": "The repeaters of the last frame that reached it, from the controller\noutwards; `null` until one did.",
+            "items": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "rssi": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The RSSI of its last acknowledgement at the controller, in dBm.",
+            "format": "int8",
+            "minimum": -128,
+            "maximum": 127
+          },
+          "listening": {
+            "type": "boolean",
+            "description": "Always listening (mains powered)."
+          }
+        },
+        "required": [
+          "id",
+          "neighbors",
+          "listening"
+        ],
+        "description": "A node in the mesh."
+      }
+    }
+  }
+}

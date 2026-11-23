@@ -35,6 +35,19 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 hex = "0.4"
 
+# The MQTT reference (tests/asyncapi.rs, the zwave-bridge feature
+# unstable-asyncapi-docs) needs what no asyncapi-rust release has yet:
+# channel and operation messages (upstream main, mlilback/asyncapi-rust#17),
+# and channel and operation descriptions, titles and summaries (our fork,
+# offered upstream as mlilback/asyncapi-rust#27 and #28). Pinned to
+# pulzar-net/asyncapi-rust, which is never published. Default and release
+# builds never use asyncapi-rust, and `cargo publish` ignores this patch.
+# Remove it once a release has all three.
+[patch.crates-io]
+asyncapi-rust = { git = "https://github.com/pulzar-net/asyncapi-rust", rev = "d62a75517859cc031a3f716df86e64d6406040d1" }
+asyncapi-rust-codegen = { git = "https://github.com/pulzar-net/asyncapi-rust", rev = "d62a75517859cc031a3f716df86e64d6406040d1" }
+asyncapi-rust-models = { git = "https://github.com/pulzar-net/asyncapi-rust", rev = "d62a75517859cc031a3f716df86e64d6406040d1" }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"

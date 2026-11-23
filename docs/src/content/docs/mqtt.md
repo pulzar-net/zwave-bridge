@@ -7,22 +7,17 @@ The bridge publishes and listens under one base topic, `zwave` unless
 `mqtt.base_topic` says otherwise. Payloads are JSON, except the plain-text
 state topics noted below. This page uses the default base topic throughout.
 
-## Topics at a glance
+This page explains how the topics work together. The
+[MQTT reference](/zwave-bridge/mqtt-reference.html) lists every topic with its QoS, retain flag and
+payload schema, field by field. It is generated from the bridge's own types,
+so it always matches the code.
 
-| Topic | Direction | Retained | What |
-|---|---|---|---|
-| `zwave/bridge/state` | out | yes | `online` or `offline`, plain text |
-| `zwave/bridge/info` | out | yes | the controller and the network |
-| `zwave/bridge/event` | out | no | inclusion, security, interview and firmware update progress |
-| `zwave/bridge/request/<name>` | in | | a request to the bridge |
-| `zwave/bridge/response/<name>` | out | no | the answer to a request |
-| `zwave/nodes/<id>` | out | yes | the node record |
-| `zwave/nodes/<id>/status` | out | yes | `alive`, `awake`, `asleep`, `dead` or `unknown`, plain text |
-| `zwave/nodes/<id>/<value>` | out | yes | one value |
-| `zwave/nodes/<id>/<value>/set` | in | | set a writable value |
-| `zwave/nodes/<id>/route` | out | yes | how the last frame from the node arrived |
-| `zwave/nodes/<id>/command` | out | no | commands the node sends, such as button presses |
-| `zwave/nodes/<id>/parameters` | out | yes | its configuration parameters, from its device file (since 0.2.0) |
+Bridge topics are `zwave/bridge/state`, `info` and `event`, and requests and
+responses under `zwave/bridge/request/<name>` and
+`zwave/bridge/response/<name>`. Each node has `zwave/nodes/<id>` for its
+record, `/status`, one retained topic per value with `/set` beside it for
+the writable ones, `/route`, `/command` for the commands it sends, and
+`/parameters` from its device file.
 
 `<id>` is the node id, a number. Network keys are never published.
 
@@ -65,21 +60,11 @@ region.
 { "event": "node_added", "node": 5 }
 ```
 
-| `event` | Other fields |
-|---|---|
-| `inclusion_started`, `inclusion_stopped` | |
-| `exclusion_started`, `exclusion_stopped` | |
-| `node_added`, `node_removed` | `node` |
-| `grant_security_classes` | `node`, `requested`: the classes it asks for; answer with `grant` |
-| `validate_dsk` | `node`, `dsk` with the PIN hidden; answer with `validate_dsk` |
-| `security_bootstrapped` | `node`, `classes` granted |
-| `security_failed` | `node`, `reason` |
-| `interview_stage` | `node`, `stage` |
-| `interview_completed` | `node` |
-| `interview_failed` | `node`, `reason` |
-| `firmware_update_progress` | `node`, `sent`, `total` fragments (since 0.2.0) |
-| `firmware_update_finished` | `node`, `status`, `success` (since 0.2.0) |
-| `provisioning_changed` | `entries`, the SmartStart list |
+`event` names what happened; the other fields depend on it. Two events ask
+for an answer during an S2 inclusion: `grant_security_classes`, answered
+with the `grant` request, and `validate_dsk`, answered with the
+`validate_dsk` request. See [Including devices](/zwave-bridge/inclusion.html). The
+[reference](/zwave-bridge/mqtt-reference.html) lists every event and its fields.
 
 ## Requests and responses
 
@@ -95,27 +80,17 @@ or `"ok": false` and an `error`:
 Put a `transaction` value in a request to have it copied into the response
 (since 0.2.0), so you can match answers to questions.
 
-An empty payload is the same as `{}`. Requests that wait for a device
-(inclusion, a firmware update) answer when they finish.
+An empty payload is the same as `{}`. A payload that is not JSON, or a field
+of the wrong type, is answered with `"ok": false` and an `error` naming the
+request. Requests that wait for a device (inclusion, a firmware update)
+answer when they finish.
 
-| Request | Fields | Response |
-|---|---|---|
-| `include` | `strategy`, `classes`, `pin`, `timeout` (all optional; see [Including devices](/zwave-bridge/inclusion.html)) | `node`, `security`, `security_error` |
-| `exclude` | `timeout` (optional) | `node` (`null` for a device from another network) |
-| `stop` | | `ok`: whether an inclusion or exclusion was running |
-| `grant` | `classes` | `ok` |
-| `validate_dsk` | `pin` | `ok` |
-| `provision` | `qr`, or `dsk` with optional `classes` and `name` | `dsk` |
-| `unprovision` | `dsk` | `removed` |
-| `provisioning_list` | | `entries`: `dsk`, `classes`, `node`, `name`, `active` |
-| `reinterview` | `node` | |
-| `remove_failed` | `node` | `node` |
-| `rename` | `node`, `name`, `location` | |
-| `topology` | | `controller`, `nodes`: `id`, `neighbors`, `route`, `rssi`, `listening` |
-| `backup` | | `file`, `bytes` |
-| `restore` | `file` (since 0.2.0) | `file`, `restart` |
-| `firmware_update` | `node`, `file`, `target` (since 0.2.0) | `node`, `status`, `success`, `wait_time`, `activated` |
-| `configure` | `node`, `settings` (since 0.2.0) | `node` |
+The requests are `include`, `exclude`, `stop`, `grant`, `validate_dsk`,
+`provision`, `unprovision`, `provisioning_list`, `reinterview`,
+`remove_failed`, `rename`, `topology`, `backup`, `restore`,
+`firmware_update` and `configure`. The
+[reference](/zwave-bridge/mqtt-reference.html) gives each one's fields and its response; the
+sections below cover the ones that need more than that.
 
 ### `rename`
 
@@ -170,14 +145,11 @@ mosquitto_pub -t zwave/bridge/request/configure -m '{"node": 5, "settings": {"3"
 
 ### `nodes/<id>`
 
-The node record, retained: its protocol information (listening or
-sleeping, device classes), interview stage, security classes,
-manufacturer and product ids, firmware version, Z-Wave Plus information,
-endpoints and their command classes, wake-up interval, neighbors, name,
-location, DSK, and `status`. With a device file (since 0.2.0), `device`
-names it: `{"file", "manufacturer", "label", "description", "endpoints"}`.
-`endpoints` names a multi-channel device's channels as its device file does,
-`{"1": "Relay 1", "2": "Relay 2"}` (unreleased; `{}` when the file names none).
+The node record, retained: what the interview found and what people named
+it, with its `status`. With a device file (since 0.2.0), `device` names the
+device and, for a multi-channel device, its channels, as
+`{"1": "Relay 1", "2": "Relay 2"}` (`endpoints`, unreleased). The
+[reference](/zwave-bridge/mqtt-reference.html) lists every field.
 
 ### `nodes/<id>/<value>`
 
@@ -185,27 +157,27 @@ Every value a node reports is a retained topic of its own. The value's
 path is `<command class>/<property>`, with `/<endpoint>` added for endpoints
 other than 0:
 
-| Topic | Example payload |
-|---|---|
-| `zwave/nodes/2/binary_switch/current` | `{"value": true, "label": "Switch", "time": 1795137000000}` |
-| `zwave/nodes/4/multilevel_switch/current` | `{"value": 42, "label": "Level", "time": 1795137000000}` |
-| `zwave/nodes/3/multilevel_sensor/air_temperature` | `{"value": 23.5, "unit": "°C", "label": "Air temperature", "time": 1795137000000}` |
-| `zwave/nodes/3/notification/home_security_motion_sensor_status` | `{"value": 8, "state": "Motion detection", "label": "Home Security Motion sensor status", "time": 1795137000000}` |
-| `zwave/nodes/3/battery/level` | `{"value": 90, "unit": "%", "label": "Battery", "time": 1795137000000}` |
+```json
+{ "time": 1795137000000, "label": "Air temperature", "value": 23.5, "unit": "°C" }
+```
 
-`time` is when the bridge received it, in Unix milliseconds. `unit` is
-present when the value has one; `state` names an enumerated value.
+That is `zwave/nodes/3/multilevel_sensor/air_temperature`. A switch's value
+is `true` or `false`, a dimmer's a level from 0 to 99, and a notification's
+the event's id with its name in `state`, as on
+`zwave/nodes/3/notification/home_security_motion_sensor_status`:
+
+```json
+{ "time": 1795137000000, "label": "Home Security Motion sensor status", "value": 8, "state": "Motion detection" }
+```
+
+`time` is when the bridge received it, in Unix milliseconds.
 
 ### `nodes/<id>/<value>/set`
 
-Set a writable value (switches and dimmers):
-
-| Payload | Binary Switch | Multilevel Switch |
-|---|---|---|
-| `ON`, `TRUE` | on | on at the last level (255) |
-| `OFF`, `FALSE` | off | off (0) |
-| a number | on unless 0 | that level, 0 to 99 |
-| `{"value": ...}` | as above | as above |
+Set a writable value (switches and dimmers). `ON` or `TRUE` turns a
+switch on and a dimmer on at its last level; `OFF` or `FALSE` turns either
+off; a number turns a switch on unless it is 0 and sets a dimmer to that
+level, 0 to 99. The value can also come as `{"value": ...}`.
 
 ```sh
 mosquitto_pub -t zwave/nodes/2/binary_switch/current/set -m ON

@@ -23,6 +23,11 @@ path = "src/main.rs"
 ## Derive a JSON Schema for the configuration, from which the docs' configuration
 ## reference is generated (tests/config_reference.rs).
 schema = ["dep:schemars"]
+## Docs tooling, not API: derive JSON Schemas and AsyncAPI messages for the MQTT
+## payloads (src/api.rs), from which the docs' MQTT reference is generated
+## (tests/asyncapi.rs). It may change in any release; default builds, release
+## binaries and cross builds never turn it on.
+unstable-asyncapi-docs = ["dep:schemars", "dep:asyncapi-rust"]
 
 [dependencies]
 zwave-host.workspace = true
@@ -38,6 +43,7 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
 lexopt = "0.3"
 schemars = { version = "1", optional = true, features = ["preserve_order"] }
+asyncapi-rust = { version = "0.5", optional = true }
 anyhow = "1"
 
 [dev-dependencies]
@@ -48,6 +54,10 @@ tempfile = "3"
 [[test]]
 name = "config_reference"
 required-features = ["schema"]
+
+[[test]]
+name = "asyncapi"
+required-features = ["unstable-asyncapi-docs"]
 
 [lints]
 workspace = true

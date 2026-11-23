@@ -1,8 +1,9 @@
 # Checks what the README and the docs site claim, and publishes the site.
 #
 #   reference   the configuration reference and its JSON Schema match the
-#               configuration types; every doctest passes, the README's
-#               library example among them
+#               configuration types; the MQTT reference (AsyncAPI) matches
+#               the payload types in src/api.rs and is valid AsyncAPI; every
+#               doctest passes, the README's library example among them
 #   quickstart  the README's quick start, run as written: download the
 #               latest release and check its sum, then the release binary
 #               and this commit's build against the simulator and a broker
@@ -40,6 +41,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: The configuration reference is generated from the code
         run: cargo test -p zwave-bridge --features schema --test config_reference
+      - name: The MQTT reference is generated from the payload types
+        run: cargo test -p zwave-bridge --features unstable-asyncapi-docs --test asyncapi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The MQTT reference is valid AsyncAPI
+        env:
+          ASYNCAPI_CLI: '@asyncapi/cli@6.3.1'
+        run: |
+          set -euo pipefail
+          npx --yes "${ASYNCAPI_CLI}" config analytics --disable
+          npx --yes "${ASYNCAPI_CLI}" validate docs/public/asyncapi.json --fail-severity=warn
       - name: Doctests, including the README's library example
         run: cargo test --workspace --doc
 

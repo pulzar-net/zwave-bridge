@@ -20,7 +20,7 @@ export default defineConfig({
 			description: 'A Z-Wave controller stack and Z-Wave to MQTT bridge in Rust.',
 			plugins: pulzarPlugins({
 				project: 'zwave-bridge',
-				linkExclude: ['/zwave-bridge/api/**', '/zwave-bridge/config.schema.json'],
+				linkExclude: ['/zwave-bridge/api/**', '/zwave-bridge/config.schema.json', '/zwave-bridge/asyncapi.json'],
 			}),
 			sidebar,
 		}),

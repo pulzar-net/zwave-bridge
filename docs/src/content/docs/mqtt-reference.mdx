@@ -1,0 +1,15 @@
+---
+title: MQTT reference
+description: Every topic, operation and payload of the bridge's MQTT API, generated from the bridge's own types.
+tableOfContents: false
+---
+
+import AsyncApiReference from '@pulzr/docs-theme/components/AsyncApiReference.astro';
+
+Every topic the bridge publishes or subscribes to, with its QoS, retain flag
+and payload schema. It is generated from the bridge's message types as an
+[AsyncAPI 3.0 document](/zwave-bridge/asyncapi.json), and CI fails if the
+two disagree. [MQTT API](/zwave-bridge/mqtt.html) explains how the topics work
+together.
+
+<AsyncApiReference spec="/zwave-bridge/asyncapi.json" />

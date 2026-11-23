@@ -1,6 +1,6 @@
 //! Home Assistant MQTT discovery configs for values.
 
-use serde_json::{json, Value as Json};
+use crate::api::{DiscoveryConfig, DiscoveryDevice};
 use zwave_host::{NodeRecord, ValueKind, ValueUpdate};
 
 /// A discovery config: the topic to publish it on and its body.
@@ -8,9 +8,8 @@ pub struct Discovery {
     /// `<prefix>/<component>/<node id>/<object id>/config`.
     pub topic: String,
     /// The config.
-    pub config: Json,
+    pub config: DiscoveryConfig,
 }
-
 fn object_id(key: &str) -> String {
     key.replace('/', "_")
 }
@@ -73,108 +72,104 @@ pub fn for_value(
     let state_topic = format!("{base}/nodes/{}/{key}", v.id.node);
     let device_id = format!("zwave_{home_id:08x}_{}", v.id.node);
     let unique_id = format!("{device_id}_{}", object_id(&key));
-    let mut device = json!({
-        "identifiers": [device_id],
-        "name": node.name.clone().unwrap_or_else(|| format!("Z-Wave node {}", v.id.node)),
-        "via_device": format!("zwave_{home_id:08x}_controller"),
-    });
+    let mut device = DiscoveryDevice {
+        identifiers: vec![device_id.clone()],
+        name: node
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("Z-Wave node {}", v.id.node)),
+        via_device: format!("zwave_{home_id:08x}_controller"),
+        ..Default::default()
+    };
     if let Some(m) = node.manufacturer {
-        device["manufacturer"] = json!(format!("{:#06x}", m.manufacturer_id));
-        device["model"] = json!(format!("{:#06x}:{:#06x}", m.product_type, m.product_id));
+        device.manufacturer = Some(format!("{:#06x}", m.manufacturer_id));
+        device.model = Some(format!("{:#06x}:{:#06x}", m.product_type, m.product_id));
     }
     if let Some(d) = device_cfg {
         if node.name.is_none() {
-            device["name"] = json!(format!("{} {}", d.manufacturer, d.label).trim().to_string());
+            device.name = format!("{} {}", d.manufacturer, d.label).trim().to_string();
         }
-        device["manufacturer"] = json!(d.manufacturer);
-        device["model"] = json!(d.label);
+        device.manufacturer = Some(d.manufacturer.clone());
+        device.model = Some(d.label.clone());
     }
-    if let Some(fw) = &node.firmware {
-        device["sw_version"] = json!(fw);
-    }
-    if let Some(loc) = &node.location {
-        device["suggested_area"] = json!(loc);
-    }
-    let mut c = json!({
-        "name": v.label,
-        "unique_id": unique_id,
-        "object_id": unique_id,
-        "state_topic": state_topic,
-        "availability_topic": format!("{base}/bridge/state"),
-        "device": device,
-    });
+    device.sw_version = node.firmware.clone();
+    device.suggested_area = node.location.clone();
+    let mut c = DiscoveryConfig {
+        name: v.label.clone(),
+        unique_id: unique_id.clone(),
+        object_id: unique_id,
+        state_topic: state_topic.clone(),
+        availability_topic: format!("{base}/bridge/state"),
+        device,
+        ..Default::default()
+    };
+    let s = |t: &str| Some(t.to_string());
     let set = format!("{state_topic}/set");
     let component = match (v.id.cc, &v.value) {
         (0x25, _) => {
-            c["command_topic"] = json!(set);
-            c["value_template"] = json!("{{ 'ON' if value_json.value else 'OFF' }}");
-            c["payload_on"] = json!("ON");
-            c["payload_off"] = json!("OFF");
+            c.command_topic = Some(set);
+            c.value_template = s("{{ 'ON' if value_json.value else 'OFF' }}");
+            c.payload_on = s("ON");
+            c.payload_off = s("OFF");
             "switch"
         }
         (0x26, _) => {
-            c["command_topic"] = json!(set);
-            c["state_value_template"] = json!("{{ 'ON' if value_json.value > 0 else 'OFF' }}");
-            c["brightness_state_topic"] = json!(state_topic);
-            c["brightness_value_template"] = json!("{{ [value_json.value, 99] | min }}");
-            c["brightness_command_topic"] = json!(set);
-            c["brightness_scale"] = json!(99);
-            c["on_command_type"] = json!("brightness");
-            c["payload_on"] = json!("ON");
-            c["payload_off"] = json!("OFF");
+            c.command_topic = Some(set.clone());
+            c.state_value_template = s("{{ 'ON' if value_json.value > 0 else 'OFF' }}");
+            c.brightness_state_topic = Some(state_topic);
+            c.brightness_value_template = s("{{ [value_json.value, 99] | min }}");
+            c.brightness_command_topic = Some(set);
+            c.brightness_scale = Some(99);
+            c.on_command_type = s("brightness");
+            c.payload_on = s("ON");
+            c.payload_off = s("OFF");
             "light"
         }
         (0x20, _) | (0x70, _) => return None,
         (_, ValueKind::Bool(_)) => {
-            c["value_template"] = json!("{{ 'ON' if value_json.value else 'OFF' }}");
-            if let Some(dc) = binary_class(&v.id.property) {
-                c["device_class"] = json!(dc);
-            }
+            c.value_template = s("{{ 'ON' if value_json.value else 'OFF' }}");
+            c.device_class = binary_class(&v.id.property).map(String::from);
             if v.id.cc == 0x80 {
-                c["entity_category"] = json!("diagnostic");
+                c.entity_category = s("diagnostic");
             }
             "binary_sensor"
         }
         (0x71, ValueKind::State { .. }) => match binary_class(&v.id.property) {
             Some(dc) => {
-                c["value_template"] = json!("{{ 'ON' if value_json.value != 0 else 'OFF' }}");
-                c["device_class"] = json!(dc);
+                c.value_template = s("{{ 'ON' if value_json.value != 0 else 'OFF' }}");
+                c.device_class = s(dc);
                 "binary_sensor"
             }
             None => {
-                c["value_template"] = json!("{{ value_json.state }}");
+                c.value_template = s("{{ value_json.state }}");
                 "sensor"
             }
         },
         (_, ValueKind::Number(_) | ValueKind::Level(_)) => {
-            c["value_template"] = json!("{{ value_json.value }}");
-            if let Some(u) = v.unit {
-                c["unit_of_measurement"] = json!(ha_unit(u));
-            }
+            c.value_template = s("{{ value_json.value }}");
+            c.unit_of_measurement = v.unit.map(|u| ha_unit(u).to_string());
             if v.id.cc == 0x32 {
-                match v.unit {
+                c.device_class = match v.unit {
                     Some("kWh") => {
-                        c["device_class"] = json!("energy");
-                        c["state_class"] = json!("total_increasing");
+                        c.state_class = s("total_increasing");
+                        s("energy")
                     }
-                    Some("W") => c["device_class"] = json!("power"),
-                    Some("V") => c["device_class"] = json!("voltage"),
-                    Some("A") => c["device_class"] = json!("current"),
-                    Some("m³") => c["device_class"] = json!("gas"),
-                    _ => {}
-                }
-                if c.get("state_class").is_none() {
-                    c["state_class"] = json!("measurement");
+                    Some("W") => s("power"),
+                    Some("V") => s("voltage"),
+                    Some("A") => s("current"),
+                    Some("m³") => s("gas"),
+                    _ => None,
+                };
+                if c.state_class.is_none() {
+                    c.state_class = s("measurement");
                 }
             } else if v.id.cc == 0x80 {
-                c["device_class"] = json!("battery");
-                c["entity_category"] = json!("diagnostic");
-                c["state_class"] = json!("measurement");
+                c.device_class = s("battery");
+                c.entity_category = s("diagnostic");
+                c.state_class = s("measurement");
             } else {
-                if let Some(dc) = sensor_class(&v.id.property) {
-                    c["device_class"] = json!(dc);
-                }
-                c["state_class"] = json!("measurement");
+                c.device_class = sensor_class(&v.id.property).map(String::from);
+                c.state_class = s("measurement");
             }
             "sensor"
         }
@@ -226,9 +221,9 @@ mod tests {
             d.topic,
             "homeassistant/sensor/zwave_c0ffee01_4/multilevel_sensor_air_temperature/config"
         );
-        assert_eq!(d.config["device_class"], "temperature");
+        assert_eq!(d.config.device_class.as_deref(), Some("temperature"));
         assert_eq!(
-            d.config["state_topic"],
+            d.config.state_topic,
             "zwave/nodes/4/multilevel_sensor/air_temperature"
         );
         let d = for_value(
@@ -249,7 +244,7 @@ mod tests {
         )
         .unwrap();
         assert!(d.topic.starts_with("ha/binary_sensor/"));
-        assert_eq!(d.config["device_class"], "motion");
+        assert_eq!(d.config.device_class.as_deref(), Some("motion"));
         let d = for_value(
             "ha",
             "zwave",
@@ -260,8 +255,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            d.config["command_topic"],
-            "zwave/nodes/4/binary_switch/current/set"
+            d.config.command_topic.as_deref(),
+            Some("zwave/nodes/4/binary_switch/current/set")
         );
         let d = for_value(
             "ha",
@@ -272,7 +267,7 @@ mod tests {
             &upd(0x32, "electric_kwh", ValueKind::Number(1.0), Some("kWh")),
         )
         .unwrap();
-        assert_eq!(d.config["state_class"], "total_increasing");
+        assert_eq!(d.config.state_class.as_deref(), Some("total_increasing"));
         assert!(for_value(
             "ha",
             "zwave",

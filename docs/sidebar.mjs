@@ -32,6 +32,10 @@ export default [
 				"slug": "mqtt"
 			},
 			{
+				"label": "MQTT reference",
+				"slug": "mqtt-reference"
+			},
+			{
 				"label": "Home Assistant",
 				"slug": "home-assistant"
 			},

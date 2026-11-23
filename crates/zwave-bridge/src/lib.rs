@@ -2,12 +2,14 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod api;
 pub mod config;
 pub mod discovery;
 
 use anyhow::{Context, Result};
 use config::Config;
 use rumqttc::{AsyncClient, Event as MqttEvent, LastWill, MqttOptions, Packet, QoS};
+use serde::Serialize;
 use serde_json::{json, Value as Json};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -15,8 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use zwave_host::{
-    Controller, Event, GrantPolicy, HostConfig, InclusionOptions, NetworkKeys, NodeStatus,
-    SecurityClass, ValueId, ValueKind,
+    Controller, Event, GrantPolicy, HostConfig, InclusionOptions, NetworkKeys, ValueId, ValueKind,
 };
 use zwave_security::provisioning::Entry;
 use zwave_serial::port::Port;
@@ -79,28 +80,6 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-fn status_name(s: NodeStatus) -> &'static str {
-    match s {
-        NodeStatus::Unknown => "unknown",
-        NodeStatus::Alive => "alive",
-        NodeStatus::Awake => "awake",
-        NodeStatus::Asleep => "asleep",
-        NodeStatus::Dead => "dead",
-    }
-}
-
-fn class_names(c: &[SecurityClass]) -> Vec<&'static str> {
-    c.iter().map(|c| c.name()).collect()
-}
-
-fn parse_classes(v: &Json) -> Vec<SecurityClass> {
-    let names: Vec<String> = serde_json::from_value(v.clone()).unwrap_or_default();
-    SecurityClass::HIGHEST_FIRST
-        .into_iter()
-        .filter(|c| names.iter().any(|n| n == c.name()))
-        .collect()
-}
-
 enum FromMqtt {
     Connected,
     Message(String, Vec<u8>),
@@ -115,9 +94,7 @@ struct Bridge {
     mqtt: AsyncClient,
     base: String,
     discovered: HashMap<u16, HashSet<String>>,
-    responses: mpsc::Sender<(String, Json)>,
-    /// The `transaction` of the request being handled, echoed in its response.
-    transaction: Option<Json>,
+    responses: mpsc::Sender<(String, Vec<u8>)>,
 }
 
 /// Runs the bridge on `port` until `shutdown` completes.
@@ -141,7 +118,7 @@ pub async fn run<P: Port>(
     opts.set_keep_alive(Duration::from_secs(cfg.mqtt.keep_alive.max(5)));
     opts.set_last_will(LastWill::new(
         format!("{base}/bridge/state"),
-        "offline",
+        api::BridgeState::payload(api::Availability::Offline),
         QoS::AtLeastOnce,
         true,
     ));
@@ -186,7 +163,7 @@ pub async fn run<P: Port>(
             }
         }
     });
-    let (rtx, mut rrx) = mpsc::channel::<(String, Json)>(64);
+    let (rtx, mut rrx) = mpsc::channel::<(String, Vec<u8>)>(64);
     let library = cfg.devices.dir.as_ref().map(|d| {
         info!("device library: {}", d.display());
         std::sync::Arc::new(zwave_host::device_config::Library::new(
@@ -204,7 +181,6 @@ pub async fn run<P: Port>(
         base,
         discovered: HashMap::new(),
         responses: rtx,
-        transaction: None,
     };
     for n in b.c.nodes() {
         b.load_device(n.id);
@@ -222,13 +198,13 @@ pub async fn run<P: Port>(
                 None => break,
             },
             r = rrx.recv() => if let Some((action, body)) = r {
-                b.publish_raw(&format!("{}/bridge/response/{action}", b.base), body.to_string().into_bytes(), false).await;
+                b.publish_raw(&format!("{}/bridge/response/{action}", b.base), body, false).await;
             },
             _ = &mut shutdown => break,
             _ = restart.notified() => {
                 // The controller restarted with a restored memory: start over with a fresh host.
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                b.publish_raw(&format!("{}/bridge/state", b.base), b"offline".to_vec(), true).await;
+                b.publish_raw(&format!("{}/bridge/state", b.base), api::BridgeState::payload(api::Availability::Offline), true).await;
                 let _ = b.mqtt.disconnect().await;
                 return Err(anyhow::anyhow!("controller memory restored; restart zwave-bridge"));
             }
@@ -236,7 +212,7 @@ pub async fn run<P: Port>(
     }
     b.publish_raw(
         &format!("{}/bridge/state", b.base),
-        b"offline".to_vec(),
+        api::BridgeState::payload(api::Availability::Offline),
         true,
     )
     .await;
@@ -256,16 +232,22 @@ impl Bridge {
         }
     }
 
-    async fn publish(&self, topic: &str, body: &Json, retain: bool) {
-        if let (Some(t), true) = (&self.transaction, topic.contains("/bridge/response/")) {
-            let mut body = body.clone();
-            body["transaction"] = t.clone();
-            return self
-                .publish_raw(topic, body.to_string().into_bytes(), retain)
-                .await;
+    /// Publishes one of the [`api`] payloads as JSON.
+    async fn publish(&self, topic: &str, body: &impl Serialize, retain: bool) {
+        match serde_json::to_vec(body) {
+            Ok(b) => self.publish_raw(topic, b, retain).await,
+            Err(e) => warn!("serialize {topic}: {e}"),
         }
-        self.publish_raw(topic, body.to_string().into_bytes(), retain)
-            .await;
+    }
+
+    /// Publishes the response to the request being handled.
+    async fn respond(&self, action: &str, body: &impl Serialize) {
+        self.publish(
+            &format!("{}/bridge/response/{action}", self.base),
+            body,
+            false,
+        )
+        .await;
     }
 
     async fn on_connected(&mut self) {
@@ -280,7 +262,7 @@ impl Bridge {
         }
         self.publish_raw(
             &format!("{}/bridge/state", self.base),
-            b"online".to_vec(),
+            api::BridgeState::payload(api::Availability::Online),
             true,
         )
         .await;
@@ -293,40 +275,38 @@ impl Bridge {
 
     async fn publish_info(&self) {
         let i = self.c.info();
-        let body = json!({
-            "home_id": format!("{:08x}", i.home_id),
-            "node_id": i.node_id,
-            "library_version": i.library_version,
-            "library_type": i.library_type,
-            "firmware": i.firmware,
-            "manufacturer_id": i.manufacturer_id,
-            "product_type": i.product_type,
-            "product_id": i.product_id,
-            "chip_type": i.chip_type,
-            "sis": i.sis,
-            "region": i.region,
-            "dsk": self.c.dsk().to_string(),
-            "nodes": i.nodes,
-            "version": env!("CARGO_PKG_VERSION"),
-        });
+        let body = api::BridgeInfo {
+            home_id: format!("{:08x}", i.home_id),
+            node_id: i.node_id,
+            library_version: i.library_version,
+            library_type: i.library_type,
+            firmware: i.firmware,
+            manufacturer_id: i.manufacturer_id,
+            product_type: i.product_type,
+            product_id: i.product_id,
+            chip_type: i.chip_type,
+            sis: i.sis,
+            region: i.region,
+            dsk: self.c.dsk().to_string(),
+            nodes: i.nodes,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        };
         self.publish(&format!("{}/bridge/info", self.base), &body, true)
             .await;
     }
 
     async fn publish_node(&self, node: u16) {
         let Some(rec) = self.c.node(node) else { return };
-        let mut body = serde_json::to_value(&rec).unwrap_or(Json::Null);
-        let status = status_name(self.c.status(node));
-        body["status"] = json!(status);
-        if let Some(d) = self.devices.get(&node) {
-            body["device"] = json!({"file": d.file, "manufacturer": d.manufacturer, "label": d.label, "description": d.description,
-                                    "endpoints": endpoint_labels(d.endpoints.as_ref())});
-        }
+        let body = api::Node::new(
+            &rec,
+            self.c.status(node),
+            self.devices.get(&node).map(|d| d.as_ref()),
+        );
         self.publish(&format!("{}/nodes/{node}", self.base), &body, true)
             .await;
         self.publish_raw(
             &format!("{}/nodes/{node}/status", self.base),
-            status.as_bytes().to_vec(),
+            body.status.as_str().as_bytes().to_vec(),
             true,
         )
         .await;
@@ -354,24 +334,16 @@ impl Bridge {
         let Some(d) = self.devices.get(&node) else {
             return;
         };
-        let params: Vec<Json> = d
-            .params
-            .iter()
-            .map(|p| {
-                json!({"key": p.key, "label": p.label, "description": p.description, "size": p.size, "min": p.min, "max": p.max,
-                       "default": p.default, "unsigned": p.unsigned, "read_only": p.read_only, "unit": p.unit,
-                       "options": p.options.iter().map(|(v, l)| json!({"value": v, "label": l})).collect::<Vec<_>>()})
-            })
-            .collect();
+        let params = api::NodeParameters(d.params.iter().map(api::Parameter::from).collect());
         self.publish(
             &format!("{}/nodes/{node}/parameters", self.base),
-            &json!(params),
+            &params,
             true,
         )
         .await;
     }
 
-    async fn event(&self, body: Json) {
+    async fn event(&self, body: api::BridgeEvent) {
         self.publish(&format!("{}/bridge/event", self.base), &body, false)
             .await;
     }
@@ -382,22 +354,22 @@ impl Bridge {
             Event::Value(v) => {
                 let key = v.id.key();
                 let topic = format!("{}/nodes/{}/{key}", self.base, v.id.node);
-                let mut body = json!({ "time": now_ms(), "label": v.label });
-                match &v.value {
-                    ValueKind::Bool(b) => body["value"] = json!(b),
-                    ValueKind::Number(n) => body["value"] = json!(n),
-                    ValueKind::Level(l) => body["value"] = json!(l),
-                    ValueKind::State { id, label } => {
-                        body["value"] = json!(id);
-                        body["state"] = json!(label);
-                    }
-                }
-                if let Some(u) = v.unit {
-                    body["unit"] = json!(u);
-                }
-                if self.cfg.homeassistant.enabled && !self.discovered.get(&v.id.node).is_some_and(|s| s.contains(&key)) {
+                let body = api::ValueMessage::new(&v, now_ms());
+                if self.cfg.homeassistant.enabled
+                    && !self
+                        .discovered
+                        .get(&v.id.node)
+                        .is_some_and(|s| s.contains(&key))
+                {
                     if let Some(rec) = self.c.node(v.id.node) {
-                        if let Some(d) = discovery::for_value(&self.cfg.homeassistant.discovery_prefix, &self.base, self.c.info().home_id, &rec, self.devices.get(&v.id.node).map(|d| d.as_ref()), &v) {
+                        if let Some(d) = discovery::for_value(
+                            &self.cfg.homeassistant.discovery_prefix,
+                            &self.base,
+                            self.c.info().home_id,
+                            &rec,
+                            self.devices.get(&v.id.node).map(|d| d.as_ref()),
+                            &v,
+                        ) {
                             self.publish(&d.topic, &d.config, true).await;
                         }
                         self.discovered.entry(v.id.node).or_default().insert(key);
@@ -406,48 +378,113 @@ impl Bridge {
                 self.publish(&topic, &body, true).await;
             }
             Event::NodeAdded { node } => {
-                self.event(json!({"event": "node_added", "node": node})).await;
+                self.event(api::BridgeEvent::NodeAdded { node }).await;
                 self.publish_node(node).await;
             }
             Event::NodeRemoved { node } => {
-                self.event(json!({"event": "node_removed", "node": node})).await;
-                self.publish_raw(&format!("{}/nodes/{node}", self.base), vec![], true).await;
-                self.publish_raw(&format!("{}/nodes/{node}/status", self.base), vec![], true).await;
+                self.event(api::BridgeEvent::NodeRemoved { node }).await;
+                self.publish_raw(&format!("{}/nodes/{node}", self.base), vec![], true)
+                    .await;
+                self.publish_raw(&format!("{}/nodes/{node}/status", self.base), vec![], true)
+                    .await;
                 self.discovered.remove(&node);
             }
-            Event::NodeUpdated { node } | Event::NodeStatus { node, .. } => self.publish_node(node).await,
+            Event::NodeUpdated { node } | Event::NodeStatus { node, .. } => {
+                self.publish_node(node).await
+            }
             Event::InterviewCompleted { node } => {
                 self.load_device(node);
                 self.publish_parameters(node).await;
-                self.event(json!({"event": "interview_completed", "node": node})).await;
+                self.event(api::BridgeEvent::InterviewCompleted { node })
+                    .await;
                 self.publish_node(node).await;
             }
-            Event::InterviewFailed { node, reason } => self.event(json!({"event": "interview_failed", "node": node, "reason": reason})).await,
-            Event::InterviewStage { node, stage } => self.event(json!({"event": "interview_stage", "node": node, "stage": stage})).await,
-            Event::InclusionStarted => self.event(json!({"event": "inclusion_started"})).await,
-            Event::InclusionStopped => self.event(json!({"event": "inclusion_stopped"})).await,
-            Event::ExclusionStarted => self.event(json!({"event": "exclusion_started"})).await,
-            Event::ExclusionStopped => self.event(json!({"event": "exclusion_stopped"})).await,
+            Event::InterviewFailed { node, reason } => {
+                self.event(api::BridgeEvent::InterviewFailed { node, reason })
+                    .await
+            }
+            Event::InterviewStage { node, stage } => {
+                self.event(api::BridgeEvent::InterviewStage {
+                    node,
+                    stage: stage.into(),
+                })
+                .await
+            }
+            Event::InclusionStarted => self.event(api::BridgeEvent::InclusionStarted).await,
+            Event::InclusionStopped => self.event(api::BridgeEvent::InclusionStopped).await,
+            Event::ExclusionStarted => self.event(api::BridgeEvent::ExclusionStarted).await,
+            Event::ExclusionStopped => self.event(api::BridgeEvent::ExclusionStopped).await,
             Event::GrantSecurityClasses { node, requested } => {
-                self.event(json!({"event": "grant_security_classes", "node": node, "requested": class_names(&requested)})).await
+                self.event(api::BridgeEvent::GrantSecurityClasses {
+                    node,
+                    requested: api::classes(&requested),
+                })
+                .await
             }
-            Event::ValidateDsk { node, dsk } => self.event(json!({"event": "validate_dsk", "node": node, "dsk": dsk})).await,
-            Event::SecurityBootstrapped { node, classes } => self.event(json!({"event": "security_bootstrapped", "node": node, "classes": class_names(&classes)})).await,
-            Event::SecurityFailed { node, reason } => self.event(json!({"event": "security_failed", "node": node, "reason": reason})).await,
-            Event::Route { node, repeaters, rssi } => {
-                self.publish(&format!("{}/nodes/{node}/route", self.base), &json!({"repeaters": repeaters, "rssi": rssi, "time": now_ms()}), true).await
+            Event::ValidateDsk { node, dsk } => {
+                self.event(api::BridgeEvent::ValidateDsk { node, dsk })
+                    .await
             }
-            Event::Command { node, endpoint, command } => {
-                let body = json!({"endpoint": endpoint, "cc": command.cc(), "command": command.name(), "frame": hex(&command.encode())});
-                self.publish(&format!("{}/nodes/{node}/command", self.base), &body, false).await;
+            Event::SecurityBootstrapped { node, classes } => {
+                self.event(api::BridgeEvent::SecurityBootstrapped {
+                    node,
+                    classes: api::classes(&classes),
+                })
+                .await
+            }
+            Event::SecurityFailed { node, reason } => {
+                self.event(api::BridgeEvent::SecurityFailed { node, reason })
+                    .await
+            }
+            Event::Route {
+                node,
+                repeaters,
+                rssi,
+            } => {
+                let body = api::Route {
+                    repeaters,
+                    rssi,
+                    time: now_ms(),
+                };
+                self.publish(&format!("{}/nodes/{node}/route", self.base), &body, true)
+                    .await
+            }
+            Event::Command {
+                node,
+                endpoint,
+                command,
+            } => {
+                let body = api::NodeCommand {
+                    endpoint,
+                    cc: command.cc(),
+                    command: command.name().to_string(),
+                    frame: hex(&command.encode()),
+                };
+                self.publish(&format!("{}/nodes/{node}/command", self.base), &body, false)
+                    .await;
             }
             Event::FirmwareUpdateProgress { node, sent, total } => {
-                self.event(json!({"event": "firmware_update_progress", "node": node, "sent": sent, "total": total})).await
+                self.event(api::BridgeEvent::FirmwareUpdateProgress { node, sent, total })
+                    .await
             }
-            Event::FirmwareUpdateFinished { node, status, success } => {
-                self.event(json!({"event": "firmware_update_finished", "node": node, "status": status, "success": success})).await
+            Event::FirmwareUpdateFinished {
+                node,
+                status,
+                success,
+            } => {
+                self.event(api::BridgeEvent::FirmwareUpdateFinished {
+                    node,
+                    status,
+                    success,
+                })
+                .await
             }
-            Event::ProvisioningChanged { entries } => self.event(json!({"event": "provisioning_changed", "entries": provisioning_json(&entries)})).await,
+            Event::ProvisioningChanged { entries } => {
+                self.event(api::BridgeEvent::ProvisioningChanged {
+                    entries: api::provisioning(&entries),
+                })
+                .await
+            }
         }
     }
 
@@ -456,12 +493,7 @@ impl Bridge {
             return;
         };
         if let Some(action) = rest.strip_prefix("bridge/request/") {
-            let args: Json = if payload.is_empty() {
-                json!({})
-            } else {
-                serde_json::from_slice(payload).unwrap_or(json!({}))
-            };
-            self.request(action.to_string(), args).await;
+            self.request(action, payload).await;
         } else if let Some(path) = rest
             .strip_prefix("nodes/")
             .and_then(|p| p.strip_suffix("/set"))
@@ -470,318 +502,336 @@ impl Bridge {
         }
     }
 
-    fn respond_later(
+    /// Publishes a response once `fut` gives it, without holding up the bridge.
+    fn respond_later<T: Serialize + Send + 'static>(
         &self,
-        action: String,
-        fut: impl std::future::Future<Output = Json> + Send + 'static,
+        action: &str,
+        fut: impl std::future::Future<Output = T> + Send + 'static,
     ) {
         let tx = self.responses.clone();
-        let transaction = self.transaction.clone();
+        let action = action.to_string();
         tokio::spawn(async move {
-            let mut body = fut.await;
-            if let Some(t) = transaction {
-                body["transaction"] = t;
+            match serde_json::to_vec(&fut.await) {
+                Ok(body) => {
+                    let _ = tx.send((action, body)).await;
+                }
+                Err(e) => warn!("serialize the {action} response: {e}"),
             }
-            let _ = tx.send((action, body)).await;
         });
     }
 
-    async fn request(&mut self, action: String, args: Json) {
-        self.transaction = args.get("transaction").cloned();
-        self.handle_request(action, args).await;
-        self.transaction = None;
+    async fn request(&mut self, action: &str, payload: &[u8]) {
+        let args: Json = if payload.is_empty() {
+            json!({})
+        } else {
+            match serde_json::from_slice(payload) {
+                Ok(j) => j,
+                Err(e) => {
+                    let body =
+                        api::ErrorResponse::new(Err(format!("{action}: not JSON: {e}")), None);
+                    return self.respond(action, &body).await;
+                }
+            }
+        };
+        let transaction = args.get("transaction").cloned();
+        debug!(%action, %args, "request");
+        self.handle_request(action, args, transaction).await;
     }
 
-    async fn handle_request(&mut self, action: String, args: Json) {
-        debug!(%action, %args, "request");
+    async fn handle_request(&mut self, action: &str, args: Json, t: Option<Json>) {
+        // The request's arguments as its type in `api`, or an error response.
+        macro_rules! args {
+            ($ty:ty) => {
+                match serde_json::from_value::<$ty>(args) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        let body = api::ErrorResponse::new(Err(format!("{action}: {e}")), t);
+                        return self.respond(action, &body).await;
+                    }
+                }
+            };
+        }
         let c = self.c.clone();
-        let node = args.get("node").and_then(Json::as_u64).map(|n| n as u16);
-        let reply = |r: Result<Json, String>| match r {
-            Ok(mut j) => {
-                j["ok"] = json!(true);
-                j
-            }
-            Err(e) => json!({"ok": false, "error": e}),
-        };
-        match action.as_str() {
+        let err = |e: zwave_host::Error| e.to_string();
+        match action {
             "include" => {
-                let grant = match args.get("strategy").and_then(Json::as_str) {
-                    Some("requested") => GrantPolicy::Requested,
-                    Some("insecure") => GrantPolicy::Only(vec![]),
-                    _ => match args.get("classes") {
-                        Some(v) => GrantPolicy::Only(parse_classes(v)),
-                        None => GrantPolicy::Ask,
-                    },
+                let a = args!(api::IncludeRequest);
+                let insecure = a.strategy == Some(api::InclusionStrategy::Insecure);
+                let grant = match (a.strategy, &a.classes) {
+                    (Some(api::InclusionStrategy::Requested), _) => GrantPolicy::Requested,
+                    (Some(api::InclusionStrategy::Insecure), _) => GrantPolicy::Only(vec![]),
+                    (None, Some(classes)) => GrantPolicy::Only(api::host_classes(classes)),
+                    (None, None) => GrantPolicy::Ask,
                 };
                 let opts = InclusionOptions {
-                    insecure: args.get("strategy").and_then(Json::as_str) == Some("insecure"),
-                    pin: args
-                        .get("pin")
-                        .and_then(Json::as_str)
+                    insecure,
+                    pin: a
+                        .pin
+                        .as_deref()
                         .and_then(|p| zwave_security::dsk::parse_pin(p).ok()),
                     grant,
-                    timeout: args
-                        .get("timeout")
-                        .and_then(Json::as_u64)
-                        .map(Duration::from_secs),
+                    timeout: a.timeout.map(Duration::from_secs),
                 };
                 self.respond_later(action, async move {
-                    reply(c.include(opts).await.map(|r| json!({"node": r.node, "security": class_names(&r.security), "security_error": r.security_error})).map_err(|e| e.to_string()))
+                    let r = c
+                        .include(opts)
+                        .await
+                        .map_err(err)
+                        .map(|r| api::IncludeData {
+                            node: r.node,
+                            security: api::classes(&r.security),
+                            security_error: r.security_error,
+                        });
+                    api::IncludeResponse::new(r, t)
                 });
             }
             "exclude" => {
-                let t = args
-                    .get("timeout")
-                    .and_then(Json::as_u64)
-                    .map(Duration::from_secs);
+                let a = args!(api::ExcludeRequest);
+                let timeout = a.timeout.map(Duration::from_secs);
                 self.respond_later(action, async move {
-                    reply(
-                        c.exclude(t)
-                            .await
-                            .map(|n| json!({"node": n}))
-                            .map_err(|e| e.to_string()),
-                    )
+                    let r = c
+                        .exclude(timeout)
+                        .await
+                        .map_err(err)
+                        .map(|node| api::ExcludeData { node });
+                    api::ExcludeResponse::new(r, t)
                 });
             }
             "stop" => {
-                let body = json!({"ok": c.stop_inclusion()});
-                self.publish(&format!("{}/bridge/response/stop", self.base), &body, false)
-                    .await;
+                args!(api::StopRequest);
+                let body = api::StopResponse {
+                    ok: c.stop_inclusion(),
+                    data: None,
+                    error: None,
+                    transaction: t,
+                };
+                self.respond(action, &body).await;
             }
             "grant" => {
-                let ok = c.grant_security_classes(parse_classes(
-                    args.get("classes").unwrap_or(&json!([])),
-                ));
-                self.publish(
-                    &format!("{}/bridge/response/grant", self.base),
-                    &json!({"ok": ok}),
-                    false,
-                )
-                .await;
+                let a = args!(api::GrantRequest);
+                let body = api::GrantResponse {
+                    ok: c.grant_security_classes(api::host_classes(&a.classes)),
+                    data: None,
+                    error: None,
+                    transaction: t,
+                };
+                self.respond(action, &body).await;
             }
             "validate_dsk" => {
-                let pin = args
-                    .get("pin")
-                    .and_then(Json::as_str)
+                let a = args!(api::ValidateDskRequest);
+                let pin = a
+                    .pin
+                    .as_deref()
                     .and_then(|p| zwave_security::dsk::parse_pin(p).ok());
-                let ok = c.validate_dsk(pin);
-                self.publish(
-                    &format!("{}/bridge/response/validate_dsk", self.base),
-                    &json!({"ok": ok}),
-                    false,
-                )
-                .await;
+                let body = api::ValidateDskResponse {
+                    ok: c.validate_dsk(pin),
+                    data: None,
+                    error: None,
+                    transaction: t,
+                };
+                self.respond(action, &body).await;
             }
             "provision" => {
-                let entry = if let Some(qr) = args.get("qr").and_then(Json::as_str) {
+                let a = args!(api::ProvisionRequest);
+                let entry = if let Some(qr) = &a.qr {
                     zwave_security::qr::parse(qr)
                         .map(|q| Entry::from_qr(&q))
                         .map_err(|e| e.to_string())
-                } else if let Some(dsk) = args.get("dsk").and_then(Json::as_str) {
+                } else if let Some(dsk) = &a.dsk {
                     dsk.parse()
                         .map_err(|e: zwave_security::Error| e.to_string())
                         .map(|dsk| Entry {
                             dsk,
-                            granted: parse_classes(
-                                args.get("classes")
-                                    .unwrap_or(&json!(["s2_authenticated", "s2_unauthenticated"])),
-                            ),
+                            granted: api::host_classes(a.classes.as_deref().unwrap_or(&[
+                                api::SecurityClass::S2Authenticated,
+                                api::SecurityClass::S2Unauthenticated,
+                            ])),
                             status: Default::default(),
                             node_id: None,
-                            name: args.get("name").and_then(Json::as_str).map(String::from),
+                            name: a.name.clone(),
                         })
                 } else {
                     Err("give \"qr\" or \"dsk\"".to_string())
                 };
                 self.respond_later(action, async move {
-                    match entry {
+                    let r = match entry {
                         Ok(e) => {
                             let dsk = e.dsk.to_string();
-                            reply(
-                                c.provision(e)
-                                    .await
-                                    .map(|_| json!({"dsk": dsk}))
-                                    .map_err(|e| e.to_string()),
-                            )
+                            c.provision(e)
+                                .await
+                                .map_err(err)
+                                .map(|_| api::DskData { dsk })
                         }
-                        Err(e) => reply(Err(e)),
-                    }
+                        Err(e) => Err(e),
+                    };
+                    api::ProvisionResponse::new(r, t)
                 });
             }
             "unprovision" => {
-                let dsk = args
-                    .get("dsk")
-                    .and_then(Json::as_str)
-                    .and_then(|d| d.parse().ok());
+                let a = args!(api::UnprovisionRequest);
+                let dsk = a.dsk.as_deref().and_then(|d| d.parse().ok());
                 self.respond_later(action, async move {
-                    match dsk {
-                        Some(d) => reply(Ok(json!({"removed": c.unprovision(&d).await.is_some()}))),
-                        None => reply(Err("give \"dsk\"".into())),
-                    }
+                    let r = match dsk {
+                        Some(d) => Ok(api::UnprovisionData {
+                            removed: c.unprovision(&d).await.is_some(),
+                        }),
+                        None => Err("give \"dsk\"".to_string()),
+                    };
+                    api::UnprovisionResponse::new(r, t)
                 });
             }
             "provisioning_list" => {
-                let body =
-                    json!({"ok": true, "entries": provisioning_json(&c.provisioning_list())});
-                self.publish(
-                    &format!("{}/bridge/response/provisioning_list", self.base),
-                    &body,
-                    false,
-                )
-                .await;
+                args!(api::ProvisioningListRequest);
+                let entries = api::provisioning(&c.provisioning_list());
+                let body = api::ProvisioningListResponse::new(
+                    Ok(api::ProvisioningListData { entries }),
+                    t,
+                );
+                self.respond(action, &body).await;
             }
             "backup" => {
+                args!(api::BackupRequest);
                 let dir = self.cfg.store.dir.clone();
                 self.respond_later(action, async move {
-                    reply(match c.backup_nvm().await {
+                    let r = match c.backup_nvm().await {
                         Ok(image) => {
                             let path = dir.join(format!("nvm-{}.bin", now_ms() / 1000));
-                            std::fs::write(&path, &image).map(|_| json!({"file": path.display().to_string(), "bytes": image.len()})).map_err(|e| e.to_string())
+                            std::fs::write(&path, &image)
+                                .map(|_| api::BackupData {
+                                    file: path.display().to_string(),
+                                    bytes: image.len(),
+                                })
+                                .map_err(|e| e.to_string())
                         }
                         Err(e) => Err(e.to_string()),
-                    })
+                    };
+                    api::BackupResponse::new(r, t)
                 });
             }
             "reinterview" => {
-                let r = node
+                let a = args!(api::ReinterviewRequest);
+                let r = a
+                    .node
                     .ok_or("give \"node\"".to_string())
-                    .and_then(|n| c.reinterview(n).map_err(|e| e.to_string()));
-                self.publish(
-                    &format!("{}/bridge/response/reinterview", self.base),
-                    &reply(r.map(|_| json!({}))),
-                    false,
-                )
-                .await;
+                    .and_then(|n| c.reinterview(n).map_err(err))
+                    .map(|_| api::Empty {});
+                self.respond(action, &api::ReinterviewResponse::new(r, t))
+                    .await;
             }
             "remove_failed" => {
+                let a = args!(api::RemoveFailedRequest);
                 self.respond_later(action, async move {
-                    match node {
-                        Some(n) => reply(
-                            c.remove_failed_node(n)
-                                .await
-                                .map(|_| json!({"node": n}))
-                                .map_err(|e| e.to_string()),
-                        ),
-                        None => reply(Err("give \"node\"".into())),
-                    }
+                    let r = match a.node {
+                        Some(n) => c
+                            .remove_failed_node(n)
+                            .await
+                            .map_err(err)
+                            .map(|_| api::NodeData { node: n }),
+                        None => Err("give \"node\"".to_string()),
+                    };
+                    api::RemoveFailedResponse::new(r, t)
                 });
             }
             "rename" => {
-                let name = args.get("name").and_then(Json::as_str).map(String::from);
-                let location = args
-                    .get("location")
-                    .and_then(Json::as_str)
-                    .map(String::from);
-                let r = node
+                let a = args!(api::RenameRequest);
+                let r = a
+                    .node
                     .ok_or("give \"node\"".to_string())
-                    .and_then(|n| c.set_name(n, name, location).map_err(|e| e.to_string()));
-                self.publish(
-                    &format!("{}/bridge/response/rename", self.base),
-                    &reply(r.map(|_| json!({}))),
-                    false,
-                )
-                .await;
+                    .and_then(|n| c.set_name(n, a.name, a.location).map_err(err))
+                    .map(|_| api::Empty {});
+                self.respond(action, &api::RenameResponse::new(r, t)).await;
             }
             "restore" => {
                 // A backup the bridge wrote (or the operator put) in the store directory.
-                let file = args.get("file").and_then(Json::as_str).map(String::from);
+                let a = args!(api::RestoreRequest);
                 let dir = self.cfg.store.dir.clone();
                 let restarted = self.restart.clone();
                 self.respond_later(action, async move {
-                    let Some(file) = file
-                        .filter(|f| !f.contains('/') && !f.contains('\\') && !f.starts_with('.'))
-                    else {
-                        return reply(Err(
-                            "\"file\" is a backup's name in the store directory".into()
-                        ));
+                    let r = async {
+                        let file = a
+                            .file
+                            .filter(|f| {
+                                !f.contains('/') && !f.contains('\\') && !f.starts_with('.')
+                            })
+                            .ok_or(
+                                "\"file\" is a backup's name in the store directory".to_string(),
+                            )?;
+                        let image =
+                            std::fs::read(dir.join(&file)).map_err(|e| format!("{file}: {e}"))?;
+                        c.restore_nvm(&image).await.map_err(err)?;
+                        restarted.notify_one();
+                        Ok(api::RestoreData {
+                            file,
+                            restart: true,
+                        })
                     };
-                    let image = match std::fs::read(dir.join(&file)) {
-                        Ok(b) => b,
-                        Err(e) => return reply(Err(format!("{file}: {e}"))),
-                    };
-                    match c.restore_nvm(&image).await {
-                        Ok(()) => {
-                            restarted.notify_one();
-                            reply(Ok(json!({"file": file, "restart": true})))
-                        }
-                        Err(e) => reply(Err(e.to_string())),
-                    }
+                    api::RestoreResponse::new(r.await, t)
                 });
             }
             "firmware_update" => {
                 // Only files the operator put in <store>/firmware, never a path from the network.
+                let a = args!(api::FirmwareUpdateRequest);
                 let dir = self.cfg.store.dir.join("firmware");
-                let file = args.get("file").and_then(Json::as_str).map(String::from);
-                let target = args.get("target").and_then(Json::as_u64).unwrap_or(0) as u8;
                 self.respond_later(action, async move {
-                    let (Some(n), Some(file)) = (node, file) else {
-                        return reply(Err("give \"node\" and \"file\"".into()));
-                    };
-                    if file.contains('/') || file.contains('\\') || file.starts_with('.') {
-                        return reply(Err("\"file\" is a name in the firmware directory".into()));
-                    }
-                    let bytes = match std::fs::read(dir.join(&file)) {
-                        Ok(b) => b,
-                        Err(e) => return reply(Err(format!("{file}: {e}"))),
-                    };
-                    let image = match zwave_host::firmware::read_image(&file, &bytes) {
-                        Ok(i) => i,
-                        Err(e) => return reply(Err(format!("{file}: {e}"))),
-                    };
-                    reply(
-                        c.update_firmware(n, &image, target)
+                    let r = async {
+                        let (Some(n), Some(file)) = (a.node, a.file) else {
+                            return Err("give \"node\" and \"file\"".to_string());
+                        };
+                        if file.contains('/') || file.contains('\\') || file.starts_with('.') {
+                            return Err("\"file\" is a name in the firmware directory".into());
+                        }
+                        let bytes =
+                            std::fs::read(dir.join(&file)).map_err(|e| format!("{file}: {e}"))?;
+                        let image = zwave_host::firmware::read_image(&file, &bytes)
+                            .map_err(|e| format!("{file}: {e}"))?;
+                        let r = c
+                            .update_firmware(n, &image, a.target.unwrap_or(0))
                             .await
-                            .map(|r| json!({"node": n, "status": r.status, "success": r.success(), "wait_time": r.wait_time, "activated": r.activated}))
-                            .map_err(|e| e.to_string()),
-                    )
+                            .map_err(err)?;
+                        Ok(api::FirmwareUpdateData {
+                            node: n,
+                            status: r.status,
+                            success: r.success(),
+                            wait_time: r.wait_time,
+                            activated: r.activated,
+                        })
+                    };
+                    api::FirmwareUpdateResponse::new(r.await, t)
                 });
             }
             "configure" => {
-                let device = node.and_then(|n| self.devices.get(&n).cloned());
-                let settings: Vec<(String, i64)> = args
-                    .get("settings")
-                    .and_then(Json::as_object)
-                    .map(|m| {
-                        m.iter()
-                            .filter_map(|(k, v)| Some((k.clone(), v.as_i64()?)))
-                            .collect()
-                    })
-                    .unwrap_or_default();
+                let a = args!(api::ConfigureRequest);
+                let device = a.node.and_then(|n| self.devices.get(&n).cloned());
+                let settings: Vec<(String, i64)> = a
+                    .settings
+                    .iter()
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_i64()?)))
+                    .collect();
                 self.respond_later(action, async move {
-                    match (node, device) {
-                        (Some(n), Some(d)) => reply(
-                            c.configure(n, &d, &settings)
-                                .await
-                                .map(|_| json!({"node": n}))
-                                .map_err(|e| e.to_string()),
-                        ),
-                        (Some(n), None) => reply(Err(format!("no device file for node {n}"))),
-                        _ => reply(Err("give \"node\" and \"settings\"".into())),
-                    }
+                    let r = match (a.node, device) {
+                        (Some(n), Some(d)) => c
+                            .configure(n, &d, &settings)
+                            .await
+                            .map_err(err)
+                            .map(|_| api::NodeData { node: n }),
+                        (Some(n), None) => Err(format!("no device file for node {n}")),
+                        _ => Err("give \"node\" and \"settings\"".to_string()),
+                    };
+                    api::ConfigureResponse::new(r, t)
                 });
             }
             "topology" => {
+                args!(api::TopologyRequest);
                 self.respond_later(action, async move {
                     for n in c.nodes() {
                         let _ = c.refresh_neighbors(n.id).await;
                     }
-                    let t = c.topology();
-                    let nodes: Vec<Json> = t
-                        .nodes
-                        .iter()
-                        .map(|n| json!({"id": n.id, "neighbors": n.neighbors, "route": n.last_route, "rssi": n.last_rssi, "listening": n.listening}))
-                        .collect();
-                    reply(Ok(json!({"controller": t.controller, "nodes": nodes})))
+                    api::TopologyResponse::new(Ok(c.topology().into()), t)
                 });
             }
             other => {
-                let body = json!({"ok": false, "error": format!("unknown request {other}")});
-                self.publish(
-                    &format!("{}/bridge/response/{other}", self.base),
-                    &body,
-                    false,
-                )
-                .await;
+                let body = api::ErrorResponse::new(Err(format!("unknown request {other}")), t);
+                self.respond(other, &body).await;
             }
         }
     }
@@ -804,32 +854,20 @@ impl Bridge {
         else {
             return;
         };
-        let text = String::from_utf8_lossy(payload).trim().to_string();
-        let json: Option<Json> = serde_json::from_str(&text).ok();
-        let raw = match json.as_ref().and_then(|j| j.get("value")).cloned().or(json) {
-            Some(Json::Bool(b)) => Some(ValueKind::Bool(b)),
-            Some(Json::Number(n)) => n.as_f64().map(|f| {
-                if cc == 0x25 {
-                    ValueKind::Bool(f != 0.0)
-                } else {
-                    ValueKind::Level(f.clamp(0.0, 255.0) as u8)
-                }
-            }),
-            _ => match text.to_ascii_uppercase().as_str() {
-                "ON" | "TRUE" => Some(if cc == 0x25 {
-                    ValueKind::Bool(true)
-                } else {
-                    ValueKind::Level(0xff)
-                }),
-                "OFF" | "FALSE" => Some(if cc == 0x25 {
-                    ValueKind::Bool(false)
-                } else {
-                    ValueKind::Level(0)
-                }),
+        let switch = cc == 0x25;
+        let value = match api::SetRequest::parse(payload).value() {
+            api::SetValue::Bool(b) => Some(ValueKind::Bool(*b)),
+            api::SetValue::Number(f) if switch => Some(ValueKind::Bool(*f != 0.0)),
+            api::SetValue::Number(f) => Some(ValueKind::Level(f.clamp(0.0, 255.0) as u8)),
+            api::SetValue::Text(w) => match w.to_ascii_uppercase().as_str() {
+                "ON" | "TRUE" if switch => Some(ValueKind::Bool(true)),
+                "ON" | "TRUE" => Some(ValueKind::Level(0xff)),
+                "OFF" | "FALSE" if switch => Some(ValueKind::Bool(false)),
+                "OFF" | "FALSE" => Some(ValueKind::Level(0)),
                 _ => None,
             },
         };
-        let Some(value) = raw else {
+        let Some(value) = value else {
             warn!(topic = path, "unreadable set payload");
             return;
         };
@@ -850,42 +888,4 @@ impl Bridge {
 
 fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
-}
-
-fn provisioning_json(entries: &[Entry]) -> Json {
-    Json::Array(
-        entries
-            .iter()
-            .map(|e| json!({"dsk": e.dsk.to_string(), "classes": class_names(&e.granted), "node": e.node_id, "name": e.name, "active": e.status == Default::default()}))
-            .collect(),
-    )
-}
-
-/// A device file's endpoint names, `{"1": "Relay 1", "2": "Relay 2"}`: what a
-/// multi-channel device calls each channel. Endpoints without a label are left
-/// out, so a device file that names none gives `{}`.
-fn endpoint_labels(endpoints: Option<&Json>) -> serde_json::Map<String, Json> {
-    endpoints
-        .and_then(Json::as_object)
-        .map(|eps| {
-            eps.iter()
-                .filter_map(|(ep, e)| Some((ep.clone(), json!(e.get("label")?.as_str()?))))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-#[cfg(test)]
-mod endpoint_label_tests {
-    use super::*;
-
-    #[test]
-    fn names_the_labelled_endpoints() {
-        let file = json!({"0": {"associations": {}}, "1": {"label": "Relay 1"}, "2": {"label": "Relay 2"}});
-        assert_eq!(
-            Json::Object(endpoint_labels(Some(&file))),
-            json!({"1": "Relay 1", "2": "Relay 2"})
-        );
-        assert!(endpoint_labels(None).is_empty());
-    }
 }
