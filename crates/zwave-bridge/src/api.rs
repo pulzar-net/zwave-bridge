@@ -1096,7 +1096,9 @@ pub struct IncludeData {
 
 response!(
     /// The response to `include`, once a device joined or listening timed out.
-    IncludeResponse, IncludeData, "A device is included"
+IncludeResponse,
+    IncludeData,
+    "A device is included"
 );
 
 request!(
@@ -1119,7 +1121,9 @@ pub struct ExcludeData {
 
 response!(
     /// The response to `exclude`.
-    ExcludeResponse, ExcludeData, "A device is excluded"
+ExcludeResponse,
+    ExcludeData,
+    "A device is excluded"
 );
 
 request!(
@@ -1130,7 +1134,9 @@ request!(
 response!(
     /// The response to `stop`: `ok` says whether an inclusion or exclusion
     /// was running.
-    StopResponse, Empty, "Including or excluding stopped"
+StopResponse,
+    Empty,
+    "Including or excluding stopped"
 );
 
 request!(
@@ -1144,7 +1150,9 @@ request!(
 
 response!(
     /// The response to `grant`: `ok` is `false` when no node was waiting.
-    GrantResponse, Empty, "The classes are granted"
+GrantResponse,
+    Empty,
+    "The classes are granted"
 );
 
 request!(
@@ -1160,7 +1168,9 @@ request!(
 response!(
     /// The response to `validate_dsk`: `ok` is `false` when no node was
     /// waiting.
-    ValidateDskResponse, Empty, "The PIN is passed on"
+ValidateDskResponse,
+    Empty,
+    "The PIN is passed on"
 );
 
 request!(
@@ -1189,7 +1199,9 @@ pub struct DskData {
 
 response!(
     /// The response to `provision`.
-    ProvisionResponse, DskData, "The device is provisioned"
+ProvisionResponse,
+    DskData,
+    "The device is provisioned"
 );
 
 request!(
@@ -1211,7 +1223,9 @@ pub struct UnprovisionData {
 
 response!(
     /// The response to `unprovision`.
-    UnprovisionResponse, UnprovisionData, "The device is no longer provisioned"
+UnprovisionResponse,
+    UnprovisionData,
+    "The device is no longer provisioned"
 );
 
 request!(
@@ -1230,7 +1244,9 @@ pub struct ProvisioningListData {
 
 response!(
     /// The response to `provisioning_list`.
-    ProvisioningListResponse, ProvisioningListData, "The provisioning list"
+ProvisioningListResponse,
+    ProvisioningListData,
+    "The provisioning list"
 );
 
 request!(
@@ -1252,7 +1268,9 @@ pub struct BackupData {
 
 response!(
     /// The response to `backup`.
-    BackupResponse, BackupData, "The backup is written"
+BackupResponse,
+    BackupData,
+    "The backup is written"
 );
 
 request!(
@@ -1278,7 +1296,9 @@ pub struct RestoreData {
 
 response!(
     /// The response to `restore`.
-    RestoreResponse, RestoreData, "The backup is restored"
+RestoreResponse,
+    RestoreData,
+    "The backup is restored"
 );
 
 request!(
@@ -1291,7 +1311,9 @@ request!(
 
 response!(
     /// The response to `reinterview`, once the interview is queued.
-    ReinterviewResponse, Empty, "The interview is queued"
+ReinterviewResponse,
+    Empty,
+    "The interview is queued"
 );
 
 request!(
@@ -1306,7 +1328,9 @@ request!(
 
 response!(
     /// The response to `remove_failed`.
-    RemoveFailedResponse, NodeData, "The node is removed"
+RemoveFailedResponse,
+    NodeData,
+    "The node is removed"
 );
 
 request!(
@@ -1324,7 +1348,9 @@ request!(
 
 response!(
     /// The response to `rename`.
-    RenameResponse, Empty, "The node is renamed"
+RenameResponse,
+    Empty,
+    "The node is renamed"
 );
 
 request!(
@@ -1360,7 +1386,9 @@ pub struct FirmwareUpdateData {
 
 response!(
     /// The response to `firmware_update`, once the update ends.
-    FirmwareUpdateResponse, FirmwareUpdateData, "The firmware update ended"
+FirmwareUpdateResponse,
+    FirmwareUpdateData,
+    "The firmware update ended"
 );
 
 request!(
@@ -1379,7 +1407,9 @@ request!(
 
 response!(
     /// The response to `configure`, once every parameter is written.
-    ConfigureResponse, NodeData, "The parameters are set"
+ConfigureResponse,
+    NodeData,
+    "The parameters are set"
 );
 
 request!(
@@ -1436,13 +1466,17 @@ impl From<zwave_host::Topology> for TopologyData {
 
 response!(
     /// The response to `topology`.
-    TopologyResponse, TopologyData, "The mesh"
+TopologyResponse,
+    TopologyData,
+    "The mesh"
 );
 
 response!(
     /// The response to a request the bridge does not know, or one it could
     /// not read; `error` says which.
-    ErrorResponse, Empty, "The request is unknown or unreadable"
+ErrorResponse,
+    Empty,
+    "The request is unknown or unreadable"
 );
 
 // ---------------------------------------------------------------------------
