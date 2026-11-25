@@ -22,7 +22,7 @@ file:
 Download, verify and install (this is the README's quick start; CI runs it):
 
 ```sh
-VERSION=0.2.1
+VERSION=0.2.2
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
