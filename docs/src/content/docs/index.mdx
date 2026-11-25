@@ -4,7 +4,7 @@ description: A Z-Wave controller stack and Z-Wave to MQTT bridge in Rust, as one
 template: splash
 ---
 
-import { Hero, Features, ReleaseDownload, StatusMatrix } from '@pulzr/docs-theme/components';
+import { Hero, Features, ReleaseDownload } from '@pulzr/docs-theme/components';
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 <Hero
@@ -34,22 +34,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 Then follow [getting started](/zwave-bridge/getting-started.html) to include a device, or
 [install it as a service](/zwave-bridge/installation.html).
-
-## Status
-
-zwave-bridge is 0.x: the whole stack is tested in CI against a controller simulator, but no release has been tested on real hardware yet. It is not certified by the Z-Wave Alliance.
-
-<StatusMatrix
-	rows={[
-		{ feature: '500, 700 and 800 series Serial API controllers', status: 'done', note: '0.1.0' },
-		{ feature: 'S2, S0 and SmartStart inclusion; interview; wake-up queues', status: 'done', note: '0.1.0' },
-		{ feature: '22 command classes; Home Assistant discovery; NVM backup', status: 'done', note: '0.1.0' },
-		{ feature: 'Long Range, device firmware updates, Z-Wave JS device files', status: 'done', note: '0.2.0' },
-		{ feature: 'NVM restore, converting between 700 and 800 series', status: 'done', note: '0.2.0' },
-		{ feature: 'Testing on real controllers and devices', status: 'progress' },
-		{ feature: 'Central Scene, Thermostat, Door Lock, Color Switch', status: 'planned' },
-	]}
-/>
 
 ## Where to go next
 

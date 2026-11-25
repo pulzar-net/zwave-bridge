@@ -31,11 +31,9 @@ cover every type and function.
 | understand how it works | [Architecture](/zwave-bridge/architecture.html) |
 | fix a problem | [Troubleshooting and FAQ](/zwave-bridge/troubleshooting.html) |
 
-## Status
+## Versions
 
-zwave-bridge is at 0.x. Everything is tested in CI against a Serial API
-controller simulator, but **no release has been tested on real hardware
-yet**. Pages that describe something only real hardware can confirm say so.
+Pages that describe something tested only against the simulator say so.
 
 Features added after the first release are marked with the version that
 brought them ("since 0.2.0"). The [release notes](https://github.com/pulzar-net/zwave-bridge/releases) list what each

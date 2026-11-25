@@ -84,5 +84,5 @@ Rust version, and every relative link resolves.
 
 ## Real hardware
 
-> Not done yet. Testing on real controllers and devices is the next
-> milestone.
+Tested on a 500 series ZM5304 controller. Anything tested only against
+the simulator is marked as such in these docs.
