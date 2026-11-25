@@ -45,7 +45,7 @@ stops or loses the broker.
   "region": "UsaLongRange",
   "dsk": "36982-35213-13151-10130-14261-37667-55588-29374",
   "nodes": [2, 3],
-  "version": "0.2.1"
+  "version": "0.2.2"
 }
 ```
 
@@ -148,7 +148,7 @@ mosquitto_pub -t zwave/bridge/request/configure -m '{"node": 5, "settings": {"3"
 The node record, retained: what the interview found and what people named
 it, with its `status`. With a device file (since 0.2.0), `device` names the
 device and, for a multi-channel device, its channels, as
-`{"1": "Relay 1", "2": "Relay 2"}` (`endpoints`, unreleased). The
+`{"1": "Relay 1", "2": "Relay 2"}` (`endpoints`, since 0.2.2). The
 [reference](/zwave-bridge/mqtt-reference.html) lists every field.
 
 ### `nodes/<id>/<value>`

@@ -28,33 +28,6 @@ Rust.
 **[Library](#use-it-as-a-library)** |
 **[Releases](https://github.com/pulzar-net/zwave-bridge/releases)**
 
-## Status
-
-zwave-bridge is **0.x and young**. The whole stack is tested in CI against a
-Serial API controller simulator, but **it has not yet been tested on real
-hardware**. Expect rough edges and breaking changes between 0.x releases,
-and back up `keys.json` (see [security](#security)). The project is not
-certified by the Z-Wave Alliance.
-
-| Feature | State |
-|---|---|
-| Serial API controllers: 500, 700 and 800 series | done in 0.1.0 |
-| Inclusion and exclusion; S2 (Unauthenticated, Authenticated, Access Control) with DSK and PIN; S0 | done in 0.1.0 |
-| SmartStart: QR codes and the provisioning list | done in 0.1.0 |
-| Interview with resume, wake-up queues for sleeping devices, node store | done in 0.1.0 |
-| 22 command classes (switches, dimmers, sensors, meters, notifications, configuration, battery, wake up, association and more) | done in 0.1.0 |
-| Supervision, Multi Channel, Transport Service and CRC-16 encapsulation | done in 0.1.0 |
-| Home Assistant MQTT discovery | done in 0.1.0 |
-| NVM backup, routes and topology | done in 0.1.0 |
-| Read-only controller probe (`zwave-bridge probe`) | done in 0.1.0 |
-| Z-Wave Long Range | done in 0.2.0 |
-| Device firmware updates | done in 0.2.0 |
-| Z-Wave JS device configuration files: parameters by name | done in 0.2.0 |
-| NVM restore, converting between 700 and 800 series and SDKs | done in 0.2.0 |
-| Testing on real controllers and devices | in progress |
-| More command classes (Central Scene, Thermostat, Door Lock, Color Switch, ...) | planned |
-| A web frontend | not planned; the bridge is headless by design |
-
 ## Supported hardware
 
 A Z-Wave controller is a USB stick (or module) running Silicon Labs' Serial
@@ -87,7 +60,7 @@ example Mosquitto) that Home Assistant's MQTT integration already uses.
 
 <!-- quickstart:download -->
 ```sh
-VERSION=0.2.1
+VERSION=0.2.2
 ARCH=$(uname -m)   # x86_64 or aarch64
 BASE=https://github.com/pulzar-net/zwave-bridge/releases/download/v$VERSION
 curl -fsSLO "$BASE/zwave-bridge-$ARCH-linux-musl"
@@ -320,8 +293,7 @@ than keeping its own database, so device knowledge is shared, not forked.
 
 ## Roadmap
 
-- **Next:** the first reports from real hardware.
-- **After that:** more command classes: Central Scene, Thermostat (mode and
+- **Next:** more command classes: Central Scene, Thermostat (mode and
   setpoint), Door Lock, Color Switch.
 
 Questions go in [Discussions](https://github.com/pulzar-net/zwave-bridge/discussions); bugs and requests in [issues](https://github.com/pulzar-net/zwave-bridge/issues).

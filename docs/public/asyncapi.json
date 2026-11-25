@@ -2,7 +2,7 @@
   "asyncapi": "3.0.0",
   "info": {
     "title": "zwave-bridge MQTT API",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Everything zwave-bridge publishes and accepts on MQTT.\n\nTopics here use the default base topic, `zwave` (`mqtt.base_topic` in the configuration), and Home Assistant's default discovery prefix, `homeassistant` (`homeassistant.discovery_prefix`). `{node}` is a node id: 2 to 232, or 256 and up for Long Range.\n\nThe bridge publishes and subscribes at QoS 1. Payloads are JSON unless a message says otherwise. Requests go to `zwave/bridge/request/<name>`; the answer comes on `zwave/bridge/response/<name>` with `ok` and the result's fields, or `ok: false` and an `error`, echoing the request's `transaction` so a client can match the two. Network keys never appear on MQTT."
   },
   "servers": {

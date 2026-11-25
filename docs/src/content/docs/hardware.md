@@ -7,7 +7,7 @@ zwave-bridge drives a Z-Wave controller: a USB stick or module running
 Silicon Labs' Serial API firmware, attached over USB serial, a UART, or TCP
 (for example through ser2net).
 
-> **No release has been tested on real hardware yet.** "Expected" below
+> **Tested on** a 500 series ZM5304 controller. "Expected" below
 > means the controller speaks the Serial API the stack implements and the
 > simulator covers it. Reports that something works, or does not, are very
 > welcome: open a
