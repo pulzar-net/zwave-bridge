@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.43.1",
-    "@pulzr/docs-theme": "0.6.1",
-    "@scalar/api-reference": "1.82.1",
+    "@pulzr/docs-theme": "0.6.4",
+    "@scalar/api-reference": "1.83.0",
     "astro": "7.4.13"
   }
 }
